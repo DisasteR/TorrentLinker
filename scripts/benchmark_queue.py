@@ -122,6 +122,14 @@ def main() -> None:
             measurements["unchanged_native_progress"] = [
                 measure(lambda: view._progress(progress)) for _ in range(3)
             ]
+            for i in range(3):
+                # A successful send removes its entry from the queue.
+                store.remove_downloads([str(args.count - 2 - i)])
+                measurements.setdefault("sent_progress", []).append(
+                    measure(lambda: view._progress(progress))
+                )
+                assert view.queue.rowCount() == args.count - i - 1
+                assert view.selected_keys() == selected
             result = {
                 "count": args.count,
                 "python": platform.python_version(),

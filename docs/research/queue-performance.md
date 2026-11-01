@@ -82,8 +82,10 @@ At 12,000 entries, the median status-changing native notification fell from 1,58
 274 ms. An unchanged retry-wait notification fell from 1,537 to 21 ms, again mostly the
 20 ms event-loop drain. Both measurements use three notifications in the same isolated
 benchmark as above. [Raw native-progress measurements](queue-native-progress-2026-10-31.json).
-Successful sends remove entries, so they still require a full table rebuild. These
-measurements do not include an Indexer request or a Torrent Client transfer.
+Successful sends now remove their rows in place instead of rebuilding the table. At
+12,000 entries, the poll after a successful send fell from about 1,450 to 350 ms,
+the same cost as a status change (`sent_progress` in `scripts/benchmark_queue.py`,
+2026-11-01). Adding entries still rebuilds the table. These measurements do not include an Indexer request or a Torrent Client transfer.
 
 The native worker test starts a controlled two-minute rate-limit wait, clicks Pause,
 and requires the worker to finish within two seconds. The item remains queued, the

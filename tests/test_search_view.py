@@ -520,6 +520,31 @@ def test_queue_status_poll_updates_only_status_cells_and_keeps_exact_selection(
     assert view.selected_keys() == selected
 
 
+def test_a_sent_entry_leaves_the_queue_without_rebuilding_the_other_rows(
+    qtbot, tmp_path, monkeypatch
+):
+    store = Store(tmp_path / "state.db")
+    indexer = Indexer("https://c411.org/api", "key")
+    for i in range(3):
+        enqueue(store, indexer, Candidate(f"Fixture {i}", 10**9, f"fixture-{i}", i), tmp_path)
+    view = SearchTab(store, Settings(), lambda: indexer, FakeQbit)
+    qtbot.addWidget(view)
+    view.queue_timer.stop()
+    monkeypatch.setattr(view, "isVisible", lambda: True)
+    view.queue.selectRow(2)
+    selected = view.selected_keys()
+    kept = [view.queue.item(row, 0) for row in range(2)]
+    sent = view.queue.item(0, 0).data(Qt.ItemDataRole.UserRole)
+
+    store.remove_downloads([sent])
+    view._poll_queue()
+
+    assert view.queue.rowCount() == 2
+    assert view.queue.item(0, 0) is kept[1], "The remaining rows were rebuilt"
+    assert view.selected_keys() == selected
+    assert "Download queue (2)" in view.view_queue.text()
+
+
 def test_unchanged_queue_poll_does_not_decode_entries(qtbot, tmp_path, monkeypatch):
     from torrentlinker.gui import search_view
 

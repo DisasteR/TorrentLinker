@@ -1288,18 +1288,23 @@ class SearchTab(QWidget):
         if rows == self._queue_snapshot:
             self._queue_version = version
             return
-        # A send outcome does not change release metadata or Zen estimates. Keep
-        # the displayed items and exact selection instead of rebuilding every row.
-        status_only = len(rows) == len(self._queue_snapshot) and all(
-            row == previous
-            or replace(
-                row,
-                status=previous.status,
-                reason=previous.reason,
-                retry_safe=previous.retry_safe,
+        # A send outcome does not change release metadata or Zen estimates, and a
+        # successful send only removes its entry. Keep the displayed items and exact
+        # selection instead of rebuilding every row.
+        shown = {entry.key: entry for entry in self._queue_snapshot}
+        status_only = all(
+            (previous := shown.get(row.key)) is not None
+            and (
+                row == previous
+                or replace(
+                    row,
+                    status=previous.status,
+                    reason=previous.reason,
+                    retry_safe=previous.retry_safe,
+                )
+                == previous
             )
-            == previous
-            for row, previous in zip(rows, self._queue_snapshot, strict=True)
+            for row in rows
         )
         self._show_queue(rows, status_only=status_only)
         self._queue_version = version
@@ -1328,6 +1333,11 @@ class SearchTab(QWidget):
         self.queue.setSortingEnabled(False)
         if status_only:
             by_key = {entry.key: entry for entry in rows}
+            for row in reversed(range(self.queue.rowCount())):
+                title = self.queue.item(row, 0)
+                assert title is not None
+                if title.data(Qt.ItemDataRole.UserRole) not in by_key:
+                    self.queue.removeRow(row)
             for row in range(self.queue.rowCount()):
                 title = self.queue.item(row, 0)
                 assert title is not None
