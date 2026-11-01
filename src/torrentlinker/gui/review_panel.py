@@ -41,7 +41,7 @@ from torrentlinker.review import (
     CheckedCandidate,
     candidate_key,
     check_candidate,
-    check_candidates,
+    find_candidates,
     remember_candidates,
     unpack_and_reseed,
 )
@@ -366,9 +366,17 @@ class ReviewPanel(QWidget):
         rejections = store.rejections(entry.item.path)
 
         def work() -> list[CheckedCandidate]:
-            found = searcher(entry, override)
+            found, checked = find_candidates(
+                store,
+                indexer,
+                entry.item,
+                lambda: searcher(entry, override),
+                rules,
+                rejections,
+                use_catalogue=override is None,
+            )
             remember_candidates(store, indexer, entry.item.path, found)
-            return check_candidates(indexer, entry.item, found, rules, rejections)
+            return checked
 
         run_in_background(work, lambda checked: self._show(entry, checked), self._failed)
 
@@ -472,6 +480,14 @@ class ReviewPanel(QWidget):
                 + self.tr(
                     "A Match compares file names and sizes. Your Torrent Client must "
                     "verify the hashes before seeding."
+                )
+            )
+        if v is not None and v.candidate.metadata.get("discovery") == "catalogue":
+            self.summary.setText(
+                self.summary.text()
+                + "\n\n"
+                + self.tr(
+                    "Found in the local Catalogue by its exact size, without spending a search."
                 )
             )
         if v is not None and v.candidate.metadata.get("discovery") == "compatible":

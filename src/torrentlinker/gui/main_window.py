@@ -133,7 +133,7 @@ from torrentlinker.review import (
     CheckedCandidate,
     candidate_key,
     check_candidate,
-    check_candidates,
+    find_candidates,
     match_zen,
     remember_candidates,
     remembered_candidates,
@@ -2332,10 +2332,18 @@ class MainWindow(QMainWindow):
         )
 
         def search(entry: LibraryEntry) -> list[CheckedCandidate]:
-            found = searcher(entry, store.item_query(entry.item.path))
+            query = store.item_query(entry.item.path)
+            found, checked = find_candidates(
+                store,
+                indexer,
+                entry.item,
+                lambda: searcher(entry, query),
+                rules,
+                store.rejections(entry.item.path),
+                use_catalogue=query is None,
+            )
             remember_candidates(store, indexer, entry.item.path, found)
-            rejections = store.rejections(entry.item.path)
-            return check_candidates(indexer, entry.item, found, rules, rejections)
+            return checked
 
         self._batch_mode = "search"
         self._begin_library_batch(BatchRunner(entries, search))

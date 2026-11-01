@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS catalogue (
     details_url TEXT NOT NULL,
     seen_at REAL NOT NULL
 );
+-- Exact sizes find Library Candidates without spending a search (catalogue_sized).
+CREATE INDEX IF NOT EXISTS catalogue_by_size ON catalogue(size);
 CREATE TABLE IF NOT EXISTS catalogue_crawl (
     category INTEGER PRIMARY KEY,
     next_offset INTEGER NOT NULL DEFAULT 0,
@@ -792,6 +794,15 @@ class Store:
                 "UPDATE catalogue SET seeders = ? WHERE infohash = ?",
                 [(count, h.lower()) for h, count in counts.items() if count >= 0],
             )
+
+    def catalogue_sized(self, size: int, limit: int = 10) -> list[CatalogueRow]:
+        """Catalogue torrents of exactly this many bytes, best seeded first."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT * FROM catalogue WHERE size = ? ORDER BY seeders DESC LIMIT ?",
+                (size, limit),
+            ).fetchall()
+        return [CatalogueRow(*r) for r in rows]
 
     def catalogue_sizes(self) -> frozenset[int]:
         """Every Catalogue torrent's exact size, to recognise a release folder by size."""

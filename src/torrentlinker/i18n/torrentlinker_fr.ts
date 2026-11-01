@@ -6444,6 +6444,10 @@ Envoi crédité {5} · Téléchargement crédité {6}</translation>
 <context>
     <name>ReviewPanel</name>
     <message>
+        <source>Found in the local Catalogue by its exact size, without spending a search.</source>
+        <translation>Trouvé dans le Catalogue local par sa taille exacte, sans consommer de recherche.</translation>
+    </message>
+    <message>
         <source>Torrent already present</source>
         <translation>Torrent déjà présent</translation>
     </message>

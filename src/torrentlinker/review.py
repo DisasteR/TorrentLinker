@@ -65,6 +65,46 @@ def search_candidates(
     return []
 
 
+def catalogue_candidates(store: Store, indexer: Indexer, item: LocalItem) -> list[Candidate]:
+    """Catalogue torrents of the item's exact size: checked before any search, they cost
+    `.torrent` downloads but none of the hourly search budget."""
+    return [
+        Candidate(
+            r.title,
+            r.size,
+            indexer.unredact(r.download_url),
+            r.seeders,
+            r.infohash,
+            r.details_url,
+            categories=(r.category,) if r.category is not None else (),
+            metadata={"discovery": "catalogue"},
+        )
+        for r in store.catalogue_sized(item.size)
+    ]
+
+
+def find_candidates(
+    store: Store,
+    indexer: Indexer,
+    item: LocalItem,
+    search: Callable[[], list[Candidate]],
+    rules: MatchRules,
+    rejections: Mapping[str, str] = {},
+    *,
+    use_catalogue: bool = True,
+) -> tuple[list[Candidate], list[CheckedCandidate]]:
+    """Candidates and their checks: the Catalogue first, then `search` unless the
+    Catalogue already gave a Full Match. A typed query (`use_catalogue=False`) always
+    searches. Returns every Candidate, to remember, and every check, Catalogue first."""
+    found: list[Candidate] = catalogue_candidates(store, indexer, item) if use_catalogue else []
+    checked = check_candidates(indexer, item, found, rules, rejections)
+    if any(v.match is not None and v.match.is_full for v in checked):
+        return found, checked
+    known = {(c.infohash or "").lower() for c in found if c.infohash}
+    searched = [c for c in search() if not c.infohash or c.infohash.lower() not in known]
+    return found + searched, checked + check_candidates(indexer, item, searched, rules, rejections)
+
+
 def check_candidates(
     indexer: Indexer,
     item: LocalItem,

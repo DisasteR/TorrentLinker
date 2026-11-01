@@ -17,6 +17,11 @@ published beta.28 packages.
 - An episode is Seeded only by a torrent of its own. Inside a seeded pack it shows
   **Orphan · in seeded pack**, so it can also be reseeded as a single episode.
 - The add-folder dialog previews how many Local Items and episodes Automatic finds.
+- Library searches check Catalogue torrents of the item's exact size first, and search
+  c411 only when they give no Full Match or when a search text is typed. On the
+  maintainer's Library, 93% of 11,811 items had such a Catalogue candidate, so a full
+  batch spends a fraction of the 1,200-per-hour search budget. Checking a candidate
+  still downloads its `.torrent`, within the per-key download limit.
 
 ## Responsiveness
 

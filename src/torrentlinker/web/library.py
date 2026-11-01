@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from torrentlinker.domain import ItemState
+from torrentlinker.indexer import Candidate
 from torrentlinker.library import LibraryEntry, LibraryResult, build_library, indexer_contents
 from torrentlinker.paths import MappedQbit, PathMapper
 from torrentlinker.reseed import start_reseed
@@ -17,7 +18,7 @@ from torrentlinker.review import (
     CheckedCandidate,
     candidate_key,
     check_candidate,
-    check_candidates,
+    find_candidates,
     remember_candidates,
     remembered_candidates,
     restore_checked,
@@ -260,25 +261,30 @@ class Library:
 
         entry = self.entry(path)
         item = self.scan_entry(entry, stop)
-        indexer = self.setup.indexer()
-        candidates = search_candidates(
+        indexer, store = self.setup.indexer(), self.setup.store
+
+        def search() -> list[Candidate]:
+            if stop.is_set():
+                return []
+            return search_candidates(
+                indexer,
+                item,
+                entry.folder.kind,
+                self.setup.settings.categories(entry.folder.kind),
+                indexer.supported_modes(),
+            )
+
+        found, checked = find_candidates(
+            store,
             indexer,
             item,
-            entry.folder.kind,
-            self.setup.settings.categories(entry.folder.kind),
-            indexer.supported_modes(),
+            search,
+            self.setup.settings.matching.rules(),
+            store.rejections(item.path),
         )
-        remember_candidates(self.setup.store, indexer, item.path, candidates)
-        result: list[dict] = []
-        rejected = self.setup.store.rejections(item.path)
-        for candidate in candidates:
-            if stop.is_set():
-                break
-            checked = check_candidates(
-                indexer, item, [candidate], self.setup.settings.matching.rules(), rejected
-            )
-            result.extend(self.candidate_row(v, indexer) for v in checked)
-            progress({"done": len(result), "total": len(candidates)})
+        remember_candidates(store, indexer, item.path, found)
+        result = [self.candidate_row(v, indexer) for v in checked]
+        progress({"done": len(result), "total": len(found)})
         return result
 
     def candidate_row(self, checked: CheckedCandidate, indexer) -> dict:
