@@ -182,3 +182,62 @@ def test_a_3d_model_keeps_its_variant_folders(tmp_path: Path) -> None:
         ("B3dserk - Hellboy", "content", ""),
         ("pwmx_files", "content", ""),
     }
+
+
+def test_a_show_folder_of_season_releases_is_a_container(tmp_path: Path) -> None:
+    root = tree(
+        tmp_path / "Séries",
+        "Les 100/The.100.S01.FRENCH.HDTV.XviD-CCS3/The.100.S01E01.avi",
+        "Les 100/The.100.S02.FRENCH.HDTV.XviD-ARK01/The.100.S02E01.avi",
+        "Anime/.7b2cff5a6cce09b8e1e267dff05e28a483da1571.parts/x.mkv",
+    )
+
+    assert {path for path, _, within in found(root, detect_items(root, ContentKind.SERIES))} == {
+        "Les 100/The.100.S01.FRENCH.HDTV.XviD-CCS3",
+        "Les 100/The.100.S01.FRENCH.HDTV.XviD-CCS3/The.100.S01E01.avi",
+        "Les 100/The.100.S02.FRENCH.HDTV.XviD-ARK01",
+        "Les 100/The.100.S02.FRENCH.HDTV.XviD-ARK01/The.100.S02E01.avi",
+    }
+
+
+def test_a_multi_disc_album_is_one_item(tmp_path: Path) -> None:
+    root = tree(
+        tmp_path / "Musique",
+        "Final Fantasy VII OST/CD1/01 - Prelude.wv",
+        "Final Fantasy VII OST/CD2/01 - Aerith.wv",
+        "Scylla/[2011] Thermocline/03 - Titre.mp3",
+        "Scylla/[2009] Immersion/01 - Titre.mp3",
+    )
+
+    assert found(root, detect_items(root, ContentKind.MUSIC)) == {
+        ("Final Fantasy VII OST", "disc", ""),
+        ("Scylla/[2011] Thermocline", "content", ""),
+        ("Scylla/[2009] Immersion", "content", ""),
+    }
+
+
+def test_seeded_roots_are_each_torrent_folder_or_single_file(tmp_path: Path) -> None:
+    from torrentlinker.domain import Torrent
+    from torrentlinker.item_detection import seeded_roots
+
+    torrents = [
+        Torrent("a", "Pack", tmp_path, {"Pack/a.stl": 1, "Pack/Sub/b.stl": 1}),
+        Torrent("b", "Single.rar", tmp_path / "Loose", {"Single.rar": 1}),
+    ]
+
+    assert seeded_roots(torrents) == {tmp_path / "Pack", tmp_path / "Loose" / "Single.rar"}
+
+
+def test_a_seeded_variant_splits_its_pack_and_previews_are_not_items(tmp_path: Path) -> None:
+    root = tree(
+        tmp_path / "STL",
+        "Hellboy/Sculpture (X Pose)/pose.stl",
+        "Hellboy/Sculpture (One Piece) Update/piece.stl",
+        "Hellboy/B3dserk - Hellboy Sculpture (Images) 2024/render.jpg",
+    )
+    seeded = frozenset({root / "Hellboy/Sculpture (X Pose)"})
+
+    assert found(root, detect_items(root, ContentKind.MODEL_3D, seeded_roots=seeded)) == {
+        ("Hellboy/Sculpture (X Pose)", "seeded", ""),
+        ("Hellboy/Sculpture (One Piece) Update", "content", ""),
+    }

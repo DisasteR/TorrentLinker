@@ -56,9 +56,12 @@ children):
 1. **Seeded anchor.** A client torrent's root is this directory, so it is an item. A
    child is a torrent root, so this is a container. `build_library` already maps every
    client file path to its torrent hashes.
-2. **Disc structure.** It contains `BDMV`, `VIDEO_TS` or `AUDIO_TS`, so it is an item.
+2. **Disc structure.** It contains `BDMV`, `VIDEO_TS` or `AUDIO_TS`, or disc folders
+   of a multi-disc album (`CD1`, `Disc 2`, `Disque 1`), so it is an item.
 3. **Catalogue size.** Its total size equals the exact byte size of a Catalogue torrent,
-   so it is an item. Ordinary Library comparison still verifies the files.
+   so it is an item. Ordinary Library comparison still verifies the files. A folder
+   wrapping a single subfolder is skipped: both have the same size, and the inner name
+   is the release.
 4. **Season folder.** Its name parses as a season (`Saison 01`, `Season 1`, `S01`,
    `Show.S01.1080p-GRP`), so it is an item. Its parent show folder is a container, and
    can still be searched as a complete series through the existing combined manifest
@@ -68,8 +71,10 @@ children):
    "one folder per movie" rule. Exceptions: a video folder holding two or more distinct
    releases (different title or year) is a genre container, and a 3D model folder with
    model files anywhere below is one item, variants and parts included.
-6. **Release name.** GuessIt finds release evidence in the name (a year with a title,
-   resolution, source, group, or season or episode), so it is an item.
+6. **Release name.** GuessIt finds a title with release evidence (year, resolution,
+   source, group or season), and content files exist somewhere below, so it is an item.
+   A folder whose subfolders are themselves named releases (`Les 100/The.100.S01…`,
+   `The.100.S02…`) groups them instead and stays a container.
 7. **Otherwise** it is a container: generic names such as `Films`, `4K`, `A-Z` or
    `Collection Nolan`.
 
@@ -79,6 +84,8 @@ series exposes its season folders the same way. Loose episode files are items of
 own. Outside a Series folder an explicit marker (`S01E02`, `S1.EP 01`, `1x02`) is
 required, because GuessIt reads `Star.Wars.Episode.1`, `Episode.50.2011` or a bare
 `1080` (S10E80) as episodes.
+
+Hidden files and folders, such as qBittorrent's `.parts` folders, are ignored.
 
 Apart from episodes, items never overlap: descent stops at the first item. Each detected item records its
 reason, so the interface can explain it ("seeded in qBittorrent", "release name",
@@ -96,12 +103,15 @@ reason, so the interface can explain it ("seeded in qBittorrent", "release name"
 
 ### Risks and open questions
 
-- A show folder holding loose episode files directly (no season folders) is detected
-  as one item by rule 5, which matches a complete-series or single-season pack. Episode
-  splitting stays out of scope, as in qui.
-- Music: an artist folder of album folders is a container; an album folder with audio
-  files is an item (rule 5). Multi-disc albums (`CD1/`, `CD2/`) need a rule like the
-  disc structures.
+- A show folder holding loose episode files directly (no season folders) is one pack
+  item by rule 5, with each episode as an item too. When the episodes come from
+  different releases (`charmed/` mixes groups), the pack item will not match a torrent;
+  only the episodes can.
+- Sample packs and genre folders have the same shape (`Drum/Kicks/*.wav`,
+  `Trance/adja/ADJA 2/*.mp3`). Detection splits both into their album-level folders.
+  Only a seeded root, a Catalogue size or a user override can keep a sample pack whole.
+- Files of another kind are skipped: a soundtrack in a movie Library Folder is not an
+  item, while a depth scan would list it.
 - Rule 3 depends on how complete the Catalogue crawl is. It only confirms; it never
   splits.
 - Deeper walking costs extra directory listings only at container levels; item
@@ -112,29 +122,77 @@ reason, so the interface can explain it ("seeded in qBittorrent", "release name"
 ## Prototype results (2026-11-01)
 
 `torrentlinker.item_detection.detect_items` implements the rules above as a read-only
-function; it is not wired into scanning. `tests/test_item_detection.py` covers mixed
-movie layouts, season packs with episodes, complete series, music, seeded and Catalogue
-anchors, genre folders and 3D variant packs.
+function; it is not wired into scanning. `seeded_roots` turns client torrents (after
+Path Mapping) into the roots rule 1 needs. `tests/test_item_detection.py` covers each
+layout below with fixture trees.
 
-`scripts/compare_item_detection.py` compares it with the depth scan on the configured
-Library Folders, using Catalogue sizes but no Torrent Client (so rule 1 was not
-exercised). On the maintainer's Library:
+`scripts/compare_item_detection.py` compares detection with the depth scan, on the
+configured Library Folders or on any `--folder PATH:KIND[:DEPTH]`, using Catalogue sizes.
+On the maintainer's disks:
 
-| Library Folder | Depth scan | Detected | Differences |
-|---|---|---|---|
-| 3D models, depth 1 | 65 | 65 | none |
-| Movies, depth 1 | 60 | 60 | none |
-| Mixed movies, depth 2 | 196 | 188 + 45 episodes | 14, all improvements |
+| Folder | Files | Depth scan | Detected | Differences |
+|---|---|---|---|---|
+| 3D models, depth 1 | 1,795 | 65 | 65 | none |
+| Movies, depth 1 | 72 | 60 | 60 | none |
+| Mixed movies, depth 2 | 339 | 196 | 187 + 45 episodes | all improvements |
+| Series, depth 1 | 18 | 2 | 2 + 13 episodes | none |
+| Mixed series, depth 2 | 295 | 42 | 15 + 241 episodes and seasons | all improvements |
+| Ebooks, depth 1 | 14,379 | 10,953 | 10,945 | 8 empty folders and audiobooks |
+| Music, depth 1 | 49,089 | 80 | 204 | sample pack split, see risks |
 
-On the mixed folder, depth 2 split three release folders into their files and listed
-`.srt`, `.nfo`, `.torrent` and `.pdf` files as items; detection keeps the releases whole
-and skips support files. It also found four Monty Python season packs and their 45
-episodes inside the movie folder. Catalogue sizes identified 24 items. The first runs
-exposed the genre-folder, 3D-variant, slice-format and movie-title-episode cases, now
-fixed and covered by tests.
+- **Movies:** depth 2 split three release folders into their files and listed `.srt`,
+  `.nfo`, `.torrent` and `.pdf` files as items. Detection keeps the releases whole,
+  skips support files, and finds four Monty Python season packs with 45 episodes.
+- **Series:** depth 2 split three season packs (`Les 100/The.100.S01…`) into episodes
+  and listed qBittorrent's hidden `.parts` folder. Detection finds every season pack,
+  `Futurama saisons 1 à 6 + films` as one pack with its seasons, and every episode,
+  whether a loose file, a file in a season folder or a release folder.
+- **Music:** artist folders split into albums (`Scylla/[2011] Thermocline`), and a
+  four-disc soundtrack (`CD1`–`CD4`) stays one item. The `Drum` sample pack splits into
+  144 kit folders.
+- **Catalogue sizes** identified 967 items across the folders, including the real
+  torrent root inside a wrapper folder.
 
-Not yet measured: libraries with Series, music or ebooks, network shares, and timing on
-large trees (the Catalogue rule walks each candidate folder once to sum its size).
+### Seeded rule
+
+A throwaway qBittorrent 5.2.4 container (the local image, listening on 127.0.0.1 only)
+mounted the 3D model folder read-only at `/data/STL`. Three real items were hashed and
+added stopped: a folder, a model folder, and one variant two levels inside a pack. The
+app's `MappedQbit` translated the client's `/data/STL` paths back to the host view, and
+`seeded_roots` gave the three roots. Detection marked them seeded and split the pack
+around the seeded variant, its siblings becoming items of their own. The run also showed
+that an image-only `(Images)` folder passed the release-name rule; rule 6 now requires
+content below. The user's own Torrent Client was never contacted.
+
+### Network shares and timing
+
+No SMB or NFS share was available without root, so filesystem calls were counted
+instead; each uncached metadata call is about one network round trip. Detection lists
+each visited folder once with `os.scandir`, whose entries carry their type, and does not
+stat files except to sum sizes for the Catalogue rule.
+
+| Folder | Depth scan calls | Detection calls |
+|---|---|---|
+| Mixed movies | 495 | 122 |
+| Mixed series | 370 | 68 |
+| Music | 53,790 | 251 |
+| Ebooks | 16,440 | 1,057 |
+| 3D models | 2,192 | 61 |
+
+The depth scan count includes walking each item's files, which Automatic mode still
+needs after detection, so detection adds these calls rather than replacing them. The
+Catalogue rule adds a stat per file of each candidate folder; it walked only the 3D,
+ebook and wrapper folders above.
+
+On a generated Library with 10,000 movies (16,666 files, a third loose in genre
+folders) and 300 shows (9,000 episodes), detection takes 0.64 s and 1.06 s against
+0.49 s and 0.21 s for the depth scan, on local disk. The first version took 72 s: GuessIt
+costs milliseconds per name. It is now asked only when a cheap test cannot decide: season
+names need a season word, `S01E02`-style markers settle episodes, a folder with one video
+cannot hold two releases, and genre detection stops at the second release.
+
+Still not measured: a real SMB/NFS share, and a Library from a user who reported depth
+problems.
 
 ## Suggested next step
 

@@ -11,9 +11,9 @@ import os
 import re
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from torrentlinker.domain import ContentKind
+from torrentlinker.domain import ContentKind, Torrent
 from torrentlinker.queries import _guess
 
 
@@ -38,7 +38,8 @@ class DetectedItem:
 
 VIDEO = {".mkv", ".m4v", ".mp4", ".avi", ".m2ts", ".ts", ".mov", ".webm", ".wmv", ".mpg"}
 AUDIO = {".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav", ".ape", ".wv", ".aac", ".dsf", ".alac"}
-EBOOK = {".epub", ".pdf", ".mobi", ".azw3", ".cbz", ".cbr", ".djvu", ".fb2"}
+EBOOK = {".epub", ".kepub", ".pdf", ".mobi", ".azw", ".azw3", ".cbz", ".cbr", ".djvu", ".fb2"}
+EBOOK |= {".prc", ".lit", ".cb7"}
 MODEL_3D = {".stl", ".3mf", ".obj", ".step", ".stp", ".blend", ".lys", ".chitubox", ".ply"}
 MODEL_3D |= {".pwmx", ".pwma", ".pwms", ".ctb", ".goo", ".gcode", ".sl1", ".photon"}  # slices
 GAME = {".iso", ".nsp", ".xci", ".exe", ".bin", ".cue", ".chd", ".pkg"}
@@ -55,6 +56,7 @@ SUPPORT = {".nfo", ".txt", ".jpg", ".jpeg", ".png", ".srt", ".sub", ".idx", ".as
 SUPPORT |= {".url", ".md", ".xml", ".diz", ".cue", ".log", ".m3u", ".m3u8", ".db", ".ini"}
 VIDEO_KINDS = {ContentKind.MOVIE, ContentKind.SERIES, ContentKind.OTHER}
 DISC_FOLDERS = {"BDMV", "VIDEO_TS", "AUDIO_TS"}
+MULTI_DISC = re.compile(r"(?i)^(cd|dis[ck]|disque)[ ._-]?\d{1,2}$")  # CD1, Disc 2, Disque 1
 # S01E02, S1.EP 01, 1x02
 EPISODE_MARKER = re.compile(
     r"(?i)(?<![a-z0-9])s\d{1,2}[ ._-]?ep?[ ._-]?\d{1,3}(?!\d)|(?<!\d)\d{1,2}x\d{2,3}(?!\d)"
@@ -76,6 +78,16 @@ def detect_items(
     return detector.found
 
 
+def seeded_roots(torrents: list[Torrent]) -> frozenset[Path]:
+    """Where each client torrent starts on disk: its folder, or its single file.
+    Paths must already be in this app's view (after Path Mapping)."""
+    return frozenset(
+        torrent.save_path / PurePosixPath(rel).parts[0]
+        for torrent in torrents
+        for rel in torrent.files
+    )
+
+
 def is_content(path: Path, kind: ContentKind) -> bool:
     suffix = path.suffix.lower()
     if suffix in ARCHIVES:
@@ -89,17 +101,24 @@ def _info(name: str) -> dict:
     return dict(_guess(name))
 
 
-def _is_episode(path: Path, kind: ContentKind) -> bool:
+# GuessIt costs milliseconds per name; only names with a season word are worth asking.
+SEASON_HINT = re.compile(r"(?i)(?<![a-z])(s\d{1,2}(?!\d)|saisons?|seasons?|int[ée]grale)")
+
+
+def _is_episode(name: str, is_dir: bool, kind: ContentKind) -> bool:
     """Outside a Series folder, an explicit marker is required: GuessIt reads movie
     titles such as "Star.Wars.Episode.1", "Episode.50.2011" or a bare "1080" (S10E80)
     as episodes."""
-    info = _info(path.name)
-    if "episode" not in info or not (path.is_dir() or path.suffix.lower() in VIDEO):
+    if not (is_dir or Path(name).suffix.lower() in VIDEO):
         return False
-    return kind is ContentKind.SERIES or bool(EPISODE_MARKER.search(path.name))
+    if EPISODE_MARKER.search(name):
+        return True
+    return kind is ContentKind.SERIES and "episode" in _info(name)  # "E05 - Titre.mkv"
 
 
 def _is_season(name: str) -> bool:
+    if not SEASON_HINT.search(name):
+        return False
     info = _info(name)
     return "season" in info and "episode" not in info
 
@@ -107,6 +126,13 @@ def _is_season(name: str) -> bool:
 def _is_release(name: str) -> bool:
     info = _info(name)
     return bool(info.get("title")) and bool(RELEASE_DETAILS & info.keys())
+
+
+@dataclass(frozen=True)
+class _Entry:
+    path: Path
+    is_dir: bool  # a real directory, not a symlink to one
+    is_file: bool
 
 
 class _Detector:
@@ -124,21 +150,41 @@ class _Detector:
         self.max_depth = max_depth
         self.found: list[DetectedItem] = []
         self._sizes: dict[Path, int] = {}
+        self._listings: dict[Path, list[_Entry]] = {}
+
+    def listing(self, directory: Path) -> list[_Entry]:
+        """Visible children, listed once. Directory entries carry their type, so a
+        network share answers with one listing instead of a stat per child."""
+        if directory not in self._listings:
+            entries = []
+            try:
+                with os.scandir(directory) as scanned:
+                    for entry in scanned:
+                        if entry.name.startswith("."):
+                            continue  # hidden, such as qBittorrent's .parts folders
+                        try:
+                            is_dir = entry.is_dir(follow_symlinks=False)
+                            is_file = not is_dir and entry.is_file()
+                        except OSError:
+                            continue
+                        entries.append(_Entry(Path(entry.path), is_dir, is_file))
+            except OSError:
+                pass  # the scan reports unreadable folders; detection only skips them
+            self._listings[directory] = sorted(entries, key=lambda e: e.path)
+        return self._listings[directory]
 
     def container(self, directory: Path, depth: int) -> None:
-        try:
-            children = sorted(directory.iterdir())
-        except OSError:
-            return  # the scan reports unreadable folders; detection only skips them
-        for child in children:
-            if child.is_dir() and not child.is_symlink():
-                self.directory(child, depth + 1)
-            elif child.is_file() and (child in self.seeded or is_content(child, self.kind)):
-                episode = self.kind in VIDEO_KINDS and _is_episode(child, self.kind)
-                reason = Reason.EPISODE if episode else Reason.LOOSE_FILE
-                if child in self.seeded:
+        for child in self.listing(directory):
+            if child.is_dir:
+                self.directory(child.path, depth + 1)
+            elif child.is_file and (child.path in self.seeded or self.is_content(child)):
+                if child.path in self.seeded:
                     reason = Reason.SEEDED
-                self.found.append(DetectedItem(child, reason))
+                elif self.kind in VIDEO_KINDS and _is_episode(child.path.name, False, self.kind):
+                    reason = Reason.EPISODE
+                else:
+                    reason = Reason.LOOSE_FILE
+                self.found.append(DetectedItem(child.path, reason))
 
     def directory(self, directory: Path, depth: int) -> None:
         reason = self.item_reason(directory, depth)
@@ -149,33 +195,44 @@ class _Detector:
         if (
             self.kind in VIDEO_KINDS
             and reason is not Reason.DISC
-            and not _is_episode(directory, self.kind)
+            and not _is_episode(directory.name, True, self.kind)
         ):
             self.episodes(directory)
+
+    def is_content(self, entry: _Entry) -> bool:
+        return entry.is_file and is_content(entry.path, self.kind)
 
     def item_reason(self, directory: Path, depth: int) -> Reason | None:
         if directory in self.seeded:
             return Reason.SEEDED
         if directory in self.above_seeded:
             return None
-        try:
-            children = list(directory.iterdir())
-        except OSError:
-            return None
-        if any(child.name.upper() in DISC_FOLDERS for child in children):
+        children = self.listing(directory)
+        if any(
+            child.path.name.upper() in DISC_FOLDERS
+            or (child.is_dir and MULTI_DISC.match(child.path.name))
+            for child in children
+        ):
             return Reason.DISC
         # A folder wrapping one subfolder has the same size; the inner name is the release.
-        wrapper = len(children) == 1 and children[0].is_dir()
+        wrapper = len(children) == 1 and children[0].is_dir
         if self.catalogue_sizes and not wrapper and self.size(directory) in self.catalogue_sizes:
             return Reason.CATALOGUE_SIZE
         if _is_season(directory.name):
             return Reason.SEASON
-        content = [child for child in children if child.is_file() and is_content(child, self.kind)]
+        content = [child.path for child in children if self.is_content(child)]
         if content and not self.distinct_releases(content):
             return Reason.CONTENT
         if self.kind is ContentKind.MODEL_3D and self.has_content_below(directory):
             return Reason.CONTENT  # a model's variants and parts stay one item
-        if _is_release(directory.name):
+        # "Les 100/The.100.S01.FRENCH…, The.100.S02…" groups releases; a complete series
+        # whose seasons are plain "Saison 1" folders stays one pack.
+        # A release name alone is not enough: "Sculpture (Images)" holds only previews.
+        if (
+            _is_release(directory.name)
+            and not any(child.is_dir and _is_release(child.path.name) for child in children)
+            and self.has_content_below(directory)
+        ):
             return Reason.RELEASE_NAME
         if depth >= self.max_depth:
             return Reason.DEPTH_LIMIT
@@ -183,42 +240,42 @@ class _Detector:
 
     def distinct_releases(self, files: list[Path]) -> bool:
         """A genre folder of movies, not one movie with its sample or extras."""
-        if self.kind not in VIDEO_KINDS:
+        if self.kind not in VIDEO_KINDS or len(files) < 2:
             return False
-        releases = {
-            (_info(file.name).get("title"), _info(file.name).get("year"))
-            for file in files
-            if not _is_episode(file, self.kind) and _is_release(file.name)
-        }
-        return len(releases) >= 2
+        releases = set()
+        for file in files:  # GuessIt is slow: stop at the second release
+            if not _is_episode(file.name, False, self.kind) and _is_release(file.name):
+                info = _info(file.name)
+                releases.add((info.get("title"), info.get("year")))
+                if len(releases) >= 2:
+                    return True
+        return False
 
     def has_content_below(self, directory: Path) -> bool:
-        for _dirpath, _dirs, names in os.walk(directory):
-            if any(is_content(Path(name), self.kind) for name in names):
-                return True
-        return False
+        children = self.listing(directory)
+        return any(self.is_content(child) for child in children) or any(
+            self.has_content_below(child.path) for child in children if child.is_dir
+        )
 
     def episodes(self, pack: Path) -> None:
         """Each episode of a pack, file or release folder, is also an item; so are the
         season folders of a complete series, and their episodes."""
-        try:
-            children = sorted(pack.iterdir())
-        except OSError:
-            return
-        for child in children:
-            if _is_episode(child, self.kind):
-                self.found.append(DetectedItem(child, Reason.EPISODE, within=pack))
-            elif child.is_dir() and _is_season(child.name):
-                self.found.append(DetectedItem(child, Reason.SEASON, within=pack))
-                self.episodes(child)
+        for child in self.listing(pack):
+            if _is_episode(child.path.name, child.is_dir, self.kind):
+                self.found.append(DetectedItem(child.path, Reason.EPISODE, within=pack))
+            elif child.is_dir and _is_season(child.path.name):
+                self.found.append(DetectedItem(child.path, Reason.SEASON, within=pack))
+                self.episodes(child.path)
 
     def size(self, directory: Path) -> int:
         if directory not in self._sizes:
             total = 0
-            for dirpath, _dirs, names in os.walk(directory):
-                for name in names:
+            for child in self.listing(directory):
+                if child.is_dir:
+                    total += self.size(child.path)
+                elif child.is_file:
                     try:
-                        total += (Path(dirpath) / name).stat().st_size
+                        total += child.path.stat().st_size
                     except OSError:
                         pass
             self._sizes[directory] = total
