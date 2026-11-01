@@ -29,6 +29,8 @@ API_INTERVAL = 0.5  # 120 requests a minute, as c411's guide documents
 API_BUDGET = 1200  # requests per rolling hour on searches, listings and the profile
 API_WINDOW = 3600.0
 LOW_BUDGET = 100  # below this, slow down to what the hour can sustain (3 s a request)
+SHORT_WINDOW = 600.0  # a refusal's window up to this is a pace to adopt, not the hourly budget
+REFUSAL_MARGIN = 1.05  # adopted paces stay a little under the reported limit
 
 
 class Queue:
@@ -106,6 +108,21 @@ class Queue:
 
     def observe(self, headers: Mapping[str, str]) -> None:
         """What c411 said about the budget in a response; plain queues ignore it."""
+
+    def adopt_refusal(self, headers: Mapping[str, str]) -> float | None:
+        """After a 429: keep to the short-window limit c411 reports from now on
+        (`x-ratelimit-limit` requests per `x-ratelimit-window` seconds), so the queue
+        is paced at the real rate instead of meeting the refusal again. Returns the new
+        interval, or None when the refusal reports no such limit."""
+        try:
+            limit = int(headers["x-ratelimit-limit"])
+            window = float(headers["x-ratelimit-window"])
+        except (KeyError, ValueError):
+            return None
+        if limit <= 0 or not 0 < window <= SHORT_WINDOW:
+            return None
+        self.interval = max(self.interval, window / limit * REFUSAL_MARGIN)
+        return self.interval
 
 
 class WindowQueue(Queue):

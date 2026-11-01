@@ -2464,6 +2464,7 @@ class MainWindow(QMainWindow):
         self.batch.signals.searched.connect(self._batch_result)
         self.batch.signals.already_present.connect(self._batch_already_present)
         self.batch.signals.error.connect(self._batch_error)
+        self.batch.signals.waiting.connect(self._batch_waiting)
         self.batch.signals.finished.connect(self._batch_finished)
         self._set_batch_running(True)
         self.upload_tab.throttle_refresh(True)
@@ -2540,6 +2541,15 @@ class MainWindow(QMainWindow):
             return
         self.library_model.set_status(
             entry.item.path, self.tr("Search failed: {0}").format(error_text(error))
+        )
+
+    def _batch_waiting(self, entry: LibraryEntry, seconds: float) -> None:
+        until = time.strftime("%H:%M:%S", time.localtime(time.time() + seconds))
+        self.batch_text = self.tr(
+            "c411 asks to wait: the batch resumes at {0} with {1}. Cancel to stop it."
+        ).format(until, entry.item.path.name)
+        self.library_model.set_status(
+            entry.item.path, self.tr("Waiting for c411 until {0}").format(until)
         )
 
     def _batch_already_present(self, entry: LibraryEntry, infohash: str) -> None:

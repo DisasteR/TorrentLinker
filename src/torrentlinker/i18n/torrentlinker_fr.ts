@@ -3599,6 +3599,14 @@ Fait aussi partie du pack {1}. Il n’est en seed seul qu’avec son propre torr
 <context>
     <name>MainWindow</name>
     <message>
+        <source>Waiting for c411 until {0}</source>
+        <translation>En attente de c411 jusqu’à {0}</translation>
+    </message>
+    <message>
+        <source>c411 asks to wait: the batch resumes at {0} with {1}. Cancel to stop it.</source>
+        <translation>c411 demande d’attendre : la recherche groupée reprend à {0} avec {1}. Annulez pour l’arrêter.</translation>
+    </message>
+    <message>
         <source>{0} Local Items, {1} of them inside packs</source>
         <translation>{0} Éléments locaux, dont {1} dans des packs</translation>
     </message>

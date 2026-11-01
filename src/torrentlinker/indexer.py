@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import threading
 import time
@@ -76,6 +77,7 @@ PREFETCH_AHEAD = 100  # torrents asked for ahead of the one being sent
 MAX_KEYS = 5  # c411's limit per account
 # A request the user waits for gives up, rather than wait longer than this for c411.
 FOREGROUND_PATIENCE = 30.0  # seconds
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -369,6 +371,9 @@ class Indexer:
             if error.status == 404:
                 raise TorrentUnavailable() from None
             if error.status == 429:
+                log.warning(
+                    "c411 refused a session download (429): retry after %.0f s", error.retry_after
+                )
                 raise RateLimited(max(error.retry_after, 60)) from None
             if not error.fatal:
                 raise RuntimeError(str(error)) from None
@@ -558,7 +563,19 @@ class Indexer:
                 last = self._http.request(method, url, params=params, headers=headers, json=json)
                 lane.observe(last.headers)
             if last.status_code == 429:
-                slot.resting[queue] = self._clock() + _retry_after(last)
+                wait = _retry_after(last)
+                slot.resting[queue] = self._clock() + wait
+                paced = lane.adopt_refusal(last.headers)
+                log.warning(
+                    "c411 refused a %s request with key %d (429): retry after %.0f s; "
+                    "reported limit %s per %s s; %s",
+                    queue,
+                    slot.number,
+                    wait,
+                    last.headers.get("x-ratelimit-limit", "?"),
+                    last.headers.get("x-ratelimit-window", "?"),
+                    f"now paced at {paced:.2f} s" if paced else "pace unchanged",
+                )
                 continue
             if last.status_code == 403 and queue == "downloads":
                 try:

@@ -766,3 +766,28 @@ def test_unavailable_search_download_is_excluded_before_catalogue_import(tmp_pat
     )
     assert store.catalogue_size() == 0
     assert store.known_hashes(["aa" * 20]) == {"aa" * 20}
+
+
+def test_a_refusal_reporting_its_limit_paces_later_requests_at_that_rate(caplog) -> None:  # type: ignore[no-untyped-def]
+    answers = [
+        httpx.Response(
+            429,
+            headers={"Retry-After": "2", "x-ratelimit-limit": "60", "x-ratelimit-window": "60"},
+        )
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return answers.pop(0) if answers else httpx.Response(200, text=SEARCH_XML)
+
+    clock = FakeClock()
+    indexer = make_indexer(handler, clock)
+    with indexer.background():
+        indexer.search(SearchQuery(q="a"), cached=False)
+    sent_before = clock.now
+    indexer.search(SearchQuery(q="b"), cached=False)
+    indexer.search(SearchQuery(q="c"), cached=False)
+
+    assert indexer.slots[0].api.interval == pytest.approx(1.05)  # 60 a minute, 5% under
+    assert clock.now - sent_before == pytest.approx(2 * 1.05)
+    assert "refused a api request with key 1 (429)" in caplog.text
+    assert "limit 60 per 60 s" in caplog.text

@@ -15,6 +15,7 @@ from torrentlinker.review import CheckedCandidate
 class BatchSignals(QObject):
     searched = Signal(int, int, object, object)  # index, total, entry, checked Candidates
     error = Signal(object, object)  # entry, exception
+    waiting = Signal(object, float)  # entry, seconds c411 asks to wait before its retry
     already_present = Signal(object, str)  # entry, torrent hash
     finished = Signal(int)
 
@@ -53,5 +54,6 @@ class BatchRunner(QRunnable):
             lambda: self._cancelled,
             lambda e, err: self.signals.error.emit(e, err),
             orphans_only=self.orphans_only,
+            on_wait=lambda e, seconds: self.signals.waiting.emit(e, seconds),
         )
         self.signals.finished.emit(done)

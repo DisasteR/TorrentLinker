@@ -59,3 +59,82 @@ def test_a_failing_item_is_reported_and_the_batch_goes_on() -> None:
 
     assert done == 2
     assert errors == ["a: boom"]
+
+
+def test_a_rate_limit_pauses_the_batch_and_retries_the_same_item() -> None:
+    from torrentlinker.indexer import RateLimited
+
+    calls: list[str] = []
+    waits: list[tuple[str, float]] = []
+    paused: list[float] = []
+
+    def search(e: LibraryEntry) -> list[str]:
+        calls.append(e.item.path.name)
+        if calls.count("b") == 1 and e.item.path.name == "b":
+            raise RateLimited(120)
+        return ["ok"]
+
+    errors: list[str] = []
+    done = run_batch(
+        [entry("a"), entry("b"), entry("c")],
+        search=search,
+        on_searched=lambda *_: None,
+        cancelled=lambda: False,
+        on_error=lambda e, err: errors.append(e.item.path.name),
+        on_wait=lambda e, seconds: waits.append((e.item.path.name, seconds)),
+        wait=lambda seconds, cancelled: paused.append(seconds) or True,
+    )
+
+    assert calls == ["a", "b", "b", "c"]
+    assert waits == [("b", 120)] and paused == [120]
+    assert errors == [] and done == 3
+
+
+def test_cancelling_during_a_rate_limit_wait_stops_the_batch() -> None:
+    from torrentlinker.indexer import RateLimited
+
+    def search(e: LibraryEntry) -> list[str]:
+        raise RateLimited(600)
+
+    done = run_batch(
+        [entry("a"), entry("b")],
+        search=search,
+        on_searched=lambda *_: None,
+        cancelled=lambda: False,
+        wait=lambda seconds, cancelled: False,  # the user cancelled while waiting
+    )
+
+    assert done == 0
+
+
+def test_a_persistent_rate_limit_ends_as_an_error_for_that_item() -> None:
+    from torrentlinker.batch import MAX_WAITS
+    from torrentlinker.indexer import RateLimited
+
+    calls: list[str] = []
+    errors: list[str] = []
+
+    def search(e: LibraryEntry) -> list[str]:
+        calls.append(e.item.path.name)
+        if e.item.path.name == "a":
+            raise RateLimited(30)
+        return ["ok"]
+
+    done = run_batch(
+        [entry("a"), entry("b")],
+        search=search,
+        on_searched=lambda *_: None,
+        cancelled=lambda: False,
+        on_error=lambda e, err: errors.append(e.item.path.name),
+        wait=lambda seconds, cancelled: True,
+    )
+
+    assert calls.count("a") == MAX_WAITS + 1 and calls[-1] == "b"
+    assert errors == ["a"] and done == 2
+
+
+def test_pause_waits_and_stops_early_when_cancelled() -> None:
+    from torrentlinker.batch import pause
+
+    assert pause(0.05, lambda: False) is True
+    assert pause(600, lambda: True) is False  # returns at once, without waiting

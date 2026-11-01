@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from torrentlinker.batch import MAX_WAITS
 from torrentlinker.domain import ItemState
-from torrentlinker.indexer import Candidate
+from torrentlinker.indexer import Candidate, RateLimited
 from torrentlinker.library import LibraryEntry, LibraryResult, build_library, indexer_contents
 from torrentlinker.paths import MappedQbit, PathMapper
 from torrentlinker.reseed import start_reseed
@@ -354,11 +356,20 @@ class Library:
         for entry in selected:
             if stop.is_set():
                 break
-            try:
-                rows = self.check(str(entry.item.path), stop, progress)
-                results.append({"path": str(entry.item.path), "rows": rows})
-            except Exception as error:
-                errors.append({"path": str(entry.item.path), "message": type(error).__name__})
+            for attempt in range(MAX_WAITS + 1):
+                try:
+                    rows = self.check(str(entry.item.path), stop, progress)
+                    results.append({"path": str(entry.item.path), "rows": rows})
+                except RateLimited as error:
+                    # c411 asks to wait: resume this item then, unless cancelled meanwhile.
+                    if attempt < MAX_WAITS:
+                        progress({"waiting_until": time.time() + error.retry_after})
+                        if not stop.wait(error.retry_after):
+                            continue
+                    errors.append({"path": str(entry.item.path), "message": "RateLimited"})
+                except Exception as error:
+                    errors.append({"path": str(entry.item.path), "message": type(error).__name__})
+                break
             progress({"done": len(results), "total": len(selected)})
         return {"results": results, "errors": errors}
 
