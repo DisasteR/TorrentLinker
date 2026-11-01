@@ -349,7 +349,7 @@ def _folder_to_json(f: LibraryFolder) -> dict[str, object]:
 def _folder_from_json(d: dict) -> LibraryFolder:  # type: ignore[type-arg]
     return LibraryFolder(
         path=Path(d["path"]),
-        depth=int(d.get("depth", 1)),
+        depth=None if (depth := d.get("depth", 1)) is None else int(depth),
         kind=ContentKind(d.get("kind", ContentKind.OTHER.value)),
     )
 

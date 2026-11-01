@@ -2892,6 +2892,10 @@ Désactiver « Ajouter .part aux noms des fichiers incomplets » dans Transmissi
 <context>
     <name>FolderEditor</name>
     <message>
+        <source>Automatic finds releases, season packs and their episodes at any depth. Choose a depth only when a folder needs it: depth 1 makes each direct child one Local Item. Removing a folder here keeps all files on disk.</source>
+        <translation>Le mode automatique trouve les sorties, les packs de saison et leurs épisodes à toute profondeur. Choisissez une profondeur seulement si un dossier l’exige : la profondeur 1 fait de chaque enfant direct un Élément local. Retirer un dossier ici conserve tous les fichiers sur le disque.</translation>
+    </message>
+    <message>
         <location filename="../gui/library_workspace.py" line="41"/>
         <source>Register the folders TorrentLinker can read. Add as many as you need. Download destinations and Torrent Client Path Mappings are configured separately.</source>
         <translation>Enregistrez les dossiers lisibles par TorrentLinker, autant que nécessaire. Les destinations de téléchargement et les correspondances de chemins du client torrent se règlent séparément.</translation>
@@ -3109,6 +3113,46 @@ Désactiver « Ajouter .part aux noms des fichiers incomplets » dans Transmissi
 <context>
     <name>LibraryFolderDialog</name>
     <message>
+        <source>Scan grouping</source>
+        <translation>Regroupement des éléments</translation>
+    </message>
+    <message>
+        <source>Looking for Local Items…</source>
+        <translation>Recherche des Éléments locaux…</translation>
+    </message>
+    <message>
+        <source>Folders holding a release stay whole; genre and collection folders are opened. Seeded torrents and the Catalogue refine this when scanning.</source>
+        <translation>Les dossiers contenant une sortie restent entiers ; les dossiers de genre et de collection sont ouverts. Les torrents en seed et le Catalogue affinent ce résultat lors de l’analyse.</translation>
+    </message>
+    <message>
+        <source>Depth {0} treats every entry {0} levels down as one Local Item; files met earlier are Local Items too.</source>
+        <translation>La profondeur {0} fait de chaque entrée située {0} niveaux plus bas un Élément local ; les fichiers rencontrés avant sont aussi des Éléments locaux.</translation>
+    </message>
+    <message>
+        <source>Depth </source>
+        <translation>Profondeur </translation>
+    </message>
+    <message>
+        <source>Could not read the folder: {0}</source>
+        <translation>Impossible de lire le dossier : {0}</translation>
+    </message>
+    <message>
+        <source>Automatic finds {0} Local Items</source>
+        <translation>Le mode automatique trouve {0} Éléments locaux</translation>
+    </message>
+    <message>
+        <source>Automatic finds no Local Item here. Check the Content Kind.</source>
+        <translation>Le mode automatique ne trouve aucun Élément local ici. Vérifiez le type de contenu.</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automatique</translation>
+    </message>
+    <message>
+        <source>, plus {0} episodes inside packs</source>
+        <translation>, plus {0} épisodes dans des packs</translation>
+    </message>
+    <message>
         <location filename="../gui/library_folder_dialog.py" line="23"/>
         <source>Add Library Folder</source>
         <translation>Ajouter un dossier à la Bibliothèque</translation>
@@ -3136,6 +3180,12 @@ Désactiver « Ajouter .part aux noms des fichiers incomplets » dans Transmissi
 </context>
 <context>
     <name>LibraryModel</name>
+    <message>
+        <source>{0}
+Episode of the pack {1}; searched with the pack.</source>
+        <translation>{0}
+Épisode du pack {1} ; recherché avec le pack.</translation>
+    </message>
     <message>
         <location filename="../gui/library_model.py" line="23"/>
         <source>Seeded</source>

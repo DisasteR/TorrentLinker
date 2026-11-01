@@ -13,6 +13,7 @@ import requests
 
 from torrentlinker.deluge import DelugeError
 from torrentlinker.domain import ItemState, LibraryFolder, LocalItem, Torrent
+from torrentlinker.item_detection import seeded_roots
 from torrentlinker.matching import IgnoreList
 from torrentlinker.qbit import Qbit
 from torrentlinker.reconcile import classify
@@ -108,8 +109,12 @@ def build_library(
             file_hashes.setdefault(torrent.save_path / rel, set()).add(torrent.hash.lower())
     entries = LibraryResult()
     previous = list(previous)
+    folders = list(folders)
+    automatic = any(folder.depth is None for folder in folders)
+    roots = seeded_roots(torrents or []) if automatic else frozenset()
+    sizes = cache.catalogue_sizes() if automatic and cache else frozenset()
     for folder in folders:
-        items = scan(folder, cache, refresh)
+        items = scan(folder, cache, refresh, seeded_roots=roots, catalogue_sizes=sizes)
         entries.errors.extend(items.errors)
         entries.extend(
             entry
@@ -154,5 +159,10 @@ def indexer_contents(client: Qbit, store: Store, indexer_url: str) -> list[Torre
 
 
 def auto_searchable(entries: Iterable[LibraryEntry]) -> list[LibraryEntry]:
-    """Entries a batch search may pick up: Orphans only, never (Partially) Seeded Items."""
-    return [e for e in entries if e.state is ItemState.ORPHAN]
+    """Entries a batch search may pick up: Orphans only, never (Partially) Seeded Items.
+
+    An episode is skipped when its pack is searched too: one search per pack, not one
+    per episode. Selecting episodes alone searches them."""
+    orphans = [e for e in entries if e.state is ItemState.ORPHAN]
+    packs = {e.item.path for e in orphans}
+    return [e for e in orphans if e.item.within not in packs]

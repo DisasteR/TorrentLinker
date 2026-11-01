@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import os
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from torrentlinker.domain import LibraryFolder, LocalItem
+from torrentlinker.item_detection import detect_items
 
 if TYPE_CHECKING:
     from torrentlinker.store import Store
@@ -40,14 +41,39 @@ class ScanResult(list[LocalItem]):
         return self
 
 
-def scan(folder: LibraryFolder, cache: Store | None = None, refresh: bool = False) -> ScanResult:
-    """List readable Local Items; never cache an incomplete item."""
+def scan(
+    folder: LibraryFolder,
+    cache: Store | None = None,
+    refresh: bool = False,
+    *,
+    seeded_roots: frozenset[Path] = frozenset(),
+    catalogue_sizes: frozenset[int] = frozenset(),
+) -> ScanResult:
+    """List readable Local Items; never cache an incomplete item.
+
+    In Automatic mode (no depth) items are detected; `seeded_roots` and
+    `catalogue_sizes` help recognise them. Episodes also appear inside their pack."""
     result = ScanResult()
-    for path in _entries_at_depth(folder.path, folder.depth, result):
+    if folder.depth is None:
+        found = [
+            (item.path, item.within)
+            for item in detect_items(
+                folder.path,
+                folder.kind,
+                seeded_roots=seeded_roots,
+                catalogue_sizes=catalogue_sizes,
+                on_error=result.failed,
+            )
+        ]
+    else:
+        found = [(path, None) for path in _entries_at_depth(folder.path, folder.depth, result)]
+    for path, within in found:
         try:
-            result.append(_local_item(path, cache, refresh))
+            item = _local_item(path, cache, refresh)
         except OSError as error:
             result.failed(path, error)
+        else:
+            result.append(replace(item, within=within) if within else item)
     return result
 
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
@@ -71,9 +72,11 @@ def detect_items(
     seeded_roots: frozenset[Path] = frozenset(),
     catalogue_sizes: frozenset[int] = frozenset(),
     max_depth: int = 8,
+    on_error: Callable[[Path, OSError], None] = lambda path, error: None,
 ) -> list[DetectedItem]:
-    """Local Items under `root`, which is always a container. Read-only."""
-    detector = _Detector(kind, seeded_roots, catalogue_sizes, max_depth)
+    """Local Items under `root`, which is always a container. Read-only; folders that
+    cannot be listed are reported to `on_error` and skipped."""
+    detector = _Detector(kind, seeded_roots, catalogue_sizes, max_depth, on_error)
     detector.container(root, 0)
     return detector.found
 
@@ -142,8 +145,10 @@ class _Detector:
         seeded_roots: frozenset[Path],
         catalogue_sizes: frozenset[int],
         max_depth: int,
+        on_error: Callable[[Path, OSError], None] = lambda path, error: None,
     ) -> None:
         self.kind = kind
+        self.on_error = on_error
         self.seeded = seeded_roots
         self.above_seeded = {parent for root in seeded_roots for parent in root.parents}
         self.catalogue_sizes = catalogue_sizes
@@ -168,8 +173,8 @@ class _Detector:
                         except OSError:
                             continue
                         entries.append(_Entry(Path(entry.path), is_dir, is_file))
-            except OSError:
-                pass  # the scan reports unreadable folders; detection only skips them
+            except OSError as error:
+                self.on_error(directory, error)
             self._listings[directory] = sorted(entries, key=lambda e: e.path)
         return self._listings[directory]
 

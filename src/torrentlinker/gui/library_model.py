@@ -133,10 +133,14 @@ class LibraryModel(QAbstractTableModel):
                     "A torrent shared by several Local Items appears on each item. "
                     "Paused torrents contribute zero; a blank value means unavailable."
                 )
+            if index.column() == 0 and e.item.within:
+                return self.tr("{0}\nEpisode of the pack {1}; searched with the pack.").format(
+                    e.item.path, e.item.within
+                )
             return str(e.item.path) if index.column() == 0 else self.data(index)
         if role == Qt.ItemDataRole.DisplayRole:
             return (
-                e.item.path.name,
+                f"{e.item.within.name} › {e.item.path.name}" if e.item.within else e.item.path.name,
                 state_label(e.state)
                 if e.state is ItemState.UNKNOWN
                 else self.status.get(e.item.path) or state_label(e.state),

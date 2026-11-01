@@ -123,7 +123,7 @@ class FeedControl:
             if entry.candidate.infohash
         ]
         self.feeds.observe_client_releases(queued)
-        queue_hashes = {candidate.infohash for candidate in queued}
+        queue_hashes = {c.infohash for c in queued if c.infohash}
         return hashes, clients, unknown, queue_hashes
 
     def inbox(self, *, client_ids: list[str] | None = None, **filters) -> list[dict]:

@@ -7,11 +7,11 @@ Reconciles files a user already has on disk with torrents on a private tracker, 
 ### Library side
 
 **Library Folder**:
-A folder the user registers for scanning, with a scan depth and a Content Kind.
+A folder the user registers for scanning, with a Content Kind and a scan grouping: Automatic (Local Items are detected, ADR-0015) or a fixed scan depth.
 _Avoid_: Source folder, watch folder
 
 **Local Item**:
-One entry found in a Library Folder at its scan depth — a single file or a folder — treated as the unit that a torrent may correspond to.
+One entry found in a Library Folder — at its scan depth, or detected in Automatic mode — a single file or a folder, treated as the unit that a torrent may correspond to. In Automatic mode an episode is a Local Item of its own and also part of its season or show pack.
 _Avoid_: File, release, media
 
 **Content Kind**:

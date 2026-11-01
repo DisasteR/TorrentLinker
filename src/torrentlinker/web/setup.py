@@ -120,7 +120,7 @@ class FolderRemoval(BaseModel):
 class FolderSetup(FolderRemoval):
     client_path: str = Field(default="", max_length=4096)
     kind: ContentKind = ContentKind.OTHER
-    depth: int = Field(default=1, ge=0, le=10)
+    depth: int | None = Field(default=1, ge=0, le=10)  # None: Automatic
 
 
 class Setup:

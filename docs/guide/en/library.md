@@ -6,7 +6,7 @@ Desktop and WebUI use the same Library layout: **Local Items**, **Folders**, and
 
 Review **Summary**, **Files**, **Description**, **NFO**, and **Evidence** before acting. Files shows local counterparts, renamed paths and absent files. A Full Match compares file names and sizes; **Verify & reseed** still requires the Torrent Client's hash Verification. **Reject Candidate** remembers your decision for this Local Item. Searching, checking and rejecting never start a Reseed.
 
-Use **Folders → Add folder** to register several folders and edit their Content Kind and scan grouping. Depth 1 treats each direct child as one Local Item. Removing a registration leaves files on disk. Settings opens the same folder editor. Download destinations and Path Mappings remain separate, per Torrent Client.
+Use **Folders → Add folder** to register several folders and edit their Content Kind and scan grouping. New folders use **Automatic**: TorrentLinker finds releases at any depth, opens genre and collection folders, keeps a season pack whole and lists each of its episodes too, shown as `Pack › Episode`. Torrents already in your Torrent Client and sizes from the Catalogue help it recognise release folders. Choose a fixed depth only for a folder Automatic gets wrong: depth 1 treats each direct child as one Local Item. Existing folders keep their depth. Removing a registration leaves files on disk. Settings opens the same folder editor. Download destinations and Path Mappings remain separate, per Torrent Client.
 
 In the WebUI, Browse lists folders on the **TorrentLinker server**, within its configured storage roots. It cannot browse the computer running your browser. Registering a readable Library Folder does not require a Torrent Client mapping. If the client is unavailable, a scan can still list files with **Seeding status unknown**; they are not automatically classified as Orphans. The desktop also scans readable folders while the client is offline and labels their seeding status unknown. Unreadable paths retain their previous scanned items.
 
@@ -16,7 +16,7 @@ Settings also lists the selected client's default and category Download Folders.
 
 [Documentation](../../README.md) · [Français](../fr/bibliotheque.md)
 
-1. Click **Add folder…** and choose its content kind and scan depth.
+1. Click **Add folder…** and choose its content kind. Keep **Automatic** unless the preview shows the wrong items.
 2. After scanning, search a selected Orphan or all Orphans.
 3. Check the Candidates. A size match must still pass the torrent client’s hash Verification.
 4. Reseed Full Matches. The summary separates new additions from torrents already in the client.
@@ -31,7 +31,7 @@ Screenshots use the English interface, dark theme and example data.
 
 The **≈ Zen/day** column shows the current estimate from Zen for torrents linked to Seeded or Partially Seeded Items. For Orphans, it shows the estimate for the best checked Match. Paused torrents contribute zero; unavailable estimates stay blank. If one torrent covers several Local Items, its estimate appears on each, so this column should not be summed as a library-wide total.
 
-In the Library, **Add folder…** lets you choose a folder, its Content Kind and scan depth without opening Settings. Depth 1 treats each immediate file or folder as one Local Item. Saving scans the Library and selects the new folder in its filter; a folder already registered is not added twice.
+In the Library, **Add folder…** lets you choose a folder, its Content Kind and scan grouping without opening Settings. In Automatic mode the dialog previews how many Local Items and episodes it finds. A batch search searches each pack once; its episodes are searched only when you select them. Saving scans the Library and selects the new folder in its filter; a folder already registered is not added twice.
 
 In the Library, **Check all Candidates** checks every untested Candidate already found, including items hidden by filters, without repeating searches or successful checks. **Reseed all Full Matches** sends confirmed Full Matches through the usual hash Verification before seeding. Both actions run in the background with progress and **Cancel batch**; errors are collected so other Candidates can continue. Torrents already in the client are labelled and counted separately from new Reseeds.
 

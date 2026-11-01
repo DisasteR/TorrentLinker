@@ -120,6 +120,7 @@ class Library:
             {
                 "path": str(e.item.path),
                 "name": e.item.path.name,
+                "within": str(e.item.within) if e.item.within else "",
                 "size": e.item.size,
                 "state": e.state,
                 "kind": e.folder.kind,
@@ -338,15 +339,15 @@ class Library:
         return [self.candidate_row(v, indexer) for v in checked]
 
     def search_items(self, paths: list[str], stop: threading.Event, progress) -> dict:
-        from torrentlinker.domain import ItemState
 
-        selected = [self.entry(path) for path in paths] if paths else list(self.entries)
+        from torrentlinker.library import auto_searchable
+
+        chosen = [self.entry(path) for path in paths] if paths else list(self.entries)
+        selected = auto_searchable(chosen)
         results, errors = [], []
         for entry in selected:
             if stop.is_set():
                 break
-            if entry.state is not ItemState.ORPHAN:
-                continue
             try:
                 rows = self.check(str(entry.item.path), stop, progress)
                 results.append({"path": str(entry.item.path), "rows": rows})

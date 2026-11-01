@@ -194,9 +194,10 @@ cannot hold two releases, and genre detection stops at the second release.
 Still not measured: a real SMB/NFS share, and a Library from a user who reported depth
 problems.
 
-## Suggested next step
+## Status
 
-Run the comparison script on Libraries from users who reported depth problems
-(it prints paths, so they review it first), with seeded roots from their Torrent
-Client. Then wire Automatic mode into `scan`, with episodes as Local Items linked to
-their pack, and add the preview to the add-folder dialog.
+Automatic mode is wired into scanning (ADR-0015): new Library Folders default to it in
+the desktop and web editors, episodes are Local Items linked to their pack, batch
+searches skip episodes whose pack is searched, and the add-folder dialog previews the
+result. Still to do: per-path overrides (**Treat as one item**, **Split into its
+contents**), a preview in the web form, and the measurements listed above.

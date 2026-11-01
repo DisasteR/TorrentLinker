@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from torrentlinker.domain import ContentKind, LibraryFolder
+from torrentlinker.gui.library_folder_dialog import grouping, grouping_box
 from torrentlinker.gui.settings_dialog import choose_directory, kind_label
 from torrentlinker.scan import ScanError
 
@@ -76,8 +77,9 @@ class FolderEditor(QWidget):
         layout.addLayout(row)
         hint = QLabel(
             self.tr(
-                "Depth 1: each direct child is one Local Item. Depth 2: scan one level further. "
-                "Removing a folder here keeps all files on disk."
+                "Automatic finds releases, season packs and their episodes at any depth. "
+                "Choose a depth only when a folder needs it: depth 1 makes each direct child "
+                "one Local Item. Removing a folder here keeps all files on disk."
             )
         )
         hint.setWordWrap(True)
@@ -103,11 +105,7 @@ class FolderEditor(QWidget):
             kind.addItem(kind_label(value), value)
         kind.setCurrentIndex(kind.findData(folder.kind))
         self.table.setCellWidget(row, 1, kind)
-        depth = QSpinBox()
-        depth.setRange(0, 10)
-        depth.setPrefix(self.tr("Depth "))
-        depth.setValue(folder.depth)
-        self.table.setCellWidget(row, 2, depth)
+        self.table.setCellWidget(row, 2, grouping_box(folder.depth))
         self.set_scan_errors(self.scan_errors, self.scanned)
 
     def set_scan_errors(self, errors: list[ScanError], scanned: bool = True) -> None:
@@ -139,7 +137,7 @@ class FolderEditor(QWidget):
             kind, depth = self.table.cellWidget(row, 1), self.table.cellWidget(row, 2)
             assert cell and isinstance(kind, QComboBox) and isinstance(depth, QSpinBox)
             result.append(
-                LibraryFolder(Path(cell.text()), depth.value(), ContentKind(kind.currentData()))
+                LibraryFolder(Path(cell.text()), grouping(depth), ContentKind(kind.currentData()))
             )
         return result
 
@@ -156,7 +154,7 @@ class FolderEditor(QWidget):
         if not path.is_dir():
             QMessageBox.warning(self, self.tr("Library Folder"), self.tr("Folder is unavailable."))
             return
-        self.add_folder(LibraryFolder(path))
+        self.add_folder(LibraryFolder(path, None))  # Automatic until the user picks a depth
         self.path.clear()
 
 

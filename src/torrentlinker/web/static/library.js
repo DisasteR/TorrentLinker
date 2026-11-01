@@ -15,7 +15,7 @@ async function loadLibrary() {
   const response = await api(`library?${params}`);
   if (generation !== libraryUI.loadGeneration) return;
   table("library-table", response.rows, [
-    {label:say("Local Item","Élément local"), name:true, render:r=>button(r.name,()=>reviewLibraryItem(r))},
+    {label:say("Local Item","Élément local"), name:true, render:r=>button(r.within?`${r.within.split(/[\\/]/).pop()} › ${r.name}`:r.name,()=>reviewLibraryItem(r))},
     {label:say("State","État"),render:r=>({orphan:say("Orphan","Orphelin"),seeded:say("Seeded","Seedé"),"partially-seeded":say("Partially seeded","Partiellement seedé"),unknown:say("Seeding status unknown","État du seed inconnu")}[r.state] || r.state)},
     {label:say("Size","Taille"),render:r=>bytes(r.size)},
     {label:say("Folder","Dossier"),render:r=>{const path=element("span",r.folder,"library-folder-path");path.title=r.folder;return path;}},
@@ -52,7 +52,8 @@ function renderLibraryFolders() {
     const row=element("div",undefined,"library-folder-row");
     const stale=(libraryUI.folderErrors || []).some(path=>path===f.local || path.startsWith(f.local+"/"));
     const health=stale?say("Scan incomplete · previous items kept","Analyse incomplète · éléments précédents conservés"):say("Scan to check file access","Analyser pour vérifier l’accès aux fichiers");
-    row.append(element("span",`${f.local} · ${f.kind} · ${say("Depth","Profondeur")} ${f.depth} · ${health}`));
+    const grouping=f.depth==null?say("Automatic","Automatique"):`${say("Depth","Profondeur")} ${f.depth}`;
+    row.append(element("span",`${f.local} · ${f.kind} · ${grouping} · ${health}`));
     const actions=element("div",undefined,"actions");
     actions.append(button(say("Edit","Modifier"),()=>editLibraryFolder(f)),button(say("Remove","Retirer"),async()=>{
       if (!confirm(say(`Remove ${f.local} from the Library? Files stay on disk.`,`Retirer ${f.local} de la bibliothèque ? Les fichiers sont conservés.`))) return;
@@ -76,9 +77,9 @@ function editLibraryFolder(folder) {
   $("library-folder-path").value=folder.local;
   $("library-folder-path").readOnly=true;
   $("library-folder-kind").value=folder.kind;
-  const select=$("library-folder-depth");
-  if(![...select.options].some(o=>o.value===String(folder.depth))) select.add(new Option(`Depth ${folder.depth}`,folder.depth));
-  select.value=folder.depth;
+  const select=$("library-folder-depth"), value=folder.depth==null?"auto":String(folder.depth);
+  if(![...select.options].some(o=>o.value===value)) select.add(new Option(`Depth ${folder.depth}`,value));
+  select.value=value;
   $("library-folder-form-title").textContent=say("Edit Library Folder","Modifier le dossier");
   $("library-folder-feedback").textContent="";
   $("library-folder-browse").disabled=true;
@@ -226,7 +227,8 @@ $("library-folder-browse").onclick=()=>guard(()=>browseLibraryFolder());
 $("library-folder-new").onclick=newLibraryFolder;
 $("library-folder-form").onsubmit=e=>{e.preventDefault();guard(async()=>{
   const local=$("library-folder-path").value.trim();
-  await api("setup/folder",{local,kind:$("library-folder-kind").value,depth:Number($("library-folder-depth").value),purpose:"library"});
+  const depth=$("library-folder-depth").value;
+  await api("setup/folder",{local,kind:$("library-folder-kind").value,depth:depth==="auto"?null:Number(depth),purpose:"library"});
   await refreshSetup();renderLibraryFolders();newLibraryFolder();
   $("library-folder-feedback").textContent=say(`Saved ${local}. Scan folders to refresh the Library.`,`${local} enregistré. Analysez les dossiers pour actualiser la bibliothèque.`);
 });};

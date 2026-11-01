@@ -58,13 +58,13 @@ class PathMapping:
 @dataclass(frozen=True)
 class LibraryFolder:
     path: Path
-    depth: int = 1
+    depth: int | None = 1  # None: Automatic, Local Items are detected (item_detection)
     kind: ContentKind = ContentKind.OTHER
 
 
 @dataclass(frozen=True)
 class LocalItem:
-    """One entry of a Library Folder at its scan depth.
+    """One entry of a Library Folder at its scan depth, or as detected in Automatic mode.
 
     `files` maps each file's path, relative to the item's parent folder and using
     forward slashes (the convention qBittorrent uses under a save path), to its size.
@@ -73,6 +73,7 @@ class LocalItem:
     path: Path
     files: dict[str, int] = field(default_factory=dict)
     search_name: str = ""  # identity for a virtual combined manifest; never a disk path
+    within: Path | None = None  # the season or show pack an episode also belongs to
 
     @property
     def size(self) -> int:

@@ -793,6 +793,13 @@ class Store:
                 [(count, h.lower()) for h, count in counts.items() if count >= 0],
             )
 
+    def catalogue_sizes(self) -> frozenset[int]:
+        """Every Catalogue torrent's exact size, to recognise a release folder by size."""
+        with self._lock:
+            return frozenset(
+                row[0] for row in self._db.execute("SELECT DISTINCT size FROM catalogue")
+            )
+
     def catalogue_size(self) -> int:
         with self._lock:
             return int(self._db.execute("SELECT COUNT(*) FROM catalogue").fetchone()[0])

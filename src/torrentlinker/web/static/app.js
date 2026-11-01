@@ -121,7 +121,7 @@ const french = {
   purpose: "Utiliser ce dossier pour",
   downloads: "Téléchargements",
   kind: "Type de contenu",
-  depth: "Profondeur d’analyse",
+  depth: "Regroupement des éléments",
   checkMapping: "Vérifier la correspondance",
   addFolder: "Ajouter un dossier",
   continue: "Continuer",
@@ -393,7 +393,7 @@ async function refreshSetup() {
     : "TORRENTLINKER WEB";
   $("saved-folders").replaceChildren(
     ...state.setup.folders.map((f) =>
-      savedFolder(f.local, "library", `${f.local} · ${f.kind} · ${f.depth}`),
+      savedFolder(f.local, "library", `${f.local} · ${f.kind} · ${f.depth ?? say("Automatic", "Automatique")}`),
     ),
   );
   if (state.setup.download_folder)
@@ -483,7 +483,7 @@ function folder() {
     client_path: $("folder-client").value,
     purpose: $("folder-purpose").value,
     kind: $("folder-kind").value,
-    depth: Number($("folder-depth").value),
+    depth: $("folder-depth").value === "auto" ? null : Number($("folder-depth").value),
   };
 }
 function indexer() {
