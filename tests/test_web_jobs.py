@@ -2,6 +2,7 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.test_upload_completeness import complete_description
@@ -610,3 +611,43 @@ def test_files_endpoint_lists_one_torrents_files_for_the_files_tab(tmp_path: Pat
             {"index": 1, "name": "b.nfo", "size": 10, "wanted": False},
         ]
         assert browser.get("/api/torrents/not-a-hash/files").status_code == 400
+
+
+def test_send_queue_probes_each_download_folder_once(tmp_path: Path, monkeypatch):
+    import threading
+
+    from torrentlinker.web import operations
+    from torrentlinker.web.operations import JobRequest
+
+    app = create_app(tmp_path / "config", password="test-password-long")
+    with TestClient(app):
+        target = app.state.agent_service.for_client("default")
+        folders = [tmp_path / "films", tmp_path / "books"]
+        for i in range(6):
+            target.setup.store.enqueue_download(
+                str(i),
+                {
+                    "client_id": "default",
+                    "folder": str(folders[i % 2]),
+                    "indexer_url": "https://tracker.example/api",
+                    "candidate": {"title": f"Release {i}", "size": 1, "download_url": "u"},
+                },
+            )
+        probes: list[str] = []
+        monkeypatch.setattr(target.setup, "path_under_root", Path)
+        monkeypatch.setattr(target.setup, "configure_download_folder", probes.append)
+        monkeypatch.setattr(target, "download_destinations", lambda: {str(f) for f in folders})
+
+        class Probed(Exception):
+            pass
+
+        def stop_before_sending(*args, **kwargs):
+            raise Probed
+
+        monkeypatch.setattr(operations, "DownloadClient", lambda setup: None)
+        monkeypatch.setattr(target.setup, "indexer", lambda: None)
+        monkeypatch.setattr(operations, "run_queue", stop_before_sending)
+        with pytest.raises(Probed):
+            target.run(JobRequest(kind="send-queue"), threading.Event(), lambda _: None)
+
+    assert sorted(probes) == sorted(str(f) for f in folders)

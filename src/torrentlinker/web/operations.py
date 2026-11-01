@@ -306,12 +306,13 @@ class Operations:
                         None,
                     )
                 if request.kind == "send-queue":
+                    hashes = set(request.hashes)
                     folder = next(
                         (
                             e.folder
                             for e in entries(target.store)
                             if e.status == "queued"
-                            and (not request.hashes or e.candidate.infohash in request.hashes)
+                            and (not hashes or e.candidate.infohash in hashes)
                         ),
                         folder,
                     )
@@ -473,10 +474,12 @@ class Operations:
         self.validate(request)
         if request.kind == "edit-queue-selection":
             if request.queue_action == "retry":
-                for row in request.selection_rows:
-                    self.setup.path_under_root(row["folder"])
-                    self.setup.configure_download_folder(row["folder"])
-                    if row["folder"] not in self.download_destinations():
+                destinations = self.download_destinations()
+                # Probe each distinct folder once, not once per selected entry.
+                for folder in dict.fromkeys(row["folder"] for row in request.selection_rows):
+                    self.setup.path_under_root(folder)
+                    self.setup.configure_download_folder(folder)
+                    if folder not in destinations:
                         raise ValueError("The queued destination changed. Review it again.")
             self.setup.store.edit_downloads(
                 request.selection_rows, request.queue_action, request.priority
@@ -941,24 +944,26 @@ class Operations:
                 if request.selection_source == "queue"
                 else None
             )
+            hashes = set(request.hashes)
             queued_entries = [
                 e
                 for e in entries(self.setup.store)
                 if e.status == "queued"
-                and (not request.hashes or e.candidate.infohash in request.hashes)
+                and (not hashes or e.candidate.infohash in hashes)
                 and (selected_keys is None or e.key in selected_keys)
             ]
             if not queued_entries and self.setup.download_folder(request.category):
                 self.setup.verified_download_folder(request.category)
             # Recheck selected folders, including entries saved before settings changed.
-            for entry in queued_entries:
-                if entry.status == "queued":
-                    self.setup.path_under_root(str(entry.folder))
-                    self.setup.configure_download_folder(str(entry.folder))
-                    if str(entry.folder) not in self.download_destinations():
-                        raise ValueError(
-                            "A queued destination changed. Remove that entry and queue it again."
-                        )
+            # Each probe lists the client's torrents, so check each folder once.
+            destinations = self.download_destinations()
+            for folder in dict.fromkeys(str(entry.folder) for entry in queued_entries):
+                self.setup.path_under_root(folder)
+                self.setup.configure_download_folder(folder)
+                if folder not in destinations:
+                    raise ValueError(
+                        "A queued destination changed. Remove that entry and queue it again."
+                    )
             client = DownloadClient(self.setup)
             send_options: dict[str, Any] = (
                 {"order": [r["key"] for r in request.selection_rows]}
