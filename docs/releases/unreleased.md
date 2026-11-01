@@ -10,9 +10,12 @@ published beta.28 packages.
   collection folders, and recognises disc structures, multi-disc albums and 3D model
   packs. Torrents already in the Torrent Client and Catalogue sizes help it find
   release folders. Existing folders keep their depth; a fixed depth remains available.
-- Season and show packs stay one Local Item, and each episode is also listed under its
-  pack (`Pack › Episode`). Batch searches search a pack once and skip its episodes;
-  episodes selected alone are searched.
+- Season and show packs stay one Local Item, and each episode is also a Local Item
+  under its pack: the desktop Library is now a tree where packs expand to their
+  episodes. Batch searches search a pack once and skip its episodes; select episodes
+  to search them.
+- An episode is Seeded only by a torrent of its own. Inside a seeded pack it shows
+  **Orphan · in seeded pack**, so it can also be reseeded as a single episode.
 - The add-folder dialog previews how many Local Items and episodes Automatic finds.
 
 ## Responsiveness

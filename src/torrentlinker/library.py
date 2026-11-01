@@ -161,8 +161,9 @@ def indexer_contents(client: Qbit, store: Store, indexer_url: str) -> list[Torre
 def auto_searchable(entries: Iterable[LibraryEntry]) -> list[LibraryEntry]:
     """Entries a batch search may pick up: Orphans only, never (Partially) Seeded Items.
 
-    An episode is skipped when its pack is searched too: one search per pack, not one
-    per episode. Selecting episodes alone searches them."""
-    orphans = [e for e in entries if e.state is ItemState.ORPHAN]
-    packs = {e.item.path for e in orphans}
-    return [e for e in orphans if e.item.within not in packs]
+    An episode is skipped when its pack is in the same batch, searched or already
+    seeded: one search per pack, not one per episode. Selecting episodes without their
+    pack searches them, to cross-seed them as single episodes."""
+    entries = list(entries)
+    packs = {e.item.path for e in entries}
+    return [e for e in entries if e.state is ItemState.ORPHAN and e.item.within not in packs]

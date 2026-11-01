@@ -89,7 +89,8 @@ def test_automatic_folders_survive_a_save_and_load(tmp_path: Path) -> None:
 
 
 def entry(path: Path, within: Path | None = None, state=ItemState.ORPHAN) -> LibraryEntry:
-    return LibraryEntry(LibraryFolder(path.parent, None), LocalItem(path, within=within), state)
+    folder = LibraryFolder((within or path).parent, None)  # a pack and its episodes share it
+    return LibraryEntry(folder, LocalItem(path, within=within), state)
 
 
 def test_a_batch_searches_a_pack_once_not_each_episode(tmp_path: Path) -> None:
@@ -98,20 +99,55 @@ def test_a_batch_searches_a_pack_once_not_each_episode(tmp_path: Path) -> None:
     seeded_pack = entry(tmp_path / "Saison 02", state=ItemState.SEEDED)
     orphan_episode = entry(tmp_path / "Saison 02/E01.mkv", tmp_path / "Saison 02")
 
-    assert auto_searchable([pack, *episodes, seeded_pack, orphan_episode]) == [
-        pack,
-        orphan_episode,  # its pack is not searched: seeded
-    ]
-    assert auto_searchable(episodes) == episodes  # selected alone, episodes are searched
+    assert auto_searchable([pack, *episodes, seeded_pack, orphan_episode]) == [pack]
+    # Selected without their pack, episodes are searched, even those of a seeded pack.
+    assert auto_searchable([*episodes, orphan_episode]) == [*episodes, orphan_episode]
 
 
-def test_the_library_shows_an_episode_under_its_pack(qtbot, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+def test_the_library_shows_episodes_as_children_of_their_pack(qtbot, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
     model = LibraryModel()
-    episode = entry(tmp_path / "Saison 01/Show.S01E01.mkv", tmp_path / "Saison 01")
-    model.set_entries([episode])
+    pack = entry(tmp_path / "Saison 01", state=ItemState.SEEDED)
+    episodes = [entry(tmp_path / f"Saison 01/E0{i}.mkv", tmp_path / "Saison 01") for i in (1, 2)]
+    film = entry(tmp_path / "Film.2020.mkv")
+    model.set_entries([episodes[0], pack, film, episodes[1]])  # any order
 
-    assert model.index(0, 0).data() == "Saison 01 › Show.S01E01.mkv"
-    assert "Episode of the pack" in model.index(0, 0).data(3)  # ToolTipRole
+    assert [model.index(r, 0).data() for r in range(model.rowCount())] == [
+        "Saison 01",
+        "Film.2020.mkv",
+    ]
+    top = model.index(0, 0)
+    assert model.rowCount(top) == 2
+    child = model.index(1, 0, top)
+    assert child.data() == "E02.mkv"
+    assert child.parent() == top
+    assert child.siblingAtColumn(1).data() == "Orphan · in seeded pack"
+    assert "Also inside the pack" in child.data(3)  # ToolTipRole
+    model.set_status(episodes[1].item.path, "Verifying…")
+    assert child.siblingAtColumn(1).data() == "Verifying…"
+
+
+def test_an_episode_is_seeded_only_by_a_torrent_of_its_own(tmp_path: Path) -> None:
+    root = tree(
+        tmp_path / "Séries",
+        "Show.S01.1080p-GRP/Show.S01E01.mkv",
+        "Show.S01.1080p-GRP/Show.S01E02.mkv",
+    )
+    pack = root / "Show.S01.1080p-GRP"
+    whole = Torrent(
+        "a" * 40,
+        pack.name,
+        root,
+        {f"{pack.name}/Show.S01E01.mkv": 10, f"{pack.name}/Show.S01E02.mkv": 10},
+    )
+    single = Torrent("b" * 40, "Show.S01E02.mkv", pack, {"Show.S01E02.mkv": 10})
+
+    entries = build_library([LibraryFolder(root, None, ContentKind.SERIES)], [whole, single])
+
+    assert {e.item.path.name: e.state for e in entries} == {
+        pack.name: ItemState.SEEDED,
+        "Show.S01E01.mkv": ItemState.ORPHAN,  # inside the seeded pack, not seeded alone
+        "Show.S01E02.mkv": ItemState.SEEDED,  # its own torrent
+    }
 
 
 def test_a_new_folder_is_automatic_and_previews_what_it_finds(qtbot, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]

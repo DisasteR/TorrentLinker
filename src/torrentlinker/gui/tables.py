@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QTableView,
     QTableWidget,
     QTableWidgetItem,
+    QTreeView,
 )
 from shiboken6 import isValid
 
@@ -48,6 +49,32 @@ class StatusDelegate(QStyledItemDelegate):
             }.get(color.name())
             if readable:
                 option.palette.setColor(QPalette.ColorRole.Text, QColor(readable))
+
+
+class TreeTable(QTreeView):
+    """A tree styled and driven like the app's tables: packs expand to their episodes."""
+
+    def selectRow(self, row: int) -> None:  # noqa: N802 - mirrors QTableView
+        self.setCurrentIndex(self.model().index(row, 0))
+
+    def horizontalHeader(self) -> QHeaderView:  # noqa: N802 - mirrors QTableView
+        return self.header()
+
+
+def style_tree(tree: TreeTable) -> None:
+    tree.setItemDelegate(StatusDelegate(tree))
+    tree.setAlternatingRowColors(True)
+    tree.setWordWrap(False)
+    tree.setUniformRowHeights(True)
+    tree.setAllColumnsShowFocus(True)
+    header = tree.header()
+    header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+    header.setStretchLastSection(False)
+    header.setDefaultSectionSize(130)
+    header.setMinimumSectionSize(40)
+    if header.count():
+        header.resizeSection(0, 380)
+    header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
 
 def style_table(table: QTableView) -> None:

@@ -32,7 +32,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
-    QTableView,
     QTabWidget,
     QToolBar,
     QToolButton,
@@ -89,7 +88,7 @@ from torrentlinker.gui.settings_dialog import (
     choose_directory,
     extra_indexer_keys,
 )
-from torrentlinker.gui.tables import EmptyState, style_table
+from torrentlinker.gui.tables import EmptyState, TreeTable, style_tree
 from torrentlinker.gui.tasks import run_in_background
 from torrentlinker.gui.theme import set_theme
 from torrentlinker.gui.torrents_view import TorrentsTab
@@ -250,9 +249,9 @@ class MainWindow(QMainWindow):
         self.library_model = LibraryModel()
         self.library_proxy = LibraryFilter()
         self.library_proxy.setSourceModel(self.library_model)
-        self.library_view = QTableView()
+        self.library_view = TreeTable()
         self.library_view.setModel(self.library_proxy)
-        style_table(self.library_view)
+        style_tree(self.library_view)
         self.library_view.setAccessibleName(self.tr("Library"))
         self.library_empty = EmptyState(
             self.library_view,
@@ -2603,7 +2602,12 @@ class MainWindow(QMainWindow):
         self.scan_action.setEnabled(True)
         self.rescan_action.setEnabled(True)
         self.add_folder_action.setEnabled(True)
-        self.statusBar().showMessage(self.tr("{0} Local Items").format(len(entries)))
+        episodes = sum(e.item.within is not None for e in entries)
+        self.statusBar().showMessage(
+            self.tr("{0} Local Items, {1} of them inside packs").format(len(entries), episodes)
+            if episodes
+            else self.tr("{0} Local Items").format(len(entries))
+        )
         self.restore_searches(entries)
         if client_error := getattr(entries, "client_error", None):
             QMessageBox.warning(

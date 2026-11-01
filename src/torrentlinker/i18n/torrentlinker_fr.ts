@@ -3181,10 +3181,14 @@ Désactiver « Ajouter .part aux noms des fichiers incomplets » dans Transmissi
 <context>
     <name>LibraryModel</name>
     <message>
+        <source>Orphan · in seeded pack</source>
+        <translation>Orphelin · dans un pack en seed</translation>
+    </message>
+    <message>
         <source>{0}
-Episode of the pack {1}; searched with the pack.</source>
+Also inside the pack {1}. Seeded on its own only by a torrent of its own; select it to search it as a single episode.</source>
         <translation>{0}
-Épisode du pack {1} ; recherché avec le pack.</translation>
+Fait aussi partie du pack {1}. Il n’est en seed seul qu’avec son propre torrent ; sélectionnez-le pour le chercher comme épisode seul.</translation>
     </message>
     <message>
         <location filename="../gui/library_model.py" line="23"/>
@@ -3594,6 +3598,10 @@ Episode of the pack {1}; searched with the pack.</source>
 </context>
 <context>
     <name>MainWindow</name>
+    <message>
+        <source>{0} Local Items, {1} of them inside packs</source>
+        <translation>{0} Éléments locaux, dont {1} dans des packs</translation>
+    </message>
     <message>
         <location filename="../gui/main_window.py" line="1009"/>
         <source>Save browser companion</source>

@@ -5,7 +5,7 @@ from typing import Any
 
 from PySide6.QtCore import (
     QT_TRANSLATE_NOOP,
-    QAbstractTableModel,
+    QAbstractItemModel,
     QCoreApplication,
     QModelIndex,
     QPersistentModelIndex,
@@ -44,7 +44,12 @@ STATE_COLORS = {
 }
 
 
-class LibraryModel(QAbstractTableModel):
+class LibraryModel(QAbstractItemModel):
+    """Local Items as a tree: packs at the top, their seasons and episodes below.
+
+    `entries` stays the flat list the rest of the app uses; each index's internal id
+    is its row in that list."""
+
     COLUMNS = (
         QT_TRANSLATE_NOOP("LibraryModel", "Name"),
         QT_TRANSLATE_NOOP("LibraryModel", "State"),
@@ -58,6 +63,9 @@ class LibraryModel(QAbstractTableModel):
         super().__init__()
         self.entries: list[LibraryEntry] = []
         self._rows: dict[Path, list[int]] = {}  # a lookup per item would be quadratic
+        self._parent: list[int | None] = []  # flat row of each entry's pack
+        self._children: dict[int | None, list[int]] = {None: []}
+        self._position: list[int] = []  # row of each entry under its parent
         self.status: dict[Path, str] = {}
         self.zen: dict[Path, float] = {}  # Zen Estimate of an Orphan's best Match
         self.seeding_zen: dict[str, float] = {}
@@ -68,7 +76,24 @@ class LibraryModel(QAbstractTableModel):
         self._rows = {}
         for row, e in enumerate(entries):
             self._rows.setdefault(e.item.path, []).append(row)
+        self._parent, self._children = [], {None: []}
+        self._position = []
+        for e in entries:
+            packs = self._rows.get(e.item.within, []) if e.item.within else []
+            pack = next((r for r in packs if entries[r].folder == e.folder), None)
+            siblings = self._children.setdefault(pack, [])
+            self._parent.append(pack)
+            self._position.append(len(siblings))
+            siblings.append(len(self._position) - 1)
         self.endResetModel()
+
+    def flat_index(self, row: int, column: int = 0) -> QModelIndex:
+        """The model index of `entries[row]`."""
+        return self.createIndex(self._position[row], column, row)
+
+    def pack_of(self, row: int) -> LibraryEntry | None:
+        pack = self._parent[row]
+        return None if pack is None else self.entries[pack]
 
     def rows_of(self, path: Path) -> list[int]:
         return self._rows.get(path, [])
@@ -83,7 +108,7 @@ class LibraryModel(QAbstractTableModel):
         else:
             self.status[path] = text
         for row in self.rows_of(path):
-            i = self.index(row, 1)
+            i = self.flat_index(row, 1)
             self.dataChanged.emit(i, i)
 
     def set_zen(self, path: Path, value: float | None) -> None:
@@ -92,7 +117,7 @@ class LibraryModel(QAbstractTableModel):
         else:
             self.zen[path] = value
         for row in self.rows_of(path):
-            i = self.index(row, self.ZEN_COLUMN)
+            i = self.flat_index(row, self.ZEN_COLUMN)
             self.dataChanged.emit(i, i)
 
     def zen_of(self, entry: LibraryEntry) -> float | None:
@@ -106,13 +131,29 @@ class LibraryModel(QAbstractTableModel):
         self.seeding_zen = (
             {row.torrent.hash.lower(): row.zen or 0.0 for row in view.rows} if view else {}
         )
-        if self.entries:
-            self.dataChanged.emit(
-                self.index(0, self.ZEN_COLUMN), self.index(len(self.entries) - 1, self.ZEN_COLUMN)
-            )
+        for rows in self._children.values():  # one range per pack, not per item
+            if rows:
+                first = self.flat_index(rows[0], self.ZEN_COLUMN)
+                self.dataChanged.emit(first, first.siblingAtRow(len(rows) - 1))
+
+    def index(
+        self, row: int, column: int, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+    ) -> QModelIndex:
+        rows = self._children.get(parent.internalId() if parent.isValid() else None, [])
+        if not 0 <= row < len(rows) or not 0 <= column < len(self.COLUMNS):
+            return QModelIndex()
+        return self.createIndex(row, column, rows[row])
+
+    def parent(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> QModelIndex:  # type: ignore[override]
+        if not index.isValid():
+            return QModelIndex()
+        pack = self._parent[index.internalId()]
+        return QModelIndex() if pack is None else self.flat_index(pack)
 
     def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
-        return 0 if parent.isValid() else len(self.entries)
+        if parent.isValid() and parent.column() != 0:
+            return 0
+        return len(self._children.get(parent.internalId() if parent.isValid() else None, []))
 
     def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         return len(self.COLUMNS)
@@ -125,7 +166,7 @@ class LibraryModel(QAbstractTableModel):
     def data(self, index: QModelIndex | QPersistentModelIndex, role: int = 0) -> Any:
         if not index.isValid():
             return None
-        e = self.entries[index.row()]
+        e = self.entries[index.internalId()]
         if role == Qt.ItemDataRole.ToolTipRole:
             if index.column() == self.ZEN_COLUMN and e.state is not ItemState.ORPHAN:
                 return self.tr(
@@ -134,16 +175,17 @@ class LibraryModel(QAbstractTableModel):
                     "Paused torrents contribute zero; a blank value means unavailable."
                 )
             if index.column() == 0 and e.item.within:
-                return self.tr("{0}\nEpisode of the pack {1}; searched with the pack.").format(
-                    e.item.path, e.item.within
-                )
+                return self.tr(
+                    "{0}\nAlso inside the pack {1}. Seeded on its own only by a torrent of "
+                    "its own; select it to search it as a single episode."
+                ).format(e.item.path, e.item.within)
             return str(e.item.path) if index.column() == 0 else self.data(index)
         if role == Qt.ItemDataRole.DisplayRole:
             return (
-                f"{e.item.within.name} › {e.item.path.name}" if e.item.within else e.item.path.name,
+                e.item.path.name,
                 state_label(e.state)
                 if e.state is ItemState.UNKNOWN
-                else self.status.get(e.item.path) or state_label(e.state),
+                else self.status.get(e.item.path) or self.state_text(index.internalId()),
                 human_size(e.item.size),
                 str(e.folder.path),
                 f"≈ {zen:.2f}" if (zen := self.zen_of(e)) is not None else "",
@@ -156,6 +198,16 @@ class LibraryModel(QAbstractTableModel):
             return e
         return None
 
+    def state_text(self, row: int) -> str:
+        e, pack = self.entries[row], self.pack_of(row)
+        if (
+            e.state is ItemState.ORPHAN
+            and pack is not None
+            and pack.state in (ItemState.SEEDED, ItemState.PARTIALLY_SEEDED)
+        ):
+            return self.tr("Orphan · in seeded pack")
+        return state_label(e.state)
+
 
 class LibraryFilter(QSortFilterProxyModel):
     """Filter the Library by state and by Library Folder; sorts sizes numerically."""
@@ -166,6 +218,7 @@ class LibraryFilter(QSortFilterProxyModel):
         self.folder: Path | None = None
         self.query = ""
         self.setSortCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.setRecursiveFilteringEnabled(True)  # a matching episode keeps its pack shown
 
     def set_filters(self, state: ItemState | None, folder: Path | None, query: str = "") -> None:
         if hasattr(self, "beginFilterChange"):  # Qt >= 6.9
@@ -181,7 +234,7 @@ class LibraryFilter(QSortFilterProxyModel):
     ) -> bool:
         model = self.sourceModel()
         assert isinstance(model, LibraryModel)
-        e = model.entries[source_row]
+        e = model.entries[model.index(source_row, 0, source_parent).internalId()]
         return (
             (self.state is None or e.state is self.state)
             and (self.folder is None or e.folder.path == self.folder)
@@ -195,10 +248,11 @@ class LibraryFilter(QSortFilterProxyModel):
     ) -> bool:
         model = self.sourceModel()
         assert isinstance(model, LibraryModel)
+        a_entry, b_entry = model.entries[left.internalId()], model.entries[right.internalId()]
         if left.column() == 2:
-            return model.entries[left.row()].item.size < model.entries[right.row()].item.size
+            return a_entry.item.size < b_entry.item.size
         if left.column() == LibraryModel.ZEN_COLUMN:
-            a = model.zen_of(model.entries[left.row()])
-            b = model.zen_of(model.entries[right.row()])
+            a = model.zen_of(a_entry)
+            b = model.zen_of(b_entry)
             return (-1.0 if a is None else a) < (-1.0 if b is None else b)
         return super().lessThan(left, right)
