@@ -417,3 +417,22 @@ def test_preferred_format_and_small_size_are_ranked_without_explicit_priorities(
 
     assert evaluate(epub, prefs)["rank"] < evaluate(replace(epub, size=2000), prefs)["rank"]
     assert prefs.priorities == ["format", "size"]
+
+
+def test_a_client_inventory_is_observed_in_one_transaction_without_rewriting_known_rows(
+    tmp_path,
+):
+    service = FeedService(tmp_path / "feeds.sqlite", lambda: Source())
+    service.observe_client_release(release("a", "Known first"))
+    statements = []
+    service.db.set_trace_callback(statements.append)
+
+    service.observe_client_releases(
+        [release("a", "Renamed in the client"), release("b"), release("c")]
+        + [Candidate("Not a hash", 1, "", infohash="xyz")]
+    )
+
+    assert sum(s.startswith("INSERT") for s in statements) == 2  # b and c, not the known a
+    assert statements.count("COMMIT") == 1
+    payloads = {row["infohash"]: row["title"] for row in service.releases()}
+    assert payloads == {"a" * 40: "Known first", "b" * 40: "Release", "c" * 40: "Release"}

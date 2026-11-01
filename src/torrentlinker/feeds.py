@@ -12,7 +12,7 @@ import re
 import sqlite3
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, fields, replace
 from pathlib import Path
 from typing import Any, Literal
@@ -981,13 +981,22 @@ class FeedService:
 
     def observe_client_release(self, row: Candidate) -> None:
         """Retain identity facts for comparison without adding an inbox membership."""
-        if not row.infohash or not re.fullmatch(r"[a-f0-9]{40}", row.infohash):
-            return
-        with self.lock, self.db:
-            self.db.execute(
-                "INSERT OR IGNORE INTO releases VALUES(?,?,?)",
-                (row.infohash, json.dumps(asdict(row)), time.time()),
-            )
+        self.observe_client_releases([row])
+
+    def observe_client_releases(self, rows: Iterable[Candidate]) -> None:
+        """The same for a whole client inventory, in one transaction; known ones are skipped."""
+        with self.lock:
+            known = {row[0] for row in self.db.execute("SELECT infohash FROM releases")}
+            now = time.time()
+            new = {
+                row.infohash: (row.infohash, json.dumps(asdict(row)), now)
+                for row in rows
+                if row.infohash
+                and row.infohash not in known
+                and re.fullmatch(r"[a-f0-9]{40}", row.infohash)
+            }
+            with self.db:
+                self.db.executemany("INSERT OR IGNORE INTO releases VALUES(?,?,?)", new.values())
 
     def metadata_error(self, infohash: str) -> None:
         with self.lock, self.db:

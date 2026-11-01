@@ -50,6 +50,44 @@ class FeedControl:
                 continue
 
     def inventory(self, *, refresh: bool = False, client_ids: list[str] | None = None) -> dict:
+        hashes, clients, unknown, queue_hashes = self._observe(refresh, client_ids)
+        known = {row["infohash"]: row for row in self.feeds.releases()}
+        if refresh:
+            missing = [
+                hash
+                for hash in sorted(hashes | queue_hashes)
+                if hash in known
+                and not work_identity(candidate(known[hash]))
+                and known[hash].get("metadata", {}).get("metadata_checked_at", 0)
+                < time.time() - 900
+            ]
+            for hash in missing[:10]:
+                try:
+                    known[hash] = self.feeds.enrich(hash)
+                except Exception:
+                    self.feeds.metadata_error(hash)
+        identities = {
+            hash: work_identity(candidate(known[hash])) if hash in known else None
+            for hash in hashes
+        }
+        unresolved = sorted(hash for hash, identity in identities.items() if not identity)
+        works = {identity for identity in identities.values() if identity is not None}
+        return {
+            "hashes": sorted(hashes),
+            "clients": clients,
+            "unavailable_clients": unknown,
+            "works": sorted(works),
+            "unknown_work_hashes": unresolved,
+            "work_identity_coverage": (
+                "Only verified identifiers from known feed releases. Other client "
+                "torrents may have unknown work identity."
+            ),
+        }
+
+    def _observe(
+        self, refresh: bool, client_ids: list[str] | None
+    ) -> tuple[set[str], dict[str, list[str]], list[str], set[str]]:
+        """Each client's torrent hashes, refreshed when asked, and the queued hashes."""
         if client_ids is not None:
             for client_id in client_ids:
                 self.service.setup.settings.profile(client_id)
@@ -73,59 +111,26 @@ class FeedControl:
             present = {torrent.hash.lower() for torrent in target.observed}
             clients[profile.id] = sorted(present)
             hashes.update(present)
-            for torrent in target.observed:
-                self.feeds.observe_client_release(
-                    Candidate(torrent.name, torrent.size, "", infohash=torrent.hash.lower())
-                )
+            self.feeds.observe_client_releases(
+                Candidate(torrent.name, torrent.size, "", infohash=torrent.hash.lower())
+                for torrent in target.observed
+            )
         from torrentlinker.download_queue import entries
 
-        queue_hashes = set()
-        for entry in entries(self.service.setup.store, all_clients=True):
-            if entry.candidate.infohash:
-                queue_hashes.add(entry.candidate.infohash)
-                self.feeds.observe_client_release(entry.candidate)
-        known = {row["infohash"]: row for row in self.feeds.releases()}
-        if refresh:
-            missing = [
-                hash
-                for hash in sorted(hashes | queue_hashes)
-                if hash in known
-                and not work_identity(candidate(known[hash]))
-                and known[hash].get("metadata", {}).get("metadata_checked_at", 0)
-                < time.time() - 900
-            ]
-            for hash in missing[:10]:
-                try:
-                    known[hash] = self.feeds.enrich(hash)
-                except Exception:
-                    self.feeds.metadata_error(hash)
-        unresolved = sorted(
-            hash
-            for hash in hashes
-            if hash not in known or not work_identity(candidate(known[hash]))
-        )
-        works = {
-            identity
-            for hash in hashes
-            if hash in known
-            if (identity := work_identity(candidate(known[hash]))) is not None
-        }
-        return {
-            "hashes": sorted(hashes),
-            "clients": clients,
-            "unavailable_clients": unknown,
-            "works": sorted(works),
-            "unknown_work_hashes": unresolved,
-            "work_identity_coverage": (
-                "Only verified identifiers from known feed releases. Other client "
-                "torrents may have unknown work identity."
-            ),
-        }
+        queued = [
+            entry.candidate
+            for entry in entries(self.service.setup.store, all_clients=True)
+            if entry.candidate.infohash
+        ]
+        self.feeds.observe_client_releases(queued)
+        queue_hashes = {candidate.infohash for candidate in queued}
+        return hashes, clients, unknown, queue_hashes
 
     def inbox(self, *, client_ids: list[str] | None = None, **filters) -> list[dict]:
         from torrentlinker.download_queue import entries
 
-        inventory = self.inventory(client_ids=client_ids)
+        _, clients, unavailable, _ = self._observe(False, client_ids)
+        present = {client: set(hashes) for client, hashes in clients.items()}
         queued = {
             e.candidate.infohash: e
             for e in entries(self.service.setup.store, all_clients=True)
@@ -134,11 +139,9 @@ class FeedControl:
         result = self.feeds.inbox(**filters)
         for row in result:
             row["in_clients"] = [
-                client
-                for client, hashes in inventory["clients"].items()
-                if row["infohash"] in hashes
+                client for client, hashes in present.items() if row["infohash"] in hashes
             ]
-            row["client_inventory_unknown"] = inventory["unavailable_clients"]
+            row["client_inventory_unknown"] = unavailable
             entry = queued.get(row["infohash"])
             row["queue_status"] = entry.status if entry else ""
             row["queued"] = bool(entry)

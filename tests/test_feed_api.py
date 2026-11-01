@@ -381,3 +381,32 @@ def test_mcp_exposes_subscription_fields_and_preferences(tmp_path):
         assert subscription["mode"]["enum"] == ["review_only", "app_queue", "automatic_download"]
         preferences = definitions["Preferences"]["properties"]
         assert {"max_size", "preferred", "priorities", "min_seeders"} <= preferences.keys()
+
+
+def test_inbox_marks_releases_already_in_clients_without_resolving_works(tmp_path, monkeypatch):
+    import time
+    from pathlib import Path
+
+    from torrentlinker import feed_control
+    from torrentlinker.domain import Torrent
+
+    app = create_app(tmp_path, password="test-password-long")
+    with TestClient(app):
+        control = app.state.agent_service.feed_control
+        target = app.state.agent_service.for_client("default")
+        target.observed = [Torrent("A" * 40, "Seeding", Path("/downloads"))]
+        target.connection_error = ""
+        target.feed_observed_at = time.time()
+        monkeypatch.setattr(
+            control.feeds, "inbox", lambda **_: [{"infohash": "a" * 40}, {"infohash": "b" * 40}]
+        )
+
+        def no_identity(*_):
+            raise AssertionError("The inbox must not resolve every client torrent's work")
+
+        monkeypatch.setattr(feed_control, "work_identity", no_identity)
+        rows = control.inbox()
+
+    assert [row["in_clients"] for row in rows] == [["default"], []]
+    assert rows[0]["client_inventory_unknown"] == []
+    assert not rows[1]["queued"]
