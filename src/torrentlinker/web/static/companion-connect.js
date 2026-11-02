@@ -10,6 +10,15 @@ try {
 history.replaceState(null, "", location.pathname);
 let attempts = 0;
 async function connect() {
+  // Browsers hide the companion from remote HTTP pages, so waiting cannot succeed.
+  if (
+    location.protocol === "http:" &&
+    !["127.0.0.1", "localhost"].includes(location.hostname)
+  ) {
+    status.textContent =
+      "The companion connects to a remote TorrentLinker only over HTTPS. Open TorrentLinker through an HTTPS address (for example with tailscale serve or a reverse proxy), download the companion again from Settings at that address, install it, then click Connect companion.";
+    return;
+  }
   if (!payload?.code || !payload?.accountId) {
     status.textContent =
       "Return to TorrentLinker → Zen → Profile and click Connect companion.";
