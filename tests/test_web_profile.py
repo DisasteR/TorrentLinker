@@ -237,3 +237,29 @@ def test_pairing_expiry_origin_binding_and_unexpected_snapshot_fields(tmp_path, 
         # Opening setup and abandoning it must not disconnect a working companion.
         browser.post("/api/zen/profile/pairing", headers=OWNER)
         assert browser.get("/api/zen/profile").json()["paired"]
+
+
+def test_profile_overview_follows_the_period_and_history(tmp_path, monkeypatch):
+    app, setup = prepared(tmp_path, monkeypatch)
+    with TestClient(app) as browser:
+        login(browser)
+        data = browser.post("/api/zen/profile/refresh?days=7", headers=OWNER).json()
+        overview = data["overview"]
+        assert overview["span"] == 7
+        assert overview["header"]["username"] == "Demo account"
+        assert overview["header"]["team"] is None
+        assert overview["tiles"]["zen"]["value"] == 123.5
+        assert overview["period"] is None  # one day of history so far
+        assert overview["calendar"][-1]["outcome"] == "api"
+        assert browser.get("/api/zen/profile?days=0").json()["overview"]["span"] == 0
+        assert browser.get("/api/zen/profile?days=5").status_code == 400
+
+
+def test_profile_torrent_clients_show_an_unreachable_client_as_unavailable(tmp_path, monkeypatch):
+    app, setup = prepared(tmp_path, monkeypatch)
+    with TestClient(app) as browser:
+        login(browser)
+        data = browser.get("/api/zen/profile/torrent-clients").json()
+        assert data["clients"] and all(c["count"] is None for c in data["clients"])
+        assert all(c["error"] for c in data["clients"])
+        assert data["zen"] is None and data["gap"] is None

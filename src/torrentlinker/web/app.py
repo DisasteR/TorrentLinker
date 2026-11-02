@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections import Counter
 from contextlib import asynccontextmanager
+from functools import partial
 from html import escape
 from pathlib import Path
 from typing import Literal
@@ -19,6 +21,7 @@ from pydantic import BaseModel, Field
 from torrentlinker import documentation
 from torrentlinker.clients import connect
 from torrentlinker.diagnostics import build_report, report_json
+from torrentlinker.domain import Torrent
 from torrentlinker.torrent_management import peer_count_order, tracker_group
 from torrentlinker.updates import installed_version
 from torrentlinker.web.confirmations import Confirmations
@@ -155,11 +158,27 @@ def create_app(
                             verification_cursor = position + 1
                             break
 
+    def history_loop() -> None:
+        """Refresh the profile hourly so Profile history has a row on days nobody opens it."""
+        from torrentlinker.profile import ProfileError
+
+        while not shutdown.wait(60):
+            key = service.secrets.get("indexer-api-key")
+            if not service.configured or not key:
+                continue
+            workspace = service.profile_workspace()
+            if time.time() >= workspace.state()["refresh_after"] + 3480:  # an hour since
+                try:
+                    workspace.refresh(service.settings.indexer.url, key)
+                except ProfileError:
+                    pass  # recorded in the history as the day's failure
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         monitor = threading.Thread(target=verify_loop, daemon=True, name="verification-monitor")
         if monitor_verifications:
             monitor.start()
+        threading.Thread(target=history_loop, daemon=True, name="profile-history").start()
         assistant.start_scheduler()
         agent_service.feed_control.start()
         try:
@@ -204,7 +223,18 @@ def create_app(
     from torrentlinker.profile_workspace import COMPANION_ROUTES
     from torrentlinker.web.profile import companion_request, profile_routes
 
-    profile_routes(app, service)
+    def client_torrents(identifier: str) -> list[Torrent]:
+        return for_client(identifier).setup.client().torrents(with_files=False)
+
+    profile_routes(
+        app,
+        service,
+        lambda: [
+            (p.name, partial(client_torrents, p.id))
+            for p in service.settings.client_profiles
+            if p.enabled
+        ],
+    )
 
     def idle() -> None:
         if jobs.active():

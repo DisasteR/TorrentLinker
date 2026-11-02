@@ -91,6 +91,30 @@ def test_profile_retains_account_progression_and_transfer_totals() -> None:
     assert profile.freeleech is False
 
 
+def test_profile_keeps_team_grade_freeleech_sources_and_total_xp() -> None:
+    data = {
+        **PROFILE,
+        "team": {"name": "Saumon", "slug": "saumon", "tag": "SMN", "role": "member"},
+        "freeleech": {"active": True, "sources": ["campaign", {"type": "lunar"}]},
+    }
+    profile = client(lambda r: httpx.Response(200, json=data)).fetch()
+
+    assert (profile.team_name, profile.team_tag, profile.team_role) == ("Saumon", "SMN", "member")
+    assert (profile.grade_tier, profile.grade_level) == ("bronze", 1)
+    assert profile.freeleech_sources == ["campaign", "lunar"]
+    assert profile.total_xp == 3400
+
+
+def test_null_team_and_class_are_not_errors() -> None:
+    data = {**PROFILE, "team": None, "class": None}
+    profile = client(lambda r: httpx.Response(200, json=data)).fetch()
+
+    assert profile.team_name is None and profile.team_tag is None and profile.team_role is None
+    assert profile.class_slug is None
+    assert profile.grade_tier is None and profile.grade_level is None
+    assert profile.quests == {}
+
+
 def test_class_and_tree_bonus_fill_the_zen_profile_keeping_manual_fields() -> None:
     profile = client(lambda r: httpx.Response(200, json=PROFILE)).fetch()
 

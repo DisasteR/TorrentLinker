@@ -12,12 +12,22 @@ Captures de l’interface française en thème sombre, avec des données d’exe
 
 ## Profil et extension navigateur
 
-**Profil** est le premier onglet Zen sur le bureau et dans l'interface web. Il
-présente le compte API, la date d'inscription, la Classe, le niveau, la progression,
-le solde Zen et les transferts. Il s'actualise toutes les deux minutes lorsque
-l'application de bureau est ouverte ou que le Profil web est visible.
-**Actualiser le profil** permet une mise à jour immédiate ; les erreurs restent
-affichées à côté des dernières valeurs reçues.
+**Profil** est le premier onglet Zen sur le bureau et dans l'interface web.
+L'en-tête présente la Classe, le niveau, l'équipe et la date d'inscription, avec des
+badges pour l'accès au téléchargement, le freeleech et la fraîcheur des données API
+et de l'extension. Suivent le ratio, le tampon, les transferts, le solde Zen et les
+seeds actifs ; les graphiques des volumes, du Zen et du ratio ; la progression ; le
+Zen gagné, dépensé et estimé depuis vos clients torrent ; la comptabilité des
+transferts avec le crédit ; les seeds actifs sur c411 comparés à chaque client
+torrent ; et un calendrier des synchronisations des 26 dernières semaines.
+
+TorrentLinker conserve une ligne d'historique du profil par jour, à partir du jour
+où vous utilisez cette version. Les graphiques, tendances et variations sur la
+période choisie (7 j, 30 j, 90 j ou Tout) apparaissent dès que deux jours sont
+enregistrés. Changer d'indexeur ou de clé démarre un nouvel historique. Le profil
+s'actualise toutes les deux minutes lorsque l'application de bureau est ouverte ou
+que le Profil web est visible. **Actualiser** permet une mise à jour immédiate ; les
+erreurs restent affichées à côté des dernières valeurs reçues.
 
 L'extension facultative pour Chrome, Brave ou Edge ajoute les seeds actifs, les
 uploads validés, la durée totale de seed et les statistiques de transfert. Gérez

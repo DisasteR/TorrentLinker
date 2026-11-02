@@ -8,6 +8,7 @@ from collections.abc import Callable
 from contextlib import ExitStack
 from dataclasses import replace
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +150,7 @@ from torrentlinker.tmdb import Tmdb
 from torrentlinker.updates import check_for_update, installed_version
 
 log = logging.getLogger(__name__)
+TORRENT_CLIENTS_EVERY = 60.0  # seconds between Profile reads of the Torrent Clients
 
 
 class MainWindow(QMainWindow):
@@ -159,11 +161,16 @@ class MainWindow(QMainWindow):
         self.settings = settings
         self.settings_path = settings_path
         from torrentlinker.companion import CompanionReceiver
+        from torrentlinker.profile_history import ProfileHistory
         from torrentlinker.profile_workspace import ProfileWorkspace
 
-        self.account_workspace = ProfileWorkspace(settings_path.parent)
+        self.account_workspace = ProfileWorkspace(
+            settings_path.parent, history=ProfileHistory(store)
+        )
         self.companion_receiver: CompanionReceiver | None = None
         self._profile_refreshing = False
+        self._torrent_clients_busy = False
+        self._torrent_clients_at = -TORRENT_CLIENTS_EVERY
         self._receiver_retry_at = 0.0
         self.agent_runtime: Any = None
         self.agent_settings_timer = QTimer(self)
@@ -308,6 +315,7 @@ class MainWindow(QMainWindow):
         self.review.candidates_checked.connect(self._show_match_zen)
         self.zen_tab = ZenTab(self.seeding_loader, lambda: self.settings.zen, settings.uploads)
         self.zen_tab.profile_view.refresh_requested.connect(self.refresh_profile)
+        self.zen_tab.profile_view.refresh_requested.connect(self.refresh_torrent_clients)
         self.companion_panel = None  # only while Settings is open
         self.profile_timer = QTimer(self)
         self.profile_timer.setInterval(3000)
@@ -918,7 +926,7 @@ class MainWindow(QMainWindow):
     def show_account_profile(self) -> None:
         self.account_workspace.bind(self.settings.indexer.url, get_secret(INDEXER_API_KEY))
         state = self.account_workspace.state()
-        self.zen_tab.profile_view.show_state(state)
+        self.zen_tab.profile_view.show_state(state, self.account_workspace.history_days())
         if self.companion_panel is not None:
             self.companion_panel.show_state(state)
         if state["paired"] and self.companion_receiver is None:
@@ -927,7 +935,8 @@ class MainWindow(QMainWindow):
                 try:
                     self._start_companion_receiver()
                 except OSError:
-                    self.zen_tab.profile_view.advanced_status.setText(
+                    self.zen_tab.profile_view.notice.show()
+                    self.zen_tab.profile_view.notice.setText(
                         self.tr(
                             "Browser connection unavailable. "
                             "Close the other TorrentLinker instance; retrying automatically."
@@ -938,6 +947,53 @@ class MainWindow(QMainWindow):
         self.show_account_profile()
         if time.time() >= self.account_workspace.state()["refresh_after"]:
             self.refresh_profile()
+        # Torrent Clients are asked at most once a minute, while Profile is shown.
+        if (
+            self.zen_tab.profile_view.isVisible()
+            and time.monotonic() - self._torrent_clients_at >= TORRENT_CLIENTS_EVERY
+        ):
+            self.refresh_torrent_clients()
+
+    def refresh_torrent_clients(self) -> None:
+        """Seeding per Torrent Client and today's Zen Estimate for the Profile view."""
+        from torrentlinker.profile_history import active_seeds
+        from torrentlinker.profile_overview import torrent_clients_overview
+
+        if not isValid(self) or self._torrent_clients_busy:
+            return
+        self._torrent_clients_busy = True
+        self._torrent_clients_at = time.monotonic()
+
+        def failing(error: Exception) -> Callable[[], list]:
+            def fetch() -> list:
+                raise error
+
+            return fetch
+
+        targets: list[tuple[str, Callable[[], list]]] = []
+        for profile in self.settings.client_profiles:
+            if not profile.enabled:
+                continue
+            try:
+                client = self._connections.client(self.settings, profile.id)
+                targets.append((profile.name, partial(client.torrents, with_files=False)))
+            except Exception as error:  # shown as unavailable
+                targets.append((profile.name, failing(error)))
+        seeds = active_seeds(self.account_workspace.state().get("companion"))
+        zen, url, uploads = self.settings.zen, self.settings.indexer.url, self.settings.uploads
+
+        def done(result: dict) -> None:
+            self._torrent_clients_busy = False
+            if isValid(self):
+                self.zen_tab.profile_view.show_torrent_clients(result)
+
+        def failed(error: Exception) -> None:
+            self._torrent_clients_busy = False
+            log.info("Profile clients not read: %s", error)
+
+        run_in_background(
+            lambda: torrent_clients_overview(zen, targets, url, seeds, uploads), done, failed
+        )
 
     def _start_companion_receiver(self) -> None:
         from torrentlinker.companion import CompanionReceiver

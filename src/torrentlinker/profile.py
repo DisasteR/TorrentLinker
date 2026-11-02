@@ -66,6 +66,13 @@ class UserProfile:
     freeleech: bool | None = None
     grade: str = ""
     quests: dict[str, dict[str, Any]] = field(default_factory=dict)
+    team_name: str | None = None  # None outside a team
+    team_tag: str | None = None
+    team_role: str | None = None
+    grade_tier: str | None = None  # bronze, argent or or; unknown tiers kept as given
+    grade_level: int | None = None
+    freeleech_sources: list[str] = field(default_factory=list)  # personal, campaign, window…
+    total_xp: int | None = None
 
     def apply(self, profile: ZenProfile) -> ZenProfile:
         """The Zen Profile with the Class and tree bonus read from c411."""
@@ -86,6 +93,13 @@ def class_from_slug(slug: str | None) -> ZenClass | None:
     return None
 
 
+def source_name(source: Any) -> str:
+    """A freeleech source as given; c411 has not shown a populated list yet."""
+    if isinstance(source, dict):
+        source = source.get("source") or source.get("type") or source.get("name") or ""
+    return str(source)
+
+
 def parse_profile(data: dict[str, Any]) -> UserProfile:
     cls = data.get("class") or {}
     slug = cls.get("effectiveSlug") or cls.get("slug")
@@ -96,6 +110,9 @@ def parse_profile(data: dict[str, Any]) -> UserProfile:
     transfer = data.get("transfer") or {}
     uploaded = transfer.get("uploaded") or {}
     downloaded = transfer.get("downloaded") or {}
+    grade = progress.get("grade") or {}
+    team = data.get("team") or {}
+    freeleech = data.get("freeleech") or {}
     return UserProfile(
         username=str(data.get("username", "")),
         class_slug=slug,
@@ -120,21 +137,21 @@ def parse_profile(data: dict[str, Any]) -> UserProfile:
         downloaded_actual=downloaded.get("actual"),
         downloaded_credit=downloaded.get("credit"),
         downloaded_total=downloaded.get("total"),
-        freeleech=(data.get("freeleech") or {}).get("active"),
-        grade=" ".join(
-            str(v)
-            for v in (
-                (progress.get("grade") or {}).get("tier"),
-                (progress.get("grade") or {}).get("level"),
-            )
-            if v is not None
-        ),
+        freeleech=freeleech.get("active"),
+        grade=" ".join(str(v) for v in (grade.get("tier"), grade.get("level")) if v is not None),
         quests={
             name: {key: value.get(key) for key in ("star", "questsCompleted", "questsTotal")}
             for name, value in (cls.get("voies") or {}).items()
             if name in {"seed", "upload", "specialization", "competitivity"}
             and isinstance(value, dict)
         },
+        team_name=team.get("name"),
+        team_tag=team.get("tag"),
+        team_role=team.get("role"),
+        grade_tier=grade.get("tier"),
+        grade_level=grade.get("level"),
+        freeleech_sources=[source_name(s) for s in freeleech.get("sources") or []],
+        total_xp=level.get("xp"),
     )
 
 

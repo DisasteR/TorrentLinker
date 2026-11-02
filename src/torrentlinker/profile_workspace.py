@@ -26,6 +26,7 @@ from urllib.parse import urlsplit
 from torrentlinker import net
 from torrentlinker.companion_downloads import CompanionDownloads, SessionFetchError
 from torrentlinker.profile import ProfileClient, ProfileError, ProfileProblem, UserProfile
+from torrentlinker.profile_history import ProfileDay, ProfileHistory
 
 COMPANION_ROUTES = {
     f"/api/companion/{name}" for name in ("pair", "snapshot", "disconnect", "commands", "result")
@@ -113,9 +114,15 @@ def valid_snapshot(data: Any, now: float) -> bool:
 
 
 class ProfileWorkspace:
-    def __init__(self, directory: Path, clock: Callable[[], float] = time.time):
+    def __init__(
+        self,
+        directory: Path,
+        clock: Callable[[], float] = time.time,
+        history: ProfileHistory | None = None,
+    ):
         self.path = directory / "profile-cache.json"
         self.clock = clock
+        self.history = history
         self.downloads = CompanionDownloads(lambda: self.clock())
         self.lock = threading.RLock()
         self.data: dict[str, Any] = {}
@@ -187,6 +194,8 @@ class ProfileWorkspace:
             with self.lock:
                 if self.data.get("binding") == binding:
                     self.error = error.problem.value
+                    if self.history and error.problem is not ProfileProblem.NO_KEY:
+                        self.history.record_failure(binding)
             raise
         with self.lock:
             if self.data.get("binding") != binding:
@@ -201,7 +210,17 @@ class ProfileWorkspace:
             self.data.update(api=api, api_updated_at=self.clock())
             self.error = None
             self._save()
+            if self.history:
+                self.history.record_api(binding, profile)
         return profile
+
+    def history_days(self) -> list[ProfileDay]:
+        """The bound account's Profile history, oldest first; never another account's."""
+        with self.lock:
+            binding = self.data.get("binding")
+            if not self.history or not binding:
+                return []
+            return self.history.days(binding)
 
     def state(self) -> dict[str, Any]:
         with self.lock:
@@ -300,6 +319,8 @@ class ProfileWorkspace:
                 raise ValueError("Snapshot already received or older than current data.")
             self.data.update(companion=body, received_at=self.clock())
             self._save()
+            if self.history:
+                self.history.record_companion(self.data["binding"], body)
             return {"accepted": True}
 
     def test_download(self, infohash: str, request_id: str, actor: str = "owner") -> dict[str, Any]:

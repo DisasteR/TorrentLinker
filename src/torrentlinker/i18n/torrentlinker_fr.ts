@@ -5950,316 +5950,445 @@ La mettre à la corbeille ?</translation>
 <context>
     <name>ProfileView</name>
     <message>
-        <location filename="../gui/profile_view.py" line="126"/>
+        <location filename="../gui/profile_view.py" line="168"/>
         <source>Active seeds</source>
         <translation>Seeds actifs</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="127"/>
+        <location filename="../gui/profile_view.py" line="1015"/>
         <source>Validated uploads</source>
         <translation>Uploads validés</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="128"/>
+        <location filename="../gui/profile_view.py" line="1020"/>
         <source>Total seed time</source>
         <translation>Durée totale de seed</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="140"/>
+        <location filename="../gui/profile_view.py" line="187"/>
         <source>Connect and manage the companion in Settings → Companion. Your login stays in the browser.</source>
         <translation>Connectez et gérez l’extension dans Paramètres → Extension. Votre session reste dans le navigateur.</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="269"/>
+        <location filename="../gui/profile_view.py" line="163"/>
+        <source>Ratio</source>
+        <translation>Ratio</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="164"/>
+        <location filename="../gui/profile_view.py" line="287"/>
+        <source>Buffer</source>
+        <translation>Tampon</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="241"/>
+        <source>Period</source>
+        <translation>Période</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="244"/>
+        <location filename="../gui/profile_view.py" line="684"/>
+        <source>{0} d</source>
+        <translation>{0} j</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="244"/>
+        <source>All</source>
+        <translation>Tout</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="251"/>
+        <source>Refresh</source>
+        <translation>Actualiser</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="281"/>
+        <source>Upload and download totals over time</source>
+        <translation>Totaux envoyés et téléchargés dans le temps</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="283"/>
+        <source>Volumes</source>
+        <translation>Volumes</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="294"/>
+        <source>Zen balance and ratio over time</source>
+        <translation>Solde Zen et ratio dans le temps</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="296"/>
+        <source>Zen balance &amp; ratio</source>
+        <translation>Solde Zen et ratio</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="356"/>
+        <source>local estimate</source>
+        <translation>estimation locale</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="376"/>
+        <source>Transfer accounting</source>
+        <translation>Comptabilité des transferts</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="395"/>
+        <source>Credit comes from bonuses and freeleech. Total upload adds it; total download subtracts it, never below zero.</source>
+        <translation>Le crédit vient des bonus et du freeleech. Il s’ajoute à l’envoi total et se retire du téléchargement total, sans descendre sous zéro.</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="407"/>
+        <source>Seeding · tracker vs clients</source>
+        <translation>Seed · tracker et clients</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="407"/>
+        <source>companion</source>
+        <translation>extension</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="425"/>
+        <source>Sync history · last 26 weeks</source>
+        <translation>Historique de synchronisation · 26 semaines</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="427"/>
+        <source>Daily profile sync results</source>
+        <translation>Résultats quotidiens de synchronisation</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="451"/>
+        <source>API and companion OK</source>
+        <translation>API et extension OK</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="452"/>
+        <source>API only</source>
+        <translation>API seule</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="453"/>
+        <source>Failed</source>
+        <translation>Échec</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="454"/>
+        <source>App not running</source>
+        <translation>Application fermée</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="619"/>
+        <source>History is being collected</source>
+        <translation>Historique en cours de collecte</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="629"/>
+        <source>Level {0}</source>
+        <translation>Niveau {0}</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="630"/>
+        <source>Team {0}</source>
+        <translation>Équipe {0}</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="631"/>
+        <source>Member since {0}</source>
+        <translation>Membre depuis {0}</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="642"/>
+        <source>Download allowed</source>
+        <translation>Téléchargement autorisé</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="646"/>
+        <source>Download blocked</source>
+        <translation>Téléchargement bloqué</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="662"/>
+        <source>Companion · {0}</source>
+        <translation>Extension · {0}</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="669"/>
+        <source>Companion · waiting</source>
+        <translation>Extension · en attente</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="671"/>
+        <source>Companion · not connected</source>
+        <translation>Extension · non connectée</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="684"/>
+        <source>all</source>
+        <translation>tout</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="764"/>
+        <source>Uploaded in period</source>
+        <translation>Envoyé sur la période</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="765"/>
+        <source>Downloaded in period</source>
+        <translation>Téléchargé sur la période</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="767"/>
+        <source>Average upload</source>
+        <translation>Envoi moyen</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="768"/>
+        <source>{0}/d</source>
+        <translation>{0}/j</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="794"/>
+        <source>Zen change</source>
+        <translation>Variation Zen</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="795"/>
+        <source>Purchases seen</source>
+        <translation>Achats constatés</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="796"/>
+        <source>Ratio now</source>
+        <translation>Ratio actuel</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="802"/>
+        <source>LEVEL</source>
+        <translation>NIVEAU</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="807"/>
+        <source>{0} XP to level {1} · {2} XP total</source>
+        <translation>{0} XP avant le niveau {1} · {2} XP au total</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="819"/>
+        <source>Quests {0} / {1} · Tree bonus {2}</source>
+        <translation>Quêtes {0} / {1} · Bonus d’arbre {2}</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="858"/>
+        <source>{0} (current)</source>
+        <translation>{0} (actuelle)</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="882"/>
+        <source>Earned</source>
+        <translation>Gagnés</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="886"/>
+        <source>Spent</source>
+        <translation>Dépensés</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="889"/>
+        <source>Estimated today (from your clients)</source>
+        <translation>Estimé aujourd’hui (vos clients)</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="892"/>
+        <source>Loading…</source>
+        <translation>Chargement…</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="894"/>
+        <source>Connect a Torrent Client to estimate</source>
+        <translation>Connectez un client torrent pour estimer</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="901"/>
+        <source>Measured over {0} days</source>
+        <translation>Mesuré sur {0} jours</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="903"/>
+        <source>Measured over all history</source>
+        <translation>Mesuré sur tout l’historique</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="904"/>
+        <source>{0} Zen / day</source>
+        <translation>{0} Zen / jour</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="909"/>
+        <source>Best class for your seeds</source>
+        <translation>Meilleure classe pour vos seeds</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="915"/>
+        <source>Top earner</source>
+        <translation>Meilleur torrent</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="916"/>
+        <source>{0} · {1} Zen/day</source>
+        <translation>{0} · {1} Zen/jour</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="931"/>
+        <source>total {0}</source>
+        <translation>total {0}</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="934"/>
+        <source>actual {0} · credit {1} · </source>
+        <translation>réel {0} · crédit {1} · </translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="966"/>
+        <source>Source</source>
+        <translation>Source</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="966"/>
+        <source>Torrents</source>
+        <translation>Torrents</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="966"/>
+        <source>Size</source>
+        <translation>Taille</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="968"/>
+        <source>Connect the companion</source>
+        <translation>Connectez l’extension</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="970"/>
+        <source>Active on c411</source>
+        <translation>Actifs sur c411</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="980"/>
+        <source>Loading Torrent Clients…</source>
+        <translation>Chargement des clients torrent…</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="983"/>
+        <source>No Torrent Client is enabled.</source>
+        <translation>Aucun client torrent activé.</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="988"/>
+        <source>Unavailable</source>
+        <translation>Indisponible</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="995"/>
+        <source>Gap</source>
+        <translation>Écart</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="999"/>
+        <source>No client reachable</source>
+        <translation>Aucun client joignable</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="1002"/>
+        <source>{0} not seen</source>
+        <translation>{0} non vus</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="1004"/>
+        <source>{0} more in clients</source>
+        <translation>{0} de plus dans les clients</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="1006"/>
+        <source>None</source>
+        <translation>Aucun</translation>
+    </message>
+    <message>
+        <location filename="../gui/profile_view.py" line="1021"/>
         <source>{0} days</source>
         <translation>{0} jours</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="277"/>
-        <source>Actual upload {0} · Actual download {1}
-Credited upload {2} · Credited download {3}</source>
-        <translation>Envoi réel {0} · Téléchargement réel {1}
-Envoi crédité {2} · Téléchargement crédité {3}</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="46"/>
-        <source>Your c411 profile</source>
-        <translation>Votre profil c411</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="50"/>
-        <source>Refresh profile</source>
-        <translation>Actualiser le profil</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="81"/>
+        <location filename="../gui/profile_view.py" line="304"/>
         <source>Progression</source>
         <translation>Progression</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="94"/>
-        <source>Transfers · API</source>
-        <translation>Transferts · API</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="114"/>
-        <source>Advanced activity · Browser companion</source>
-        <translation>Activité détaillée · Extension navigateur</translation>
-    </message>
-    <message>
-        <source>Save extension…</source>
-        <translation>Enregistrer l’extension…</translation>
-    </message>
-    <message>
-        <source>Connect companion</source>
-        <translation>Connecter l’extension</translation>
-    </message>
-    <message>
-        <source>Disconnect &amp; clear</source>
-        <translation>Déconnecter et effacer</translation>
-    </message>
-    <message>
-        <source>Pair with this account</source>
-        <translation>Associer à ce compte</translation>
-    </message>
-    <message>
-        <source>Extract the extension ZIP, then load its folder in your browser&apos;s Extensions page with Developer mode enabled. Open c411 and click the extension. Read a preview, enter this receiver address and code, pair, then send the snapshot. The code expires in 10 minutes; the connection lasts one hour.</source>
-        <translation type="vanished">Extrayez le ZIP et chargez son dossier dans la page Extensions du navigateur en mode développeur. Ouvrez c411 et cliquez sur l’extension. Lisez un aperçu, saisissez cette adresse et ce code, associez puis envoyez. Le code expire après 10 minutes ; la connexion dure une heure.</translation>
-    </message>
-    <message>
-        <source>Receiver address</source>
-        <translation type="vanished">Adresse de réception</translation>
-    </message>
-    <message>
-        <source>Pairing code</source>
-        <translation>Code d’association</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="164"/>
+        <location filename="../gui/profile_view.py" line="586"/>
         <source>Add an API key with profile:read access in Settings → Indexer.</source>
         <translation>Ajoutez une clé API avec le droit profile:read dans Paramètres → Indexeur.</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="165"/>
+        <location filename="../gui/profile_view.py" line="587"/>
         <source>API key refused. Check Settings → Indexer and refresh.</source>
         <translation>Clé API refusée. Vérifiez Paramètres → Indexeur puis actualisez.</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="166"/>
+        <location filename="../gui/profile_view.py" line="588"/>
         <source>The API key needs profile:read access.</source>
         <translation>La clé API nécessite le droit profile:read.</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="167"/>
+        <location filename="../gui/profile_view.py" line="589"/>
         <source>The tracker asked us to wait. Try refreshing later.</source>
         <translation>Le tracker demande de patienter. Réessayez plus tard.</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="168"/>
+        <location filename="../gui/profile_view.py" line="590"/>
         <source>Profile unavailable. Check your connection and refresh.</source>
         <translation>Profil indisponible. Vérifiez la connexion puis actualisez.</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="203"/>
-        <source>Allowed</source>
-        <translation>Autorisé</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="203"/>
-        <source>Blocked</source>
-        <translation>Bloqué</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="239"/>
+        <location filename="../gui/profile_view.py" line="335"/>
         <source>Seeding</source>
         <translation>Seed</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="240"/>
+        <location filename="../gui/profile_view.py" line="336"/>
         <source>Uploading</source>
         <translation>Upload</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="241"/>
+        <location filename="../gui/profile_view.py" line="337"/>
         <source>Specialization</source>
         <translation>Spécialisation</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="242"/>
+        <location filename="../gui/profile_view.py" line="338"/>
         <source>Competitiveness</source>
         <translation>Compétitivité</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="71"/>
-        <source>Zen balance</source>
-        <translation>Solde Zen</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="72"/>
-        <source>Class &amp; level</source>
-        <translation>Classe et niveau</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="73"/>
-        <source>Download access</source>
-        <translation>Accès au téléchargement</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="97"/>
+        <location filename="../gui/profile_view.py" line="165"/>
+        <location filename="../gui/profile_view.py" line="285"/>
+        <location filename="../gui/profile_view.py" line="379"/>
         <source>Uploaded</source>
         <translation>Envoyé</translation>
     </message>
     <message>
-        <location filename="../gui/profile_view.py" line="97"/>
+        <location filename="../gui/profile_view.py" line="166"/>
+        <location filename="../gui/profile_view.py" line="286"/>
+        <location filename="../gui/profile_view.py" line="380"/>
         <source>Downloaded</source>
         <translation>Téléchargé</translation>
     </message>
     <message>
-        <source>Your browser login stays in the browser. Preview and send only the fields you choose.</source>
-        <translation type="vanished">Votre session reste dans le navigateur. Prévisualisez et envoyez uniquement les champs choisis.</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="181"/>
+        <location filename="../gui/profile_view.py" line="624"/>
         <source>Connect your c411 account</source>
         <translation>Connectez votre compte c411</translation>
     </message>
     <message>
-        <source>Pair again</source>
-        <translation type="vanished">Associer à nouveau</translation>
-    </message>
-    <message>
-        <source>Stale snapshot</source>
-        <translation type="vanished">Données anciennes</translation>
-    </message>
-    <message>
-        <source>Snapshot received</source>
-        <translation>Données reçues</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="294"/>
-        <source>Active seeds, validated uploads and total seed time require a browser snapshot.</source>
-        <translation>Les seeds actifs, uploads validés et la durée de seed nécessitent un aperçu du navigateur.</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="101"/>
-        <source>Actual</source>
-        <translation>Réel</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="102"/>
-        <source>Credit</source>
-        <translation>Crédit</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="103"/>
-        <source>Total</source>
-        <translation>Total</translation>
-    </message>
-    <message>
-        <source>API snapshot is older than five minutes. Refresh for current values.</source>
-        <translation type="vanished">Les données API ont plus de cinq minutes. Actualisez pour les mettre à jour.</translation>
-    </message>
-    <message>
-        <source>Account information from the c411 API.</source>
-        <translation type="vanished">Informations du compte issues de l’API c411.</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="183"/>
-        <source>Account {0} · Member since {1} · API updated {2}</source>
-        <translation>Compte {0} · Membre depuis {1} · API actualisée {2}</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="190"/>
-        <source>{0} Zen
-Earned {1} · Spent {2}</source>
-        <translation>{0} Zen
-Gagnés {1} · Dépensés {2}</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="197"/>
-        <source>{0}
-Level {1} · Tree bonus {2}%</source>
-        <translation>{0}
-Niveau {1} · Bonus d’arbre {2}%</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="217"/>
-        <source>{0} XP in this level · {1} XP to next level</source>
-        <translation>{0} XP dans ce niveau · {1} XP avant le prochain niveau</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="230"/>
-        <source>Quests {0} / {1} · Stars {2}</source>
-        <translation>Quêtes {0} / {1} · Étoiles {2}</translation>
-    </message>
-    <message>
-        <source>Paired. Send a preview from the extension.</source>
-        <translation type="vanished">Associé. Envoyez un aperçu depuis l’extension.</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="290"/>
-        <source>Connect the companion to see advanced activity.</source>
-        <translation>Connectez l’extension pour afficher l’activité détaillée.</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="210"/>
-        <source>Freeleech active</source>
-        <translation>Freeleech actif</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="212"/>
-        <source>Standard download rules</source>
-        <translation>Règles de téléchargement standard</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="261"/>
-        <source>{0} · c411 browser · Last sync {1}</source>
-        <translation>{0} · Navigateur c411 · Dernière synchronisation {1}</translation>
-    </message>
-    <message>
-        <source>Active seeds {0}   ·   Validated uploads {1}   ·   Total seed time {2} days
-Actual upload {3} · Actual download {4}
-Credited upload {5} · Credited download {6}</source>
-        <translation type="vanished">Seeds actifs {0}   ·   Uploads validés {1}   ·   Durée totale de seed {2} jours
-Envoi réel {3} · Téléchargement réel {4}
-Envoi crédité {5} · Téléchargement crédité {6}</translation>
-    </message>
-    <message>
-        <source>Connect once to sync account statistics, transfers, seed time and active seeds every two minutes. Your login stays in the browser. Keep a signed-in c411 tab open.</source>
-        <translation>Connectez une fois pour synchroniser les statistiques du compte, les transferts, la durée et le nombre de seeds toutes les deux minutes. Votre session reste dans le navigateur. Gardez un onglet c411 connecté ouvert.</translation>
-    </message>
-    <message>
-        <source>Connecting in your browser. Once the companion is installed, connection and updates are automatic. Keep the browser connection page open during installation.</source>
-        <translation>Connexion dans votre navigateur. Une fois l’extension installée, la connexion et les mises à jour sont automatiques. Gardez la page de connexion ouverte pendant l’installation.</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="173"/>
+        <location filename="../gui/profile_view.py" line="595"/>
         <source>Waiting for an API update. Retrying automatically.</source>
         <translation>En attente des données API. Nouvelle tentative automatique.</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="176"/>
-        <source>Account information from the c411 API. Updates automatically every two minutes.</source>
-        <translation>Informations du compte issues de l’API c411. Mise à jour automatique toutes les deux minutes.</translation>
-    </message>
-    <message>
-        <source>Connect another browser</source>
-        <translation>Connecter un autre navigateur</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="256"/>
-        <source>Waiting for a browser update</source>
-        <translation>En attente du navigateur</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="258"/>
-        <source>Automatic sync connected</source>
-        <translation>Synchronisation automatique connectée</translation>
-    </message>
-    <message>
-        <location filename="../gui/profile_view.py" line="288"/>
-        <source>Connected. Waiting for the first automatic browser update.</source>
-        <translation>Connecté. En attente de la première mise à jour automatique du navigateur.</translation>
     </message>
 </context>
 <context>

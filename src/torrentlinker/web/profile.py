@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from datetime import date
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from torrentlinker.companion_downloads import MAX_RESULT
+from torrentlinker.domain import Torrent
 from torrentlinker.profile import ProfileError
+from torrentlinker.profile_history import active_seeds
+from torrentlinker.profile_overview import PERIODS, overview, torrent_clients_overview
 from torrentlinker.profile_workspace import extension_origin
 from torrentlinker.web.setup import Setup
 
@@ -61,15 +67,39 @@ class SessionDownloads(BaseModel):
     enabled: bool
 
 
-def profile_routes(app: FastAPI, setup: Setup) -> None:
+TorrentClients = Callable[[], list[tuple[str, Callable[[], list[Torrent]]]]]
+Period = Query(30, description="Days of Profile history: 7, 30, 90 or 0 for all.")
+
+
+def profile_routes(app: FastAPI, setup: Setup, torrent_clients: TorrentClients) -> None:
+    def with_overview(days: int) -> dict[str, Any]:
+        """The workspace state plus the Profile overview for a period of history."""
+        if days not in PERIODS:
+            raise HTTPException(400, "Choose 7, 30, 90 or 0 days.")
+        workspace = setup.profile_workspace()
+        state = workspace.state()
+        return {**state, "overview": overview(state, workspace.history_days(), days, date.today())}
+
     @app.post("/api/zen/profile/session-downloads")
-    def session_downloads(body: SessionDownloads):
+    def session_downloads(body: SessionDownloads, days: int = Period):
         workspace = setup.profile_workspace()
         try:
             workspace.set_session_downloads(body.enabled)
         except ValueError as error:
             raise HTTPException(409, str(error)) from error
-        return workspace.state()
+        return with_overview(days)
+
+    @app.get("/api/zen/profile/torrent-clients")
+    def profile_torrent_clients() -> dict[str, Any]:
+        """Seeding per Torrent Client against c411, and today's Zen Estimate."""
+        settings = setup.settings
+        return torrent_clients_overview(
+            settings.zen,
+            torrent_clients(),
+            settings.indexer.url,
+            active_seeds(setup.profile_workspace().state().get("companion")),
+            settings.uploads,
+        )
 
     @app.post("/api/zen/profile/download-tests")
     def test_download(body: DownloadTest):
@@ -86,11 +116,11 @@ def profile_routes(app: FastAPI, setup: Setup) -> None:
             raise HTTPException(404, str(error)) from error
 
     @app.get("/api/zen/profile")
-    def state():  # type: ignore[no-untyped-def]
-        return setup.profile_workspace().state()
+    def state(days: int = Period):  # type: ignore[no-untyped-def]
+        return with_overview(days)
 
     @app.post("/api/zen/profile/refresh")
-    def refresh():  # type: ignore[no-untyped-def]
+    def refresh(days: int = Period):  # type: ignore[no-untyped-def]
         workspace = setup.profile_workspace()
         try:
             profile = workspace.refresh(
@@ -100,7 +130,7 @@ def profile_routes(app: FastAPI, setup: Setup) -> None:
             setup.save()
         except ProfileError:
             pass  # Typed error is shown next to the last successful API data.
-        return workspace.state()
+        return with_overview(days)
 
     @app.post("/api/zen/profile/pairing")
     def pairing():  # type: ignore[no-untyped-def]
@@ -110,10 +140,9 @@ def profile_routes(app: FastAPI, setup: Setup) -> None:
             raise HTTPException(409, str(error)) from error
 
     @app.post("/api/zen/profile/disconnect")
-    def disconnect():  # type: ignore[no-untyped-def]
-        workspace = setup.profile_workspace()
-        workspace.disconnect()
-        return workspace.state()
+    def disconnect(days: int = Period):  # type: ignore[no-untyped-def]
+        setup.profile_workspace().disconnect()
+        return with_overview(days)
 
     @app.get("/api/zen/profile/extension")
     def extension(request: Request) -> Response:

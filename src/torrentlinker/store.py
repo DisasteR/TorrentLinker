@@ -139,6 +139,13 @@ CREATE TABLE IF NOT EXISTS plan_item (
     outcome TEXT,
     reason TEXT
 );
+-- Profile history: one row per local day per account binding (see profile_history).
+CREATE TABLE IF NOT EXISTS profile_history (
+    account TEXT NOT NULL,
+    day TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    PRIMARY KEY (account, day)
+);
 """
 
 
@@ -1118,3 +1125,26 @@ class Store:
 
     def clear_plan(self) -> None:
         self.save_plan([])
+
+    def profile_day(self, account: str, day: str) -> dict | None:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT payload FROM profile_history WHERE account = ? AND day = ?",
+                (account, day),
+            ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def save_profile_day(self, account: str, day: str, payload: dict) -> None:
+        with self._lock, self._db:
+            self._db.execute(
+                "INSERT OR REPLACE INTO profile_history VALUES (?, ?, ?)",
+                (account, day, json.dumps(payload, allow_nan=False)),
+            )
+
+    def profile_days(self, account: str) -> list[tuple[str, dict]]:
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT day, payload FROM profile_history WHERE account = ? ORDER BY day",
+                (account,),
+            ).fetchall()
+        return [(day, json.loads(payload)) for day, payload in rows]

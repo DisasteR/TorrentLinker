@@ -12,11 +12,20 @@ Screenshots use the English interface, dark theme and example data.
 
 ## Profile and browser companion
 
-**Profile** is the first Zen tab on desktop and WebUI. It shows your API account,
-membership date, Class, level, quest progression, Zen balance and transfer totals.
-It refreshes every two minutes while the desktop app is running or the WebUI
-Profile tab is visible. **Refresh profile** requests an immediate update; errors
-appear alongside the last successful values.
+**Profile** is the first Zen tab on desktop and WebUI. The header shows your
+Class, level, team and membership date, with badges for download access, freeleech
+and how fresh the API and companion data are. Below come your ratio, buffer,
+transfer totals, Zen Balance and active seeds; charts of volumes, Zen and ratio;
+progression; Zen earned, spent and estimated from your Torrent Clients; transfer
+accounting with credit; active seeds on c411 against each Torrent Client; and a
+calendar of the last 26 weeks of syncs.
+
+TorrentLinker keeps one row of profile history per day, from the day you start
+using this version. Charts, trend lines and changes over the chosen period
+(7 d, 30 d, 90 d or All) appear once two days are recorded. Changing the indexer
+or its key starts a new history. The profile refreshes every two minutes while
+the desktop app is running or the WebUI Profile tab is visible. **Refresh**
+requests an immediate update; errors appear alongside the last successful values.
 
 The optional Chrome, Brave or Edge companion adds active seed count, validated
 uploads, total seed time and transfer statistics. Manage its installation and

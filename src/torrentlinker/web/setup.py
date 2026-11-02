@@ -20,6 +20,7 @@ from torrentlinker.domain import ContentKind, LibraryFolder, PathMapping, Torren
 from torrentlinker.indexer import Indexer
 from torrentlinker.library import known_files
 from torrentlinker.paths import PathMapper
+from torrentlinker.profile_history import ProfileHistory
 from torrentlinker.profile_workspace import ProfileWorkspace
 from torrentlinker.qbit import ClientApi
 from torrentlinker.store import Store
@@ -150,13 +151,13 @@ class Setup:
         self.connector = connector
         self.lock = threading.RLock()
         self._folder_proofs: dict[tuple, float] = {}
-        self._profile_workspace = ProfileWorkspace(directory)
         self.download_guard: Callable[[bytes, str], None] | None = None
         self._client: ClientApi | None = None
         self._indexer: Indexer | None = None
         self.store = Store(directory / "catalogue.sqlite").for_client(
             self.settings.active_client_id
         )
+        self._profile_workspace = ProfileWorkspace(directory, history=ProfileHistory(self.store))
         proxy = self.settings.proxy
         net.configure(
             net.proxy_url(proxy.address, proxy.username, self.secrets.get("proxy-password")),
