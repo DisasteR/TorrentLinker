@@ -964,8 +964,8 @@ class MainWindow(QMainWindow):
         from torrentlinker.profile_history import active_seeds
         from torrentlinker.profile_overview import torrent_clients_overview
 
-        if not isValid(self) or self._torrent_clients_busy:
-            return
+        if not isValid(self) or self._torrent_clients_busy or not self._startup_complete:
+            return  # before setup, a window contacts no client
         self._torrent_clients_busy = True
         self._torrent_clients_at = time.monotonic()
 

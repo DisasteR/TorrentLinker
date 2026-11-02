@@ -28,6 +28,24 @@ def test_existing_settings_without_key_do_not_start_network_work(qtbot, tmp_path
     assert not window.seeding_timer.isActive()
 
 
+def test_profile_reads_no_torrent_client_before_setup(qtbot, tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(main_window, "get_secret", lambda name: "")
+    monkeypatch.setattr(main_window.MainWindow, "refresh_profile", lambda self: None)
+    window = main_window.MainWindow(
+        Settings(), tmp_path / "settings.json", Store(tmp_path / "s.db")
+    )
+    qtbot.addWidget(window)
+    monkeypatch.setattr(window._connections, "client", lambda *a, **kw: calls.append(a))
+    window.show()
+    assert window.zen_tab.profile_view.isVisible()
+
+    window._poll_account_profile()
+    window.zen_tab.profile_view.refresh_requested.emit()
+
+    assert not calls
+
+
 def test_media_layout_shortcut_is_restored_when_the_app_reopens(qtbot, tmp_path, monkeypatch):
     from PySide6.QtWidgets import QComboBox
 
