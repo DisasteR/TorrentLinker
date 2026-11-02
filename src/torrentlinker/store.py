@@ -225,7 +225,7 @@ class Verification:
     rechecked_at: float | None
     # Piece ranges Verification checks when some files are absent; None means all of them.
     required_pieces: list[tuple[int, int]] | None
-    # Local files the torrent must find in place, relative to its save path.
+    # Local files that must stay in place, relative to the Local Item's folder.
     local_files: list[str] = field(default_factory=list)
 
 

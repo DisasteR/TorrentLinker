@@ -110,7 +110,8 @@ def _start_reseed(
     added()
     absent = set(match.unwanted)
     required = pieces_inside(meta, absent) if absent else None
-    local_files = sorted(client_match.pairs.values())
+    # Where the user keeps the files, as checked below: never the client's own view.
+    local_files = sorted(match.pairs.values())
     store.start_verification(h, item.path, candidate_key, required, local_files)
     # qBittorrent re-applies its own list of file paths when a new torrent settles and
     # when a check starts. A rename it has not taken in yet is then undone on disk,
@@ -301,7 +302,11 @@ def check_verifications(
                 continue
             if t.state in CHECKING_STATES:
                 continue
-            if missing := _missing(t.save_path, record.local_files):
+            # The files where the user keeps them, beside the Local Item, exactly as the
+            # Reseed checked before the hash check. The client's reported save path,
+            # translated back through Path Mappings or written as a share path, may
+            # name the same folder differently (#53).
+            if missing := _missing(record.item_path.parent, record.local_files):
                 # Never seed from files that are not where the user keeps them.
                 _remove_reseed(qbit, store, t.hash)
                 problem = f"Local files are no longer in place: {', '.join(missing)}"

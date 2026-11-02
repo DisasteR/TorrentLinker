@@ -387,3 +387,34 @@ def test_setup_timeout_cleans_up_only_after_successful_removal(
     assert check_verifications(client, store) == []
     assert store.rejections(item.path) == {}
     assert item.path.read_bytes() == scene.read_bytes()
+
+
+def test_a_client_naming_the_folder_differently_does_not_cancel_the_reseed(
+    tmp_path: Path,
+) -> None:
+    """#53: every Full Match was cancelled as "no longer in place" when the client
+    reported the save folder another way (a share path, a Path Mapping round trip)."""
+    from dataclasses import replace
+
+    item, data = ebook(tmp_path)
+    meta = read_torrent(data)
+
+    class ShareClient(FakeQbit):
+        def torrent(self, hash, with_files=True):  # type: ignore[no-untyped-def]
+            found = super().torrent(hash, with_files)
+            return found and replace(found, save_path=Path("//nas/share/Library"))
+
+        def torrents(self, tag=None, with_files=True):  # type: ignore[no-untyped-def]
+            return [
+                replace(t, save_path=Path("//nas/share/Library"))
+                for t in super().torrents(tag, with_files)
+            ]
+
+    qbit, store = ShareClient(), Store(tmp_path / "s.db")
+    h = start_reseed(qbit, store, item, meta, match(item, meta.files), meta.infohash)  # type: ignore[arg-type]
+    qbit.finish_check(h, 1.0)
+
+    [outcome] = check_verifications(qbit, store, now=lambda: 1e12)
+
+    assert outcome.verified and not outcome.problem
+    assert qbit.started == [h]

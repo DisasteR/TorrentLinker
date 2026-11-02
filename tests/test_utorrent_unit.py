@@ -348,7 +348,9 @@ def test_full_reseed_verification_survives_new_adapter_and_preserves_native_layo
     client = MappedQbit(api_for(web), mapper)
     store = Store(tmp_path / "s.db")
     h = start_reseed(client, store, item, meta, Match({p: p for p in meta.files}), "candidate")
-    assert store.verification(h).local_files == ["book.epub"]
+    # Recorded where the user keeps them (beside the Local Item), not in µTorrent's
+    # layout, whose multifile save path is the content folder itself.
+    assert store.verification(h).local_files == ["Bundle/book.epub" if multi else "book.epub"]
     assert client.torrent(h).save_path == local
     assert not any(c.get("action") == "start" for c in web.calls)
     assert check_verifications(client, store) == []
