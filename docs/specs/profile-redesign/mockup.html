@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Visual reference for docs/specs/profile-redesign.md. Sample data only. Open directly in a browser. -->
+<title>TorrentLinker Profile Revamp</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: app shell (nav rail + workspace). Workspace = identity band, KPI strip, evolution charts, then a 2-col grid of detail panels. Tokens mirror gui/theme.py. */
+:root {
+  --bg: #f3f6fa; --surface: #ffffff; --raised: #f7f9fc; --line: #d5dfe9;
+  --fg: #203047; --muted: #5c6c80;
+  --accent: #087f76; --accent-soft: #e8f3f2; --brand: #087f76;
+  --up: #1f9d63; --down: #2f6fd0; --zen: #8a5800; --ratio: #b07a12;
+  --ok: #1f9d63; --warn: #8a5800; --err: #b42332;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #151b23; --surface: #1d2530; --raised: #222d39; --line: #354454;
+  --fg: #e7eef6; --muted: #a6b4c4;
+  --accent: #087f76; --accent-soft: #273c48; --brand: #68cec5;
+  --up: #4ad394; --down: #6fa8ff; --zen: #edbf73; --ratio: #e7c35a;
+  --ok: #4ad394; --warn: #edbf73; --err: #ff9c9c; color-scheme: dark;
+}}
+:root[data-theme="dark"] {
+  --bg: #151b23; --surface: #1d2530; --raised: #222d39; --line: #354454;
+  --fg: #e7eef6; --muted: #a6b4c4;
+  --accent: #087f76; --accent-soft: #273c48; --brand: #68cec5;
+  --up: #4ad394; --down: #6fa8ff; --zen: #edbf73; --ratio: #e7c35a;
+  --ok: #4ad394; --warn: #edbf73; --err: #ff9c9c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); }
+.shell { display: grid; grid-template-columns: 196px 1fr; min-height: 100%; }
+nav.rail { background: var(--surface); border-right: 1px solid var(--line); padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+.logo { font-weight: 600; color: var(--brand); padding: 4px 10px 16px; letter-spacing: .01em; }
+.rail a { color: var(--muted); text-decoration: none; padding: 7px 10px; border-radius: 6px; }
+.rail a.on { background: var(--accent-soft); color: var(--brand); font-weight: 500; }
+main { padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; min-width: 0; max-width: 1280px; }
+.demo { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--warn); border: 1px dashed var(--warn); border-radius: 6px; padding: 6px 10px; align-self: flex-start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+.eyebrow { font: 600 11px var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.src { font: 500 10px var(--mono); letter-spacing: .04em; text-transform: none; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+.src.new { border-color: var(--warn); color: var(--warn); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* identity */
+.identity { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font: 600 22px var(--sans); flex: none; }
+.who { flex: 1 1 260px; min-width: 0; }
+.who h1 { margin: 0; font-size: 22px; font-weight: 600; text-wrap: balance; }
+.who .meta { color: var(--muted); font-size: 13px; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.pill { font: 500 11px var(--sans); padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.info { color: var(--brand); }
+.actions { display: flex; gap: 8px; align-items: center; }
+button { font: 500 13px var(--sans); border-radius: 6px; padding: 7px 14px; border: 1px solid var(--line); background: var(--raised); color: var(--fg); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 4px 10px; background: transparent; color: var(--muted); font-size: 12px; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--brand); }
+
+/* kpis */
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 6px; min-width: 0; }
+.kpi .k { font: 600 10.5px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.kpi .v { font: 500 22px var(--mono); font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
+.kpi .v small { font-size: 12px; color: var(--muted); margin-left: 3px; }
+.kpi .d { font: 12px var(--mono); color: var(--muted); }
+.kpi .d .pos { color: var(--ok); }
+.kpi svg { display: block; width: 100%; height: 30px; margin-top: 4px; }
+
+/* charts */
+.charts { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
+.chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.chart-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.chart-head .range { color: var(--muted); font: 12px var(--mono); }
+.legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+svg.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font: 10px var(--mono); }
+.foot { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; }
+.foot div { background: var(--raised); border-radius: 6px; padding: 6px 10px; font-size: 11px; color: var(--muted); }
+.foot b { display: block; color: var(--fg); font: 500 14px var(--mono); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* progression */
+.level { display: flex; gap: 16px; align-items: center; }
+.ring { flex: none; }
+.ring text { fill: var(--fg); }
+.voies { display: grid; gap: 9px; margin-top: 14px; }
+.voie { display: grid; grid-template-columns: 120px 1fr 84px; gap: 10px; align-items: center; font-size: 13px; }
+.bar { height: 7px; background: var(--raised); border-radius: 4px; overflow: hidden; border: 1px solid var(--line); }
+.bar span { display: block; height: 100%; background: var(--brand); border-radius: 4px; }
+.stars { color: var(--zen); letter-spacing: 1px; font-size: 12px; }
+.grade { font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--zen); border: 1px solid var(--zen); padding: 1px 8px; border-radius: 4px; }
+
+/* zen */
+.zen-split { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin: 10px 0 6px; }
+.zen-split span:first-child { background: var(--zen); } .zen-split span:last-child { background: var(--line); }
+.rows { display: grid; gap: 0; margin-top: 8px; }
+.row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.row span:first-child { color: var(--muted); }
+
+/* transfer accounting */
+.acct { display: grid; gap: 12px; }
+.acct .lbl { display: flex; flex-wrap: wrap; gap: 2px 12px; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.stack { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--raised); }
+
+/* calendar */
+.cal { display: grid; grid-template-columns: repeat(auto-fill, 13px); gap: 3px; }
+.cal i { width: 13px; height: 13px; border-radius: 3px; background: var(--raised); border: 1px solid var(--line); }
+.cal i.ok { background: var(--ok); border-color: transparent; opacity: .85; }
+.cal i.part { background: var(--warn); border-color: transparent; }
+.cal i.ko { background: var(--err); border-color: transparent; }
+.calkey { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 10px; flex-wrap: wrap; }
+.calkey i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+/* compare */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+td.r, th.r { text-align: right; }
+.delta-warn { color: var(--warn); } .delta-ok { color: var(--ok); }
+.tablewrap { overflow-x: auto; }
+
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .charts, .grid2 { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .shell { grid-template-columns: 1fr; } nav.rail { display: none; } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voie { grid-template-columns: 96px 1fr 56px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="shell">
+  <nav class="rail" aria-label="Workspaces">
+    <div class="logo">TorrentLinker</div>
+    <a href="#">Search</a><a href="#">Library</a><a href="#">Upload</a><a href="#">Torrents</a><a href="#">Zen</a>
+    <a href="#" class="on">Profile</a><a href="#">Assistant</a>
+  </nav>
+
+  <main>
+    <div class="demo">Preview · sample data, not your account</div>
+
+    <section class="panel identity" aria-label="Account">
+      <div class="avatar">V</div>
+      <div class="who">
+        <h1>vietnoirien</h1>
+        <div class="meta">Gardien · Level 23 · Team Saumon [SMN] · Member since 14 Mar 2025</div>
+        <div class="pills">
+          <span class="pill ok">Download allowed</span>
+          <span class="pill info">Freeleech · campaign</span>
+          <span class="pill ok">API · 2 min ago</span>
+          <span class="pill warn">Companion · 3 h ago</span>
+        </div>
+      </div>
+      <div class="actions">
+        <div class="seg" role="group" aria-label="Period">
+          <button type="button" data-days="7">7 d</button>
+          <button type="button" data-days="30" aria-pressed="true">30 d</button>
+          <button type="button" data-days="90">90 d</button>
+          <button type="button" data-days="0">All</button>
+        </div>
+        <button class="primary" type="button">Refresh</button>
+      </div>
+    </section>
+
+    <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+    <section class="charts">
+      <div class="panel">
+        <div class="chart-head">
+          <div><h3>Volumes</h3><div class="range" id="vrange"></div></div>
+          <div class="legend"><span><i style="background:var(--up)"></i>Uploaded</span><span><i style="background:var(--down)"></i>Downloaded</span><span><i style="background:var(--muted);opacity:.5"></i>Buffer</span></div>
+        </div>
+        <svg class="chart" id="vol" viewBox="0 0 640 220" role="img" aria-label="Upload and download totals over time"></svg>
+        <div class="foot" id="volfoot"></div>
+      </div>
+      <div class="panel">
+        <div class="chart-head">
+          <div><h3>Zen balance &amp; ratio</h3><div class="range" id="zrange"></div></div>
+          <div class="legend"><span><i style="background:var(--zen)"></i>Zen</span><span><i style="background:var(--ratio);border-radius:0;height:2px"></i>Ratio</span></div>
+        </div>
+        <svg class="chart" id="zen" viewBox="0 0 420 220" role="img" aria-label="Zen balance and ratio over time"></svg>
+        <div class="foot" id="zenfoot"></div>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <div class="panel">
+        <p class="eyebrow">Progression <span class="src">API</span></p>
+        <div class="level">
+          <svg class="ring" width="96" height="96" viewBox="0 0 96 96" aria-label="Level progress 62%">
+            <circle cx="48" cy="48" r="40" fill="none" stroke="var(--raised)" stroke-width="9"/>
+            <circle cx="48" cy="48" r="40" fill="none" stroke="var(--brand)" stroke-width="9" stroke-linecap="round" stroke-dasharray="155.8 251.3" transform="rotate(-90 48 48)"/>
+            <text x="48" y="46" text-anchor="middle" font-size="24" font-weight="600" font-family="IBM Plex Sans, sans-serif">23</text>
+            <text x="48" y="62" text-anchor="middle" font-size="9" font-family="IBM Plex Mono, monospace" fill="var(--muted)">LEVEL</text>
+          </svg>
+          <div>
+            <div class="num" style="font-size:15px">4 960 / 8 000 XP</div>
+            <div style="color:var(--muted);font-size:13px">3 040 XP to level 24 · 48 210 XP total</div>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="grade">Argent II</span><span class="stars">★★★☆</span><span style="color:var(--muted);font-size:13px">Quests 31 / 52 · Tree bonus +2.5 %</span></div>
+          </div>
+        </div>
+        <div class="voies" id="voies"></div>
+      </div>
+
+      <div class="panel">
+        <p class="eyebrow">Zen <span class="src">API</span> <span class="src">local estimate</span></p>
+        <div class="num" id="zenbal" style="font-size:26px;font-weight:500">12 480 <small style="font-size:13px;color:var(--muted)">Zen</small></div>
+        <div class="zen-split" id="zensplit" aria-hidden="true"></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)"><span>Earned <b class="num" id="zenearned" style="color:var(--fg)"></b></span><span>Spent <b class="num" id="zenspent" style="color:var(--fg)"></b></span></div>
+        <div class="rows">
+          <div class="row"><span>Estimated today (from your clients)</span><span class="num">+218 Zen</span></div>
+          <div class="row"><span>Measured over 30 days</span><span class="num">+194 Zen / day</span></div>
+          <div class="row"><span>Best class for your seeds</span><span>Gardien (current) · Archiviste −6 %</span></div>
+          <div class="row"><span>Top earner</span><span>The.Expanse.S03.MULTi.1080p · 14 Zen/day</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p class="eyebrow">Transfer accounting <span class="src">API</span></p>
+        <div class="acct" id="acct"></div>
+        <p style="color:var(--muted);font-size:12px;margin:12px 0 0">Credit comes from bonuses and freeleech. Total upload adds it; total download subtracts it, never below zero.</p>
+      </div>
+
+      <div class="panel">
+        <p class="eyebrow">Seeding · tracker vs clients <span class="src">companion</span> <span class="src">clients</span></p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Source</th><th class="r">Torrents</th><th class="r">Size</th></tr></thead>
+          <tbody>
+            <tr><td>Active on c411</td><td class="r num">412</td><td class="r num">3.84 TiB</td></tr>
+            <tr><td>qBittorrent · seedbox</td><td class="r num">318</td><td class="r num">2.97 TiB</td></tr>
+            <tr><td>Transmission · NAS</td><td class="r num">91</td><td class="r num">0.86 TiB</td></tr>
+            <tr><td><b>Gap</b></td><td class="r num delta-warn">3 not seen</td><td class="r num delta-warn">12.4 GiB</td></tr>
+          </tbody>
+        </table></div>
+        <div class="rows" style="margin-top:6px">
+          <div class="row"><span>Validated uploads</span><span class="num">27</span></div>
+          <div class="row"><span>Total seed time</span><span class="num">18 942 days</span></div>
+        </div>
+      </div>
+
+      <div class="panel" style="grid-column:1/-1">
+        <p class="eyebrow">Sync history · last 26 weeks <span class="src new">needs history</span></p>
+        <div class="cal" id="cal" aria-label="Daily profile sync results"></div>
+        <div class="calkey"><span><i style="background:var(--ok)"></i>API and companion OK</span><span><i style="background:var(--warn)"></i>API only</span><span><i style="background:var(--err)"></i>Failed</span><span><i style="background:var(--raised);border:1px solid var(--line)"></i>App not running</span></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const GiB = 1024 ** 3, TiB = 1024 ** 4;
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+const r = rng(411);
+const DAYS = 180, today = new Date(2026, 10, 2);
+const hist = [];
+let up = 5.1 * TiB, dl = 1.32 * TiB, zen = 6900;
+for (let i = DAYS; i >= 0; i--) {
+  const d = new Date(today); d.setDate(d.getDate() - i);
+  up += (18 + r() * 34) * GiB * (1 + (DAYS - i) / 260);
+  dl += (r() < .35 ? r() * 22 : r() * 3) * GiB;
+  zen += 150 + r() * 90 - (r() < .06 ? 1200 + r() * 1500 : 0);
+  hist.push({ d, up, dl, zen });
+}
+const fmt = (b) => b >= TiB ? [(b / TiB).toFixed(2), "TiB"] : [(b / GiB).toFixed(1), "GiB"];
+const fmtS = (b) => fmt(b).join(" ");
+const nf = (n) => Math.round(n).toLocaleString("fr-FR");
+const iso = (d) => d.toISOString().slice(0, 10);
+
+function path(pts) { return pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" "); }
+function niceMax(v) { const p = 10 ** Math.floor(Math.log10(v)); return Math.ceil(v / p / 2) * 2 * p; }
+
+function spark(vals, color) {
+  const lo = Math.min(...vals), hi = Math.max(...vals), w = 120, h = 30;
+  const pts = vals.map((v, i) => [i / (vals.length - 1) * w, h - 3 - (v - lo) / ((hi - lo) || 1) * (h - 6)]);
+  const last = pts[pts.length - 1];
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path d="${path(pts)} L${w} ${h} L0 ${h} Z" fill="${color}" opacity=".12"/><path d="${path(pts)}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/><circle cx="${last[0]}" cy="${last[1]}" r="2.2" fill="${color}"/></svg>`;
+}
+
+function render(days) {
+  const sl = days ? hist.slice(-days - 1) : hist;
+  const a = sl[0], z = sl[sl.length - 1];
+  const kp = [
+    ["Ratio", (z.up / z.dl).toFixed(2), "", `${(z.up / z.dl - a.up / a.dl >= 0 ? "+" : "")}${(z.up / z.dl - a.up / a.dl).toFixed(2)}`, sl.map(h => h.up / h.dl), "var(--ratio)"],
+    ["Buffer", ...fmt(z.up - z.dl), "+" + fmtS((z.up - z.dl) - (a.up - a.dl)), sl.map(h => h.up - h.dl), "var(--brand)"],
+    ["Uploaded", ...fmt(z.up), "+" + fmtS(z.up - a.up), sl.map(h => h.up), "var(--up)"],
+    ["Downloaded", ...fmt(z.dl), "+" + fmtS(z.dl - a.dl), sl.map(h => h.dl), "var(--down)"],
+    ["Zen", nf(z.zen), "", (z.zen - a.zen >= 0 ? "+" : "") + nf(z.zen - a.zen), sl.map(h => h.zen), "var(--zen)"],
+    ["Active seeds", "412", "", "+9", sl.map((_, i) => 380 + i * 32 / sl.length + Math.sin(i) * 3), "var(--brand)"],
+  ];
+  document.getElementById("kpis").innerHTML = kp.map(([k, v, u, d, s, c]) =>
+    `<div class="kpi"><div class="k">${k}</div><div class="v">${v}<small>${u}</small></div><div class="d"><span class="pos">${d}</span> · ${days ? days + " d" : "all"}</div>${spark(s, c)}</div>`).join("");
+
+  const range = `${iso(a.d)} → ${iso(z.d)}`;
+  document.getElementById("vrange").textContent = range;
+  document.getElementById("zrange").textContent = range;
+
+  // volumes chart
+  const W = 640, H = 220, L = 8, R = 64, T = 10, B = 26, pw = W - L - R, ph = H - T - B;
+  const max = niceMax(z.up), x = (i) => L + i / (sl.length - 1) * pw, y = (v) => T + ph - v / max * ph;
+  let g = "";
+  for (let k = 0; k <= 4; k++) { const v = max * k / 4, yy = y(v); g += `<line x1="${L}" x2="${L + pw}" y1="${yy}" y2="${yy}" stroke="var(--line)" stroke-width="1"/><text x="${W - R + 6}" y="${yy + 3}">${k ? fmtS(v) : "0"}</text>`; }
+  [0, Math.floor((sl.length - 1) / 2), sl.length - 1].forEach((i, j) => g += `<text x="${x(i)}" y="${H - 8}" text-anchor="${["start", "middle", "end"][j]}">${iso(sl[i].d)}</text>`);
+  const pu = sl.map((h, i) => [x(i), y(h.up)]), pd = sl.map((h, i) => [x(i), y(h.dl)]), pb = sl.map((h, i) => [x(i), y(h.up - h.dl)]);
+  g += `<path d="${path(pu)} L${x(sl.length - 1)} ${y(0)} L${L} ${y(0)} Z" fill="var(--up)" opacity=".14"/>`;
+  g += `<path d="${path(pb)}" fill="none" stroke="var(--muted)" stroke-dasharray="3 3" stroke-width="1.2" opacity=".7"/>`;
+  g += `<path d="${path(pu)}" fill="none" stroke="var(--up)" stroke-width="2"/>`;
+  g += `<path d="${path(pd)} L${x(sl.length - 1)} ${y(0)} L${L} ${y(0)} Z" fill="var(--down)" opacity=".14"/><path d="${path(pd)}" fill="none" stroke="var(--down)" stroke-width="2"/>`;
+  g += `<circle cx="${pu.at(-1)[0]}" cy="${pu.at(-1)[1]}" r="3.5" fill="var(--up)"/><circle cx="${pd.at(-1)[0]}" cy="${pd.at(-1)[1]}" r="3.5" fill="var(--down)"/>`;
+  document.getElementById("vol").innerHTML = g;
+  document.getElementById("volfoot").innerHTML = `<div>Uploaded in period<b>${fmtS(z.up - a.up)}</b></div><div>Downloaded in period<b>${fmtS(z.dl - a.dl)}</b></div><div>Average upload<b>${fmtS((z.up - a.up) / (sl.length - 1))}/d</b></div>`;
+
+  // zen bars (daily delta) + ratio line
+  const ZW = 420, ZR = 40, ZL = 40, zpw = ZW - ZL - ZR;
+  const zmax = niceMax(Math.max(...sl.map(h => h.zen))), zx = (i) => ZL + i / (sl.length - 1) * zpw, zy = (v) => T + ph - v / zmax * ph;
+  const rat = sl.map(h => h.up / h.dl), rlo = Math.floor(Math.min(...rat) * 2) / 2, rhi = Math.ceil(Math.max(...rat) * 2) / 2, ry = (v) => T + ph - (v - rlo) / (rhi - rlo) * ph;
+  let zg = "";
+  for (let k = 0; k <= 4; k++) { const yy = T + ph * (1 - k / 4); zg += `<line x1="${ZL}" x2="${ZL + zpw}" y1="${yy}" y2="${yy}" stroke="var(--line)"/><text x="${ZL - 6}" y="${yy + 3}" text-anchor="end">${nf(zmax * k / 4)}</text><text x="${ZW - ZR + 6}" y="${yy + 3}">${(rlo + (rhi - rlo) * k / 4).toFixed(2)}</text>`; }
+  [0, sl.length - 1].forEach((i, j) => zg += `<text x="${zx(i)}" y="${H - 8}" text-anchor="${j ? "end" : "start"}">${iso(sl[i].d)}</text>`);
+  const pz = sl.map((h, i) => [zx(i), zy(h.zen)]), pr = rat.map((v, i) => [zx(i), ry(v)]);
+  zg += `<path d="${path(pz)} L${zx(sl.length - 1)} ${zy(0)} L${ZL} ${zy(0)} Z" fill="var(--zen)" opacity=".16"/><path d="${path(pz)}" fill="none" stroke="var(--zen)" stroke-width="2"/>`;
+  zg += `<path d="${path(pr)}" fill="none" stroke="var(--ratio)" stroke-width="1.5" stroke-dasharray="5 3"/>`;
+  zg += `<circle cx="${pz.at(-1)[0]}" cy="${pz.at(-1)[1]}" r="3.5" fill="var(--zen)"/>`;
+  document.getElementById("zen").innerHTML = zg;
+  const spends = sl.slice(1).filter((h, i) => h.zen < sl[i].zen).length;
+  document.getElementById("zenfoot").innerHTML = `<div>Zen change<b>${(z.zen - a.zen >= 0 ? "+" : "") + nf(z.zen - a.zen)}</b></div><div>Purchases seen<b>${spends}</b></div><div>Ratio now<b>${(z.up / z.dl).toFixed(2)}</b></div>`;
+}
+
+document.getElementById("voies").innerHTML = [["Seeding", 11, 14, 3], ["Uploading", 7, 14, 2], ["Specialization", 9, 12, 3], ["Competitiveness", 4, 12, 1]]
+  .map(([n, d, t, s]) => `<div class="voie"><span>${n}</span><div class="bar"><span style="width:${d / t * 100}%"></span></div><span class="num" style="text-align:right">${d}/${t} <span class="stars">${"★".repeat(s)}</span></span></div>`).join("");
+
+const last = hist.at(-1);
+// Tiles and charts show actual traffic; this panel adds c411 credit on top.
+const acct = [["Uploaded", last.up, last.up * .09, "var(--up)"], ["Downloaded", last.dl, -last.dl * .22, "var(--down)"]];
+const spent = 19160, earned = Math.round(last.zen) + spent;
+document.getElementById("zenbal").firstChild.textContent = nf(last.zen) + " ";
+document.getElementById("zenearned").textContent = nf(earned);
+document.getElementById("zenspent").textContent = nf(spent);
+document.getElementById("zensplit").innerHTML = `<span style="flex:${last.zen}"></span><span style="flex:${spent}"></span>`;
+document.getElementById("acct").innerHTML = acct.map(([n, act, cr, c]) => {
+  const tot = Math.max(0, act + cr), base = Math.max(act, tot);
+  const crw = Math.abs(cr) / base * 100;
+  return `<div><div class="lbl"><span>${n}</span><span class="num">actual ${fmtS(act)} · credit ${cr >= 0 ? "+" : "−"}${fmtS(Math.abs(cr))} · <b style="color:var(--fg)">total ${fmtS(tot)}</b></span></div>
+  <div class="stack"><span style="width:${(cr >= 0 ? act : tot) / base * 100}%;background:${c}"></span><span style="width:${crw}%;background:${c};opacity:.35;${cr < 0 ? "background-image:repeating-linear-gradient(45deg,transparent 0 3px,var(--surface) 3px 5px)" : ""}"></span></div></div>`;
+}).join("");
+
+let cal = "";
+for (let i = 181; i >= 0; i--) { const v = r(); cal += `<i class="${v < .05 ? "ko" : v < .14 ? "part" : v < .2 ? "" : "ok"}" title="${iso(new Date(today - i * 864e5))}"></i>`; }
+document.getElementById("cal").innerHTML = cal;
+
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".seg button").forEach(o => o.setAttribute("aria-pressed", o === b));
+  render(+b.dataset.days);
+}));
+render(30);
+</script>
