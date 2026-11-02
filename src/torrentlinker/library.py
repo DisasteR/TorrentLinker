@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from functools import partial
@@ -59,6 +60,9 @@ def _timed_out(error: BaseException) -> bool:
             break
         error = nested
     return False
+
+
+CLIENT_PAUSE_MAX = 2.0  # seconds; a very slow answer must not stall the scan for long
 
 
 def _client_read(
@@ -143,19 +147,46 @@ def build_library(
     return entries
 
 
-def indexer_contents(client: Qbit, store: Store, indexer_url: str) -> list[Torrent]:
+def indexer_contents(
+    client: Qbit,
+    store: Store,
+    indexer_url: str,
+    *,
+    refresh: bool = False,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> list[Torrent]:
     """The Indexer's torrents in the Torrent Client, with their files.
 
     Only they make a Local Item Seeded: a file seeded for another tracker stays an Orphan,
     to be searched and cross-seeded. Files are read for these torrents alone, one request
     each, which spares thousands of requests when the client seeds for other trackers.
+
+    File lists read before are reused (`refresh` reads them all again). The client
+    answers on its main thread, so after each request this waits as long as the answer
+    took: the client spends at most half its time on TorrentLinker and stays usable.
+    Lists are saved as they come, so an interrupted scan keeps what it read.
     """
     listed = _client_read(lambda: client.torrents(with_files=False), "torrents")
     known = store.known_hashes([t.hash.lower() for t in listed])
-    return [
-        replace(t, files=_client_read(partial(client.files, t.hash), "files", t.name))
-        for t in indexer_torrents(listed, indexer_url, known)
-    ]
+    torrents = indexer_torrents(listed, indexer_url, known)
+    cached = {} if refresh else store.torrent_files([t.hash for t in torrents])
+    result, fresh = [], {}
+    try:
+        for t in torrents:
+            files = cached.get(t.hash.lower())
+            if files is None:
+                started = clock()
+                files = _client_read(partial(client.files, t.hash), "files", t.name)
+                sleep(min(clock() - started, CLIENT_PAUSE_MAX))
+                fresh[t.hash] = files
+                if len(fresh) >= 200:
+                    store.cache_torrent_files(fresh)
+                    fresh = {}
+            result.append(replace(t, files=files))
+    finally:
+        store.cache_torrent_files(fresh)
+    return result
 
 
 def auto_searchable(entries: Iterable[LibraryEntry]) -> list[LibraryEntry]:

@@ -227,3 +227,40 @@ def test_mapped_app_download_pack_is_recognized_inside_a_library_subfolder(tmp_p
     assert entries[0].item.path == model
     assert entries[0].state is ItemState.SEEDED
     assert entries[0].torrent_hashes == frozenset({source.hash})
+
+
+def test_file_lists_are_read_once_paced_and_again_only_when_asked(tmp_path: Path) -> None:
+    from tests.fake_qbit import FakeQbit
+    from torrentlinker.library import indexer_contents
+    from torrentlinker.store import Store
+
+    url = "https://c411.org/api/torznab"
+    client = FakeQbit()
+    client.by_hash = {
+        h * 40: Torrent(h * 40, n, LIB, {n: 1}, tracker="https://tracker.c411.org/a")
+        for h, n in (("a", "One.mkv"), ("b", "Two.mkv"))
+    }
+    read: list[str] = []
+    files = client.files
+    now = [0.0]
+
+    def slow_files(h: str) -> dict[str, int]:
+        read.append(h)
+        now[0] += 0.3  # the client takes 0.3 s to answer
+        return files(h)
+
+    client.files = slow_files  # type: ignore[method-assign]
+    pauses: list[float] = []
+    store = Store(tmp_path / "s.db")
+
+    def scan(**kw: object) -> list[Torrent]:
+        return indexer_contents(client, store, url, clock=lambda: now[0], sleep=pauses.append, **kw)
+
+    first = scan()
+    assert len(read) == 2 and pauses == [0.3, 0.3]  # as long as each answer took
+    assert scan() == first and len(read) == 2  # the next scan asks for no file list
+    store.forget_torrent_files("b" * 40)  # e.g. files renamed inside it by a Reseed
+    scan()
+    assert read[2:] == ["b" * 40]
+    scan(refresh=True)  # Rescan everything reads every list again
+    assert sorted(read[3:]) == ["a" * 40, "b" * 40]

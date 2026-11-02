@@ -2603,7 +2603,7 @@ class MainWindow(QMainWindow):
         def work():
             client_error = None
             try:
-                torrents = indexer_contents(qbit, store, url)
+                torrents = indexer_contents(qbit, store, url, refresh=refresh)
             except Exception as error:
                 client_error = error
                 torrents = None

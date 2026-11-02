@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS rejection (
     reason TEXT NOT NULL,
     PRIMARY KEY (item_path, candidate_key)
 );
+-- A torrent's file list, as its client last reported it: fixed for an info hash unless
+-- files are renamed inside the torrent, so scans need not ask the client again.
+CREATE TABLE IF NOT EXISTS torrent_files (
+    client_id TEXT NOT NULL,
+    infohash TEXT NOT NULL,
+    files TEXT NOT NULL,
+    PRIMARY KEY (client_id, infohash)
+);
 CREATE TABLE IF NOT EXISTS scan_cache (
     item_path TEXT PRIMARY KEY,
     signature TEXT NOT NULL,
@@ -693,6 +701,36 @@ class Store:
             self._db.execute(
                 "INSERT OR REPLACE INTO scan_cache VALUES (?, ?, ?)",
                 (str(item_path), signature, json.dumps(files)),
+            )
+
+    def torrent_files(self, hashes: list[str]) -> dict[str, dict[str, int]]:
+        """File lists of these torrents read in an earlier scan, by lowercase hash."""
+        found: dict[str, dict[str, int]] = {}
+        with self._lock:
+            for i in range(0, len(hashes), 500):
+                chunk = [h.lower() for h in hashes[i : i + 500]]
+                marks = ",".join("?" * len(chunk))
+                for h, files in self._db.execute(
+                    f"SELECT infohash, files FROM torrent_files WHERE client_id = ? "
+                    f"AND infohash IN ({marks})",
+                    [self.client_id, *chunk],
+                ):
+                    found[h] = {str(k): int(v) for k, v in json.loads(files).items()}
+        return found
+
+    def cache_torrent_files(self, files: dict[str, dict[str, int]]) -> None:
+        with self._lock, self._db:
+            self._db.executemany(
+                "INSERT OR REPLACE INTO torrent_files VALUES (?, ?, ?)",
+                [(self.client_id, h.lower(), json.dumps(f)) for h, f in files.items() if f],
+            )
+
+    def forget_torrent_files(self, infohash: str) -> None:
+        """After renaming files inside a torrent: its next scan asks the client again."""
+        with self._lock, self._db:
+            self._db.execute(
+                "DELETE FROM torrent_files WHERE client_id = ? AND infohash = ?",
+                (self.client_id, infohash.lower()),
             )
 
     # Catalogue --------------------------------------------------------------

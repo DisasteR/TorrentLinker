@@ -121,6 +121,8 @@ def _start_reseed(
         for old, new in renames:
             _require_absent_rename_sources(item.save_path, [(old, new)])
             qbit.rename_file(h, old, new)
+        if renames:
+            store.forget_torrent_files(h)  # its file list changed
     except Exception as e:  # e.g. a client that cannot rename into other folders
         qbit.remove(h)  # never deletes files
         store.end_verification(h)
