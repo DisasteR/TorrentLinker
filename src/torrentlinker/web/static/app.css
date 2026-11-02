@@ -46,6 +46,7 @@
 .pf-empty { color: var(--muted); font-size: 13px; padding: 18px 0; text-align: center; }
 .pf-identity { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .pf-avatar { width: 56px; height: 56px; border-radius: 50%; background: #087f76; color: #fff; display: grid; place-items: center; font-size: 22px; font-weight: 600; flex: none; }
+.pf-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 .pf-who { flex: 1 1 260px; min-width: 0; }
 .pf-who h2 { margin: 0; font-size: 22px; font-weight: 600; overflow-wrap: anywhere; }
 .pf-meta { font-size: 13px; }

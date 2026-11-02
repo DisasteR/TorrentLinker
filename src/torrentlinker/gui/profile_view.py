@@ -12,6 +12,7 @@ from datetime import date, datetime
 from typing import Any
 
 from PySide6.QtCore import QEvent, QSettings, Qt, Signal
+from PySide6.QtGui import QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -148,6 +149,7 @@ class ProfileView(QWidget):
         self.history: list[ProfileDay] = []
         self.clients: dict[str, Any] | None = None
         self._dark: bool | None = None
+        self._avatar: QPixmap | None = None
         self._columns: tuple[int, bool] | None = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 16, 8, 8)
@@ -576,6 +578,34 @@ class ProfileView(QWidget):
             self.history = history
         self.redraw()
 
+    def show_avatar(self, data: bytes | None) -> None:
+        """The account's avatar clipped to the header circle; the initial without one."""
+        image = QPixmap()
+        if not data or not image.loadFromData(data):
+            self._avatar = None
+            self.avatar.setText((self.state.get("api") or {}).get("username", "?")[:1].upper())
+            return
+        ratio = self.devicePixelRatioF()
+        side = round(56 * ratio)
+        image = image.scaled(
+            side,
+            side,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        circle = QPixmap(side, side)
+        circle.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(circle)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        path = QPainterPath()
+        path.addEllipse(0, 0, side, side)
+        painter.setClipPath(path)
+        painter.drawPixmap((side - image.width()) // 2, (side - image.height()) // 2, image)
+        painter.end()
+        circle.setDevicePixelRatio(ratio)
+        self._avatar = circle
+        self.avatar.setPixmap(circle)
+
     def show_torrent_clients(self, clients: dict[str, Any] | None) -> None:
         self.clients = clients
         o = overview(self.state, self.history, self.period, date.today())
@@ -622,7 +652,10 @@ class ProfileView(QWidget):
 
     def _show_header(self, o: dict[str, Any]) -> None:
         h, api = o["header"], self.state.get("api")
-        self.avatar.setText(h["initial"])
+        if self._avatar is not None:
+            self.avatar.setPixmap(self._avatar)
+        else:
+            self.avatar.setText(h["initial"])
         self.identity.setText(h["username"] or self.tr("Connect your c411 account"))
         self.meta.setText(
             " · ".join(

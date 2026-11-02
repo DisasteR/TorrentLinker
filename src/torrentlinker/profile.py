@@ -73,6 +73,7 @@ class UserProfile:
     grade_level: int | None = None
     freeleech_sources: list[str] = field(default_factory=list)  # personal, campaign, window…
     total_xp: int | None = None
+    avatar_url: str | None = None  # absolute or relative to the indexer site
 
     def apply(self, profile: ZenProfile) -> ZenProfile:
         """The Zen Profile with the Class and tree bonus read from c411."""
@@ -152,6 +153,7 @@ def parse_profile(data: dict[str, Any]) -> UserProfile:
         grade_level=grade.get("level"),
         freeleech_sources=[source_name(s) for s in freeleech.get("sources") or []],
         total_xp=level.get("xp"),
+        avatar_url=data.get("avatarUrl") if isinstance(data.get("avatarUrl"), str) else None,
     )
 
 

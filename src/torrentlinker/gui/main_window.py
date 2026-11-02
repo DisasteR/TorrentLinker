@@ -170,6 +170,7 @@ class MainWindow(QMainWindow):
         self.companion_receiver: CompanionReceiver | None = None
         self._profile_refreshing = False
         self._torrent_clients_busy = False
+        self._avatar_token: str | None = None
         self._torrent_clients_at = -TORRENT_CLIENTS_EVERY
         self._receiver_retry_at = 0.0
         self.agent_runtime: Any = None
@@ -927,6 +928,10 @@ class MainWindow(QMainWindow):
         self.account_workspace.bind(self.settings.indexer.url, get_secret(INDEXER_API_KEY))
         state = self.account_workspace.state()
         self.zen_tab.profile_view.show_state(state, self.account_workspace.history_days())
+        if state.get("avatar") != self._avatar_token:
+            self._avatar_token = state.get("avatar")
+            image = self.account_workspace.avatar()
+            self.zen_tab.profile_view.show_avatar(image[0] if image else None)
         if self.companion_panel is not None:
             self.companion_panel.show_state(state)
         if state["paired"] and self.companion_receiver is None:

@@ -89,6 +89,18 @@ def profile_routes(app: FastAPI, setup: Setup, torrent_clients: TorrentClients) 
             raise HTTPException(409, str(error)) from error
         return with_overview(days)
 
+    @app.get("/api/zen/profile/avatar")
+    def avatar() -> Response:
+        """The account's cached avatar, so the page never contacts the image host."""
+        image = setup.profile_workspace().avatar()
+        if image is None:
+            raise HTTPException(404, "No avatar.")
+        return Response(
+            image[0],
+            media_type=image[1],
+            headers={"Cache-Control": "private, max-age=86400", "Content-Disposition": "inline"},
+        )
+
     @app.get("/api/zen/profile/torrent-clients")
     def profile_torrent_clients() -> dict[str, Any]:
         """Seeding per Torrent Client against c411, and today's Zen Estimate."""

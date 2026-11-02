@@ -66,8 +66,22 @@ function row(label, value, cls) {
 const collecting = () => say("History is being collected", "Historique en cours de collecte");
 
 function showProfileHeader(o, data) {
-  const h = o.header;
-  $("profile-avatar").textContent = h.initial;
+  const h = o.header, avatar = $("profile-avatar");
+  // The avatar comes from this server's cache; the initial stays when there is none.
+  if (data.avatar && avatar.dataset.token !== data.avatar) {
+    const img = element("img");
+    img.alt = "";
+    img.src = `api/zen/profile/avatar?v=${encodeURIComponent(data.avatar)}`;
+    img.onerror = () => {
+      avatar.dataset.token = "";
+      avatar.textContent = h.initial;
+    };
+    avatar.replaceChildren(img);
+    avatar.dataset.token = data.avatar;
+  } else if (!data.avatar) {
+    avatar.dataset.token = "";
+    avatar.textContent = h.initial;
+  }
   $("profile-username").textContent =
     h.username || say("Connect your c411 account", "Connectez votre compte c411");
   $("profile-meta").textContent = [

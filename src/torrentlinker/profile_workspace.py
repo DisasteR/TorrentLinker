@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import math
 import os
@@ -21,7 +22,9 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
+
+import httpx
 
 from torrentlinker import net
 from torrentlinker.companion_downloads import CompanionDownloads, SessionFetchError
@@ -39,6 +42,61 @@ DETAILS = {
     "totalSeedingTimeSec",
     "validatedUploadsCount",
 }
+
+
+AVATAR_MAX_BYTES = 2_000_000
+AVATAR_RETRY = 3600.0  # seconds before a failed avatar is tried again
+# Raster images by their first bytes, never by the server's word: no SVG, which can script.
+AVATAR_TYPES = (
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"GIF87a", "image/gif"),
+    (b"GIF89a", "image/gif"),
+)
+
+
+def image_type(data: bytes) -> str | None:
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return next((kind for magic, kind in AVATAR_TYPES if data.startswith(magic)), None)
+
+
+def avatar_url(source: str, url: str | None) -> str | None:
+    """The avatar's absolute https URL, or None when it is missing or unsafe to fetch."""
+    if not url:
+        return None
+    absolute = urljoin(source + "/", url)
+    try:
+        parts = urlsplit(absolute)
+        parts.port  # noqa: B018 - raises on a malformed port
+    except ValueError:
+        return None
+    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
+        return None
+    try:
+        address = ipaddress.ip_address(parts.hostname)
+    except ValueError:
+        return None if parts.hostname == "localhost" else absolute
+    return None if not address.is_global else absolute
+
+
+def fetch_avatar(url: str) -> bytes | None:
+    """At most AVATAR_MAX_BYTES of a raster image; no key, cookie or credential is sent."""
+    try:
+        with (
+            net.client(timeout=15, follow_redirects=True, max_redirects=3) as client,
+            client.stream("GET", url) as response,
+        ):
+            if response.status_code != 200 or response.url.scheme != "https":
+                return None
+            data = b""
+            for chunk in response.iter_bytes():
+                data += chunk
+                if len(data) > AVATAR_MAX_BYTES:
+                    return None
+    except (httpx.HTTPError, OSError):
+        return None
+    return data if image_type(data) else None
 
 
 def extension_origin(origin: str) -> bool:
@@ -121,6 +179,7 @@ class ProfileWorkspace:
         history: ProfileHistory | None = None,
     ):
         self.path = directory / "profile-cache.json"
+        self.avatar_path = directory / "profile-avatar.img"
         self.clock = clock
         self.history = history
         self.downloads = CompanionDownloads(lambda: self.clock())
@@ -173,6 +232,7 @@ class ProfileWorkspace:
         with self.lock:
             if self.data.get("binding") != binding:
                 self.data = {"binding": binding, "source": source}
+                self.avatar_path.unlink(missing_ok=True)
                 self._code, self._pair, self._client = "", None, None
                 self.downloads.clear()
                 self.error = None
@@ -212,7 +272,58 @@ class ProfileWorkspace:
             self._save()
             if self.history:
                 self.history.record_api(binding, profile)
+        self._update_avatar(binding, profile)
         return profile
+
+    def _update_avatar(self, binding: str, profile: UserProfile) -> None:
+        """Keep the account's avatar on disk; a failure only leaves the initial shown."""
+        with self.lock:
+            url = avatar_url(str(self.data.get("source") or ""), profile.avatar_url)
+            known = self.data.get("avatar") or {}
+            if url is None:
+                if known:
+                    self.data.pop("avatar", None)
+                    self.avatar_path.unlink(missing_ok=True)
+                    self._save()
+                return
+            if known.get("url") == url and (
+                known.get("ok") or self.clock() - known.get("at", 0) < AVATAR_RETRY
+            ):
+                return
+        data = fetch_avatar(url)  # outside the lock: it can take seconds
+        with self.lock:
+            if self.data.get("binding") != binding:
+                return
+            if data is not None:
+                temp = self.avatar_path.with_name(self.avatar_path.name + ".tmp")
+                fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                os.chmod(temp, 0o600)
+                with os.fdopen(fd, "wb") as output:
+                    output.write(data)
+                os.replace(temp, self.avatar_path)
+            else:
+                self.avatar_path.unlink(missing_ok=True)
+            self.data["avatar"] = {"url": url, "ok": data is not None, "at": self.clock()}
+            self._save()
+
+    def avatar(self) -> tuple[bytes, str] | None:
+        """The cached avatar and its image type, checked again on every read."""
+        with self.lock:
+            if not (self.data.get("avatar") or {}).get("ok"):
+                return None
+            try:
+                data = self.avatar_path.read_bytes()
+            except OSError:
+                return None
+        kind = image_type(data)
+        return (data, kind) if kind else None
+
+    def avatar_token(self) -> str | None:
+        """Changes with the avatar, so pages can cache it by URL."""
+        avatar = self.data.get("avatar") or {}
+        if not avatar.get("ok") or not self.avatar_path.exists():
+            return None
+        return hashlib.sha256(str(avatar["url"]).encode()).hexdigest()[:12]
 
     def history_days(self) -> list[ProfileDay]:
         """The bound account's Profile history, oldest first; never another account's."""
@@ -240,6 +351,7 @@ class ProfileWorkspace:
                 "paired": bool(self._pair),
                 "stale": bool(companion and self.clock() - captured_at(companion) > 300),
                 "downloads": {**self.downloads.state(), "enabled": self.session_downloads},
+                "avatar": self.avatar_token(),
             }
 
     def pairing(self) -> dict[str, Any]:
