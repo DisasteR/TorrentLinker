@@ -594,6 +594,7 @@ function aProvider(existing = null) {
       if (!dialog.isConnected || snapshot !== JSON.stringify(contextBody())) return;
       const source = {server: at("Server context", "Contexte du serveur"), provider: at("Provider context", "Contexte du fournisseur"), manual: at("Manual context", "Contexte manuel"), fallback: at("Not reported. Fallback", "Non communiqué. Valeur de repli")};
       contextStatus.textContent = `${source[result.source]}: ${result.context_window.toLocaleString()} tokens`;
+      if (result.served_models) contextStatus.textContent += ` ${at("The server does not list this model. It serves", "Le serveur ne propose pas ce modèle. Il sert")}: ${result.served_models.join(", ")}`;
     } finally { checkContext.disabled = false; }
   });
   for (const input of [kind, url, model, key, contextWindow, contextAuto]) input.addEventListener("input", () => { contextStatus.textContent = ""; });

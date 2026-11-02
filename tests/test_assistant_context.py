@@ -301,6 +301,39 @@ def test_missing_or_invalid_context_metadata_uses_fallback(tmp_path, response):
         assert all(url.startswith("http://model.invalid/") for url in seen)
 
 
+def test_fallback_names_the_models_a_server_serves_instead_of_the_configured_one(tmp_path):
+    # Strata answers any model name, so a stale setting only shows as a lost context window.
+    def server(request):
+        if request.url.path == "/v1/models":
+            return httpx.Response(
+                200, json={"data": [{"id": "qwen-new", "meta": {"n_ctx": 262144}}]}
+            )
+        if request.url.path == "/props":
+            return httpx.Response(
+                200,
+                json={"model_alias": "qwen-new", "default_generation_settings": {"n_ctx": 262144}},
+            )
+        return httpx.Response(404)
+
+    with TestClient(
+        create_app(
+            tmp_path, password="test-password-long", assistant_transport=httpx.MockTransport(server)
+        )
+    ) as browser:
+        login(browser)
+        result = browser.post(
+            "/api/setup/assistant/context",
+            json={
+                "name": "Server",
+                "kind": "compatible",
+                "url": "http://model.invalid/v1",
+                "model": "qwen-old",
+            },
+        ).json()
+        assert (result["context_window"], result["source"]) == (32768, "fallback")
+        assert result["served_models"] == ["qwen-new"]
+
+
 def test_manual_context_and_saved_key_are_preserved(tmp_path):
     seen = []
 

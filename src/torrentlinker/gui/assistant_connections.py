@@ -242,7 +242,12 @@ class AssistantConnections(QWidget):
                         "fallback": self.tr("Not reported. Fallback: %1 tokens"),
                         "manual": self.tr("Manual context: %1 tokens"),
                     }[result["source"]]
-                    context_status.setText(label.replace("%1", str(result["context_window"])))
+                    text = label.replace("%1", str(result["context_window"]))
+                    if result.get("served_models"):
+                        text += " " + self.tr(
+                            "The server does not list this model. It serves: %1"
+                        ).replace("%1", ", ".join(result["served_models"]))
+                    context_status.setText(text)
 
                 def failed(error):
                     from shiboken6 import isValid

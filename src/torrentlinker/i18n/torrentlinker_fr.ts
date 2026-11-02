@@ -396,6 +396,10 @@
         <translation>Contexte manuel : %1 tokens</translation>
     </message>
     <message>
+        <source>The server does not list this model. It serves: %1</source>
+        <translation>Le serveur ne propose pas ce modèle. Il sert : %1</translation>
+    </message>
+    <message>
         <location filename="../gui/assistant_connections.py" line="234"/>
         <source>Use an address reachable by TorrentLinker. In Docker, localhost is the container. Changing the address clears the saved key unless you enter a new one.</source>
         <translation>Utilisez une adresse accessible depuis TorrentLinker. Dans Docker, localhost désigne le conteneur. Changer l’adresse efface la clé enregistrée, sauf si vous en saisissez une nouvelle.</translation>

@@ -87,7 +87,9 @@ def discover_context(models, provider, key):
             return result
         # llama.cpp reports trained size in /models; only /props gives its active slot size.
         if not matches:
-            return fallback
+            # Some servers answer any model name, so name what they serve instead.
+            served = [r["id"] for r in rows if isinstance(r.get("id"), str)][:5]
+            return {**fallback, "served_models": served} if served else fallback
         props = read("/props", native=True)
         aliases = props.get("model_aliases", [])
         if props.get("model_alias"):
