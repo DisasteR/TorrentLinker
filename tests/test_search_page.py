@@ -59,9 +59,8 @@ def test_pills_follow_the_category_and_filter_at_once(qtbot, tmp_path):
     view = make_view(qtbot, tmp_path, requests)
     assert list(view.pills.buttons) == [None, 1, 2]
     assert view.pills.buttons[None].isChecked()
-    view.pills.buttons[2].click()
-    qtbot.waitUntil(lambda: not view._searching and view._native_page is not None)
-    assert requests[-1].url.params["category"] == "2"
+    view.pills.buttons[2].click()  # even while the first listing is still loading
+    qtbot.waitUntil(lambda: not view._searching and requests[-1].url.params.get("category") == "2")
     assert view.category.current_category == 2
     assert view.pills.buttons[2].isChecked()
     # A subcategory lights its parent's pill.
@@ -73,8 +72,12 @@ def test_pills_follow_the_category_and_filter_at_once(qtbot, tmp_path):
 
 
 def test_pill_counts_are_global_totals_and_the_header_shows_the_filtered_total(qtbot, tmp_path):
-    view = make_view(qtbot, tmp_path, [])
-    assert view.pills.buttons[1].text() == "Films && Vidéos"  # no counts before a search
+    requests: list = []
+    view = make_view(qtbot, tmp_path, requests)
+    # Opening the page lists the latest releases once, as c411's does.
+    qtbot.waitUntil(lambda: view._native_page is not None and not view._searching)
+    listings = [r for r in requests if r.url.path == "/api/torrents"]
+    assert len(listings) == 1 and "name" not in listings[0].url.params
     view.query.setText("ocean")
     view.search_button.click()
     qtbot.waitUntil(lambda: view._native_page is not None and not view._searching)
@@ -554,9 +557,11 @@ def test_a_torznab_indexer_gets_the_page_without_native_controls(qtbot, tmp_path
     assert list(view.pills.buttons) == [None, 7000]
     assert all(not control.isVisible() for control in view.filters.native_controls)
     assert not view.filters.sort.isVisible() and view.filters.crew.isHidden()
+    qtbot.waitUntil(lambda: len(calls) == 1 and not view._searching)  # the first listing
+    assert calls[0].categories == ()
     view.pills.buttons[7000].click()
-    qtbot.waitUntil(lambda: len(calls) == 1 and not view._searching)
-    assert calls[0].categories == (7000,)
+    qtbot.waitUntil(lambda: len(calls) == 2 and not view._searching)
+    assert calls[1].categories == (7000,)
     # Rows without c411's details still draw in both densities, and paging is open-ended.
     view.set_density("comfortable")
     view.results.grab()
@@ -564,8 +569,8 @@ def test_a_torznab_indexer_gets_the_page_without_native_controls(qtbot, tmp_path
     assert shown.details is None and shown.poster is None and shown.label == "EPUB"
     assert view.page_bar.isVisible() and view.next.isEnabled() and not view.previous.isEnabled()
     view.page_bar.page_requested.emit(2)
-    qtbot.waitUntil(lambda: len(calls) == 2 and not view._searching)
-    assert calls[1].offset == 100 and view.previous.isEnabled()
+    qtbot.waitUntil(lambda: len(calls) == 3 and not view._searching)
+    assert calls[2].offset == 100 and view.previous.isEnabled()
     view.set_density("compact")
     assert view.results.grab().width() > 0
     assert view.results_summary.text() == ""

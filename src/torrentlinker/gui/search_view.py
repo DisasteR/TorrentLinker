@@ -217,6 +217,8 @@ class SearchTab(QWidget):
         self.previous, self.next = self.page_bar.previous, self.page_bar.next
         self.filters.sort_changed.connect(self._sort_changed)
         self._search_pending = False
+        self._listed = False  # the first visit lists the latest releases
+        self._queued_search: tuple[int | None] | None = None
         # Filters search by themselves a moment after the last change, as c411's do.
         self._auto_search = QTimer(self)
         self._auto_search.setSingleShot(True)
@@ -478,9 +480,16 @@ class SearchTab(QWidget):
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
-        self._configure_filters()
+        configured = self._configure_filters() is not None
         self.refresh_queue()
         self.refresh_ages()
+        if configured and not self._listed and not self._results:
+            # The first visit lists the latest releases, as c411's page does, once the
+            # filters have loaded; later visits keep what is shown (one search, not one
+            # per visit).
+            self._listed = True
+            self._search_pending = True
+            self._run_pending_search()
 
     def _configure_filters(self) -> Indexer | None:
         try:
@@ -531,6 +540,8 @@ class SearchTab(QWidget):
 
     def search(self, offset: int | None = None) -> None:
         if self._searching:
+            # A pill or page chosen while a search runs is searched right after it.
+            self._queued_search = (offset,)
             return
         indexer = self._configure_filters()
         if indexer is None or not self.filters.ready:
@@ -564,15 +575,15 @@ class SearchTab(QWidget):
             page = offset // PAGE_SIZE + 1
             run_in_background(
                 lambda: native_search(indexer, params, page),
-                lambda result: self._show_native(result, indexer),
-                self._search_failed,
+                lambda result: self._settled(self._show_native, result, indexer),
+                lambda error: self._settled(self._search_failed, error),
             )
         else:
             self._native_page = None
             run_in_background(
                 lambda: indexer.search(query, cached=False),
-                lambda rows: self._show_results(rows, indexer),
-                self._search_failed,
+                lambda rows: self._settled(self._show_results, rows, indexer),
+                lambda error: self._settled(self._search_failed, error),
             )
 
     def _show_native(self, page: SearchPage, indexer: Indexer) -> None:
@@ -601,6 +612,13 @@ class SearchTab(QWidget):
             label.setProperty("role", "error" if error else "muted")
             label.style().unpolish(label)
             label.style().polish(label)
+
+    def _settled(self, show: Callable[..., None], *args: object) -> None:
+        """Show a search's outcome, then run the search asked for meanwhile, if any."""
+        show(*args)
+        if (queued := self._queued_search) is not None:
+            self._queued_search = None
+            self.search(queued[0])
 
     def _search_failed(self, error: Exception) -> None:
         self._searching = False
