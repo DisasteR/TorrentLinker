@@ -97,7 +97,11 @@ class Sparkline(QWidget):
         if len(self.values) < 2:
             painter.setPen(QColor(c["muted"]))
             font = painter.font()
-            font.setPointSizeF(font.pointSizeF() * 0.85)
+            # The app stylesheet sizes fonts in pixels, so pointSizeF() is -1.
+            if font.pixelSize() > 0:
+                font.setPixelSize(max(1, round(font.pixelSize() * 0.85)))
+            else:
+                font.setPointSizeF(font.pointSizeF() * 0.85)
             painter.setFont(font)
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignVCenter, self.empty)
             return
