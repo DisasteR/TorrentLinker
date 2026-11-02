@@ -62,6 +62,11 @@ localhost ; il n'est pas configuré pour votre serveur distant. Installez le ZIP
 du serveur dans le navigateur de votre ordinateur, pas dans le conteneur Docker.
 Le navigateur doit pouvoir joindre c411 et l'interface web.
 
+En HTTP simple, le navigateur empêche une page distante de parler à l'extension :
+une adresse comme `http://100.x.y.z:8787` ne peut pas se connecter. Avec
+Tailscale, lancez `tailscale serve --bg 8787` sur le serveur, ouvrez l'adresse
+`https://….ts.net` affichée, puis retéléchargez l'extension depuis cette adresse.
+
 ## Activer les téléchargements par session
 
 Après la connexion, cochez **Télécharger les .torrent avec ma session c411** dans
