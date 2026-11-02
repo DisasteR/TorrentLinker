@@ -86,6 +86,9 @@ def library_smoke_checks() -> None:
             def show_account_profile(self) -> None:
                 pass  # This Library probe does not bind a real tracker account.
 
+            def refresh_torrent_clients(self) -> None:
+                pass  # Profile would connect to the default client and outlive the wait.
+
             def qbit(self) -> MappedQbit:
                 return client
 
