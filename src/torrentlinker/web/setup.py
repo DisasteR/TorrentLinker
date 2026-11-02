@@ -18,6 +18,7 @@ from torrentlinker.clients import connect
 from torrentlinker.config import ProxySettings, Settings
 from torrentlinker.domain import ContentKind, LibraryFolder, PathMapping, TorrentClient
 from torrentlinker.indexer import Indexer
+from torrentlinker.library import known_files
 from torrentlinker.paths import PathMapper
 from torrentlinker.profile_workspace import ProfileWorkspace
 from torrentlinker.qbit import ClientApi
@@ -556,7 +557,7 @@ class Setup:
                 if attempts >= 10:
                     break
                 attempts += 1
-                files = self.client().files(torrent.hash)
+                files = known_files(self.client(), self.store, torrent.hash)
                 for rel, size in sorted(files.items(), key=lambda f: f[1], reverse=True)[:3]:
                     try:
                         file = self.path_under_root(str(mapped / rel), directory=False)

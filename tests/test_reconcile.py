@@ -264,3 +264,20 @@ def test_file_lists_are_read_once_paced_and_again_only_when_asked(tmp_path: Path
     assert read[2:] == ["b" * 40]
     scan(refresh=True)  # Rescan everything reads every list again
     assert sorted(read[3:]) == ["a" * 40, "b" * 40]
+
+
+def test_known_files_reads_a_torrent_once(tmp_path: Path) -> None:
+    from tests.fake_qbit import FakeQbit
+    from torrentlinker.library import known_files
+    from torrentlinker.store import Store
+
+    client = FakeQbit()
+    client.by_hash = {"a" * 40: Torrent("a" * 40, "One.mkv", LIB, {"One.mkv": 1})}
+    read: list[str] = []
+    files = client.files
+    client.files = lambda h: read.append(h) or files(h)  # type: ignore[method-assign]
+    store = Store(tmp_path / "s.db")
+
+    assert known_files(client, store, "a" * 40) == {"One.mkv": 1}
+    assert known_files(client, store, "A" * 40) == {"One.mkv": 1}  # any case
+    assert read == ["a" * 40]

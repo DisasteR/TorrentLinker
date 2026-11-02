@@ -147,6 +147,16 @@ def build_library(
     return entries
 
 
+def known_files(client: Qbit, store: Store, infohash: str) -> dict[str, int]:
+    """A torrent's file list, from an earlier read when there was one. For reads that
+    only look (probes, scans); never for checking renames, which must ask the client."""
+    if (files := store.torrent_files([infohash]).get(infohash.lower())) is not None:
+        return files
+    files = client.files(infohash)
+    store.cache_torrent_files({infohash: files})
+    return files
+
+
 def indexer_contents(
     client: Qbit,
     store: Store,
