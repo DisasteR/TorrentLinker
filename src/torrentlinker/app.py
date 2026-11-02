@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import multiprocessing
+import os
 import sys
+from collections.abc import MutableMapping
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths, QTimer
+from PySide6.QtCore import QCoreApplication, QStandardPaths, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -185,11 +187,19 @@ def show_unexpected_errors() -> None:
     sys.excepthook = hook
 
 
+def apply_ui_scale(scale: float, environ: MutableMapping[str, str] = os.environ) -> None:
+    """Qt reads the scale factor once, before the application starts. It multiplies the
+    desktop's own scaling; a QT_SCALE_FACTOR set by the user wins."""
+    if scale != 1.0 and "QT_SCALE_FACTOR" not in environ:
+        environ["QT_SCALE_FACTOR"] = f"{scale:g}"
+
+
 def main() -> int:
     multiprocessing.freeze_support()  # a frozen build re-runs itself for child processes
+    QCoreApplication.setApplicationName("TorrentLinker")
+    QCoreApplication.setOrganizationName("TorrentLinker")
+    apply_ui_scale(Settings.load(data_dir() / "settings.json").ui_scale)
     app = QApplication(sys.argv)
-    app.setApplicationName("TorrentLinker")
-    app.setOrganizationName("TorrentLinker")
     show_unexpected_errors()
     app.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "icon.png")))
     setup_logging(data_dir() / "torrentlinker.log")

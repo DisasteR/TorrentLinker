@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
 from torrentlinker import net
 from torrentlinker.client_folders import ClientFolder
 from torrentlinker.clients import connect
-from torrentlinker.config import Settings
+from torrentlinker.config import UI_SCALES, Settings
 from torrentlinker.credentials import TMDB_API_KEY, get_secret, set_secret
 from torrentlinker.domain import ContentKind, LibraryFolder, PathMapping, Torrent, TorrentClient
 from torrentlinker.downloads import DownloadFolders, IndexerCategory
@@ -279,6 +279,18 @@ class SettingsDialog(QDialog):
         self.theme.addItem(self.tr("Dark"), "dark")
         self.theme.setCurrentIndex(max(self.theme.findData(self.settings.theme), 0))
         form.addRow(self.tr("Theme"), self.theme)
+        self.ui_scale = QComboBox()
+        for scale in UI_SCALES:
+            self.ui_scale.addItem(f"{scale:.0%}", scale)
+        current = min(UI_SCALES, key=lambda scale: abs(scale - self.settings.ui_scale))
+        self.ui_scale.setCurrentIndex(self.ui_scale.findData(current))
+        self.ui_scale.setToolTip(
+            self.tr(
+                "Enlarges or shrinks the whole interface, on top of your desktop's scaling. "
+                "Takes effect after restarting the app."
+            )
+        )
+        form.addRow(self.tr("Interface size"), self.ui_scale)
         self.media_layout = QComboBox()
         self.media_layout.addItem(self.tr("Cinematic home"), "cinematic")
         self.media_layout.addItem(self.tr("Focus"), "focus")
@@ -1395,6 +1407,13 @@ class SettingsDialog(QDialog):
         s.proxy.torrent_client = self.proxy_client.isChecked()
         s.language = self.language.currentData()
         s.theme = self.theme.currentData()
+        if self.ui_scale.currentData() != s.ui_scale:
+            QMessageBox.information(
+                self,
+                self.tr("Interface size"),
+                self.tr("Restart TorrentLinker to apply the new interface size."),
+            )
+        s.ui_scale = self.ui_scale.currentData()
         s.media_layout = self.media_layout.currentData()
         s.client = self._chosen_client()
         s.deluge.host = self.deluge_host.text().strip()

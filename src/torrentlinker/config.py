@@ -20,6 +20,17 @@ from torrentlinker.matching import (
 from torrentlinker.plan import PlanGoal, PlanOptions
 from torrentlinker.zen import ZenClass, ZenProfile
 
+UI_SCALES = (0.75, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0)
+
+
+def ui_scale(value: object) -> float:
+    """A saved interface size, kept within what the Settings offer."""
+    try:
+        scale = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 1.0
+    return min(max(scale, UI_SCALES[0]), UI_SCALES[-1])
+
 
 @dataclass
 class QbitSettings:
@@ -118,6 +129,7 @@ class Settings:
     kind_categories: dict[ContentKind, list[int]] = field(default_factory=dict)
     language: str = "auto"  # auto | en | fr
     theme: str = "auto"  # auto | light | dark
+    ui_scale: float = 1.0  # desktop interface size, on top of the system's scaling
     media_layout: str = "cinematic"  # cinematic | focus | collection
 
     def categories(self, kind: ContentKind) -> tuple[int, ...]:
@@ -234,6 +246,7 @@ class Settings:
             "kind_categories": {k.value: v for k, v in self.kind_categories.items()},
             "language": self.language,
             "theme": self.theme,
+            "ui_scale": self.ui_scale,
             "media_layout": self.media_layout,
             "library_folders": [_folder_to_json(f) for f in self.library_folders],
             "path_mappings": [asdict(m) for m in self.path_mappings],
@@ -273,6 +286,7 @@ class Settings:
             matching=MatchingSettings(**data.get("matching", {})),
             language=str(data.get("language", "auto")),
             theme=str(data.get("theme", "auto")),
+            ui_scale=ui_scale(data.get("ui_scale", 1.0)),
             media_layout=(
                 data["media_layout"]
                 if data.get("media_layout") in ("cinematic", "focus", "collection")

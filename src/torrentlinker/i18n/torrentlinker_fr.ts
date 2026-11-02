@@ -7982,6 +7982,18 @@ Le torrent est ensuite ajouté à votre client torrent avec les fichiers décomp
 <context>
     <name>SettingsDialog</name>
     <message>
+        <source>Restart TorrentLinker to apply the new interface size.</source>
+        <translation>Redémarrez TorrentLinker pour appliquer la nouvelle taille de l’interface.</translation>
+    </message>
+    <message>
+        <source>Enlarges or shrinks the whole interface, on top of your desktop&apos;s scaling. Takes effect after restarting the app.</source>
+        <translation>Agrandit ou réduit toute l’interface, en plus de la mise à l’échelle du bureau. Prend effet après le redémarrage de l’application.</translation>
+    </message>
+    <message>
+        <source>Interface size</source>
+        <translation>Taille de l’interface</translation>
+    </message>
+    <message>
         <source>Export support report…</source>
         <translation>Exporter le rapport de diagnostic…</translation>
     </message>
