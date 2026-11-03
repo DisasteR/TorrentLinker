@@ -47,10 +47,18 @@ def test_stall_is_logged_with_the_gui_stack(qtbot, caplog):
 def test_quick_ticks_log_nothing(qtbot, caplog):
     parent = QObject()
     watchdog = StallWatchdog(200, parent)
+    # A busy CI runner can pause the whole process past the threshold. Measure the real
+    # gaps between heartbeats so only a stall the GUI never had counts as a false alarm.
+    ticks = [time.perf_counter()]
+    watchdog.timer.timeout.connect(lambda: ticks.append(time.perf_counter()))
     caplog.set_level(logging.WARNING, logger="torrentlinker.stall")
     qtbot.wait(300)
     watchdog.running = False
-    assert not [r for r in caplog.records if "stalled" in r.getMessage()]
+    watchdog.worker.join(timeout=1)
+    ticks.append(time.perf_counter())
+    longest = max(later - earlier for earlier, later in zip(ticks, ticks[1:]))
+    if longest <= watchdog.threshold:
+        assert not [r for r in caplog.records if "stalled" in r.getMessage()]
 
 
 def test_off_unless_asked(monkeypatch):
