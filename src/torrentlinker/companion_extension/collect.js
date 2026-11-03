@@ -28,6 +28,34 @@ export async function collectProfile(options) {
   };
   const num = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null);
   const str = (x) => (typeof x === "string" ? x.slice(0, 160) : null);
+  // The Zen ledger, newest first, back to about three months: only each entry's date
+  // and signed amount leave c411, never its reason or id.
+  const readLedger = async () => {
+    const perPage = 25;
+    const oldest = Date.now() - 92 * 86400000;
+    const entries = [];
+    for (let page = 1; page <= 20; page++) {
+      const body = await get(`/api/tokens/history?page=${page}&perPage=${perPage}`);
+      if (!Array.isArray(body.history))
+        throw new Error("Zen ledger format changed. Nothing sent.");
+      for (const row of body.history) {
+        const at = Date.parse(row?.createdAt);
+        const delta = num(row?.delta);
+        if (!Number.isFinite(at) || delta === null)
+          throw new Error("Zen ledger format changed. Nothing sent.");
+        if (entries.length && at > Date.parse(entries.at(-1).createdAt))
+          throw new Error("Zen ledger order changed. Nothing sent.");
+        entries.push({ createdAt: new Date(at).toISOString(), delta });
+      }
+      if (
+        body.history.length < perPage ||
+        (Number.isSafeInteger(body.total) && page * perPage >= body.total) ||
+        Date.parse(entries.at(-1).createdAt) < oldest
+      )
+        return entries;
+    }
+    return entries;
+  };
   const first = await get("/api/user/profile");
   const id = (x) =>
     (typeof x.id === "string" || Number.isSafeInteger(x.id)) &&
@@ -70,6 +98,12 @@ export async function collectProfile(options) {
     if (!Number.isSafeInteger(count) || count < 0)
       throw new Error("Active seed count format changed. Nothing sent.");
     snapshot.activeSeeds = { total: count }; // Never return titles, hashes or file lists.
+  }
+  if (options.ledger) {
+    // Optional: a failed ledger read leaves earlier days empty, not the sync failed.
+    try {
+      snapshot.zenLedger = await readLedger();
+    } catch {}
   }
   const last = await get("/api/user/profile");
   if (id(last) !== snapshot.account.id)

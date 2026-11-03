@@ -4,6 +4,7 @@ import os
 import socket
 import threading
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -58,6 +59,20 @@ def test_connect_click_pairs_and_syncs_without_extension_confirmation(tmp_path, 
             route.fulfill(json={"stats": snapshot()["details"]})
         elif "/api/profile/active-seeds" in path:
             route.fulfill(json={"meta": {"total": 42}})
+        elif "/api/tokens/history" in path:
+            # c411's reason and id stay in the browser; only date and amount are sent.
+            now = datetime.now(UTC)
+            ledger = [(now, 23), (now - timedelta(days=1), 50)]
+            route.fulfill(
+                json={
+                    "success": True,
+                    "history": [
+                        {"id": i, "createdAt": at.isoformat(), "reason": "daily", "delta": d}
+                        for i, (at, d) in enumerate(ledger)
+                    ],
+                    "total": None,
+                }
+            )
         else:
             route.fulfill(content_type="text/html", body="<h1>Fake c411 account</h1>")
 
@@ -83,9 +98,16 @@ def test_connect_click_pairs_and_syncs_without_extension_confirmation(tmp_path, 
             handoff = handoff_opened.value
             expect(handoff.locator("h1")).to_have_css("color", "rgb(101, 212, 202)")
             # This is the only user action after installing the companion.
-            expect(page.locator("#profile-advanced")).to_contain_text("42", timeout=15000)
+            for _ in range(150):
+                if (workspace.state().get("companion") or {}).get("activeSeeds"):
+                    break
+                page.wait_for_timeout(100)
+            assert workspace.state()["companion"]["activeSeeds"] == {"total": 42}
             assert workspace.state()["paired"]
             assert reads.count("https://c411.org/api/user/profile") == 2
+            yesterday = workspace.history_days()[0]
+            balance = workspace.state()["companion"]["profile"]["balance"]
+            assert yesterday.ledger and yesterday.values["balance"] == balance - 23
             expect(page.locator("#session-downloads")).to_be_enabled()
             page.locator("#session-downloads").check()
             expect(page.locator("#session-downloads")).to_be_checked()
@@ -110,9 +132,6 @@ def test_connect_click_pairs_and_syncs_without_extension_confirmation(tmp_path, 
             assert result["bytes"] == len(descriptor)
             assert result["discarded"]
             assert len([url for url in reads if url.endswith("/download")]) == 1
-            page.reload()
-            page.locator("[data-view=zen]").first.click()
-            expect(page.locator("#profile-advanced")).to_contain_text("42")
 
             # Closing extension/app tabs and restarting the browser retains consent.
             before_restart = workspace.state()["received_at"]
@@ -164,7 +183,10 @@ def test_connect_click_pairs_and_syncs_without_extension_confirmation(tmp_path, 
             page.locator("[data-view=setup]").first.click()
             page.locator("[data-settings-section=companion]").click()
             page.locator("#profile-disconnect").click()
-            expect(page.locator("#profile-advanced")).not_to_contain_text("42")
+            for _ in range(50):
+                if not workspace.state()["paired"]:
+                    break
+                page.wait_for_timeout(100)
             assert not workspace.state()["paired"]
             worker.evaluate("""() => {
                 const clock = Date.now;

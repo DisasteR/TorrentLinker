@@ -2,7 +2,8 @@
 
 Each row keeps the day's last successful API values, the companion's last active
 seeds and seed time, and whether the day saw an API success, a companion snapshot
-or a failure. A failure never overwrites the day's good values. The account is the
+or a failure. A failure never overwrites the day's good values. Days before any
+sync can be replayed from c411's Zen ledger; those never replace an API day. The account is the
 profile cache's binding, so changing the indexer or its key starts a new history.
 History never changes planning inputs.
 """
@@ -12,7 +13,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from torrentlinker.profile import UserProfile
@@ -38,13 +39,17 @@ class ProfileDay:
     api: bool = False
     companion: bool = False
     failed: bool = False
+    ledger: bool = False  # Zen values replayed from c411's ledger, not synced
 
     @property
     def outcome(self) -> str:
-        """ok (API and companion), api (API only) or failed (no API success that day,
-        even with companion snapshots: the API sync is what the day is judged by)."""
+        """ok (API and companion), api (API only), failed (no API success that day,
+        even with companion snapshots: the API sync is what the day is judged by) or
+        none (only replayed from the ledger: nothing was tried)."""
         if self.api:
             return "ok" if self.companion else "api"
+        if self.ledger and not (self.companion or self.failed):
+            return "none"
         return "failed"
 
 
@@ -90,6 +95,43 @@ class ProfileHistory:
     def record_failure(self, account: str) -> None:
         self._update(account, lambda row: row.update(failed=True))
 
+    def record_ledger(
+        self, account: str, balance: float, entries: list[tuple[float, float]]
+    ) -> None:
+        """Fill each day from the oldest entry to yesterday with its closing Zen.
+
+        `balance` is the current balance and `entries` (time, delta) every ledger
+        entry since the oldest one, so walking back undoes them day by day. Earned
+        and spent need today's API totals to walk back from.
+        """
+        now = self.clock()
+        today = local_day(now)
+        entries = sorted((e for e in entries if e[0] <= now), reverse=True)
+        if not entries:
+            return
+        totals = self.store.profile_day(account, today) or {}
+        current = (totals.get("values") or {}) if totals.get("api") else {}
+        values: dict[str, float] = {"balance": balance}
+        values.update({k: current[k] for k in ("earned", "spent") if current.get(k) is not None})
+        oldest = local_day(entries[-1][0])
+        day = date.fromisoformat(today)
+        index = 0
+        while (day := day - timedelta(days=1)).isoformat() >= oldest:
+            # Undo everything after this day's close.
+            while index < len(entries) and local_day(entries[index][0]) > day.isoformat():
+                delta = entries[index][1]
+                values["balance"] -= delta
+                name = "earned" if delta > 0 else "spent"
+                if name in values:
+                    values[name] -= abs(delta)
+                index += 1
+            row = self.store.profile_day(account, day.isoformat()) or {"values": {}}
+            if row.get("api"):
+                continue
+            row["values"].update(values)
+            row["ledger"] = True
+            self.store.save_profile_day(account, day.isoformat(), row)
+
     def days(self, account: str) -> list[ProfileDay]:
         return [
             ProfileDay(
@@ -98,6 +140,7 @@ class ProfileHistory:
                 bool(row.get("api")),
                 bool(row.get("companion")),
                 bool(row.get("failed")),
+                bool(row.get("ledger")),
             )
             for day, row in self.store.profile_days(account)
         ]

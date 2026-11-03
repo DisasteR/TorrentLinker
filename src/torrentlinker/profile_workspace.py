@@ -42,6 +42,7 @@ DETAILS = {
     "totalSeedingTimeSec",
     "validatedUploadsCount",
 }
+LEDGER_LIMIT = 500  # Zen ledger entries per snapshot: about three months of payouts
 
 
 AVATAR_MAX_BYTES = 2_000_000
@@ -110,6 +111,24 @@ def captured_at(data: dict[str, Any]) -> float:
     return stamp.timestamp()
 
 
+def ledger_entries(ledger: Any) -> list[tuple[float, float]] | None:
+    """(time, delta) from the companion's Zen ledger read, None when malformed."""
+    if not isinstance(ledger, list) or len(ledger) > LEDGER_LIMIT:
+        return None
+    entries = []
+    for entry in ledger:
+        if not isinstance(entry, dict) or set(entry) != {"createdAt", "delta"}:
+            return None
+        delta = entry["delta"]
+        if type(delta) not in (int, float) or not math.isfinite(delta) or abs(delta) > 1e12:
+            return None
+        try:
+            entries.append((captured_at({"capturedAt": entry["createdAt"]}), float(delta)))
+        except (ValueError, TypeError, AttributeError, OverflowError):
+            return None
+    return entries
+
+
 def valid_snapshot(data: Any, now: float) -> bool:
     def text(value: Any) -> bool:
         return isinstance(value, str) and 0 < len(value) <= 160
@@ -119,7 +138,7 @@ def valid_snapshot(data: Any, now: float) -> bool:
             type(value) in (int, float) and 0 <= value <= 1e30 and math.isfinite(value)
         )
 
-    if not isinstance(data, dict) or set(data) != {
+    if not isinstance(data, dict) or set(data) - {"zenLedger"} != {
         "schema",
         "source",
         "capturedAt",
@@ -128,6 +147,8 @@ def valid_snapshot(data: Any, now: float) -> bool:
         "details",
         "activeSeeds",
     }:
+        return False
+    if "zenLedger" in data and ledger_entries(data["zenLedger"]) is None:
         return False
     if (
         type(data["schema"]) is not int
@@ -429,10 +450,15 @@ class ProfileWorkspace:
             previous = self.data.get("companion")
             if previous and captured_at(body) <= captured_at(previous):
                 raise ValueError("Snapshot already received or older than current data.")
+            body = dict(body)
+            ledger = ledger_entries(body.pop("zenLedger", []))
             self.data.update(companion=body, received_at=self.clock())
             self._save()
             if self.history:
                 self.history.record_companion(self.data["binding"], body)
+                balance = body["profile"]["balance"]
+                if ledger and balance is not None:
+                    self.history.record_ledger(self.data["binding"], balance, ledger)
             return {"accepted": True}
 
     def test_download(self, infohash: str, request_id: str, actor: str = "owner") -> dict[str, Any]:

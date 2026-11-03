@@ -12,6 +12,7 @@ account statistics in **Zen → Profile**.
 | Capability | How it works |
 | --- | --- |
 | Sync account statistics | Updates account identity, Zen balance, Class, level, transfer totals, total seed time, validated upload count and active seed count every two minutes. |
+| Fill earlier Zen history | Every six hours, reads about three months of your c411 Zen ledger (the date and amount of each entry, never its reason) so the Profile's Zen curve covers days before TorrentLinker started recording. Days recorded from the API are never replaced. |
 | Fetch `.torrent` files through your browser session | Optional, off by default. Uses the signed-in c411 account when TorrentLinker needs torrent metadata, including Library checks, queue sends and Plan sends. |
 
 The companion supplements the API profile; it does not replace API values or your

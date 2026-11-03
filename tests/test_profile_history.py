@@ -171,3 +171,111 @@ def test_the_workspace_records_refreshes_failures_and_starts_over_on_a_new_key(
         workspace.refresh(setup.settings.indexer.url, "other-key")
     (day,) = workspace.history_days()
     assert day.outcome == "failed" and day.values == {}
+
+
+def stamp(when: str) -> float:
+    return datetime.fromisoformat(when).timestamp()
+
+
+def test_the_zen_ledger_fills_earlier_days_backwards_from_todays_balance(tmp_path):
+    h, _ = history(tmp_path, "2026-11-03T10:00:00")
+    h.record_api("account", replace(PROFILE, balance=930.0, total_earned=2930, total_spent=2000))
+    h.record_ledger(
+        "account",
+        930.0,
+        [
+            (stamp("2026-11-03T00:05:00"), 150),  # today: already in the balance
+            (stamp("2026-11-01T18:00:00"), -500),  # a purchase
+            (stamp("2026-11-01T00:05:00"), 140),
+            (stamp("2026-10-31T00:05:00"), 130),
+        ],
+    )
+
+    rows = {d.day: d for d in h.days("account")}
+    assert {
+        day: (d.values["balance"], d.values["earned"], d.values["spent"]) for day, d in rows.items()
+    } == {
+        "2026-10-31": (1140.0, 2640, 1500),
+        "2026-11-01": (780.0, 2780, 2000),
+        "2026-11-02": (780.0, 2780, 2000),
+        "2026-11-03": (930.0, 2930, 2000),
+    }
+    # Replayed days are not syncs: the calendar leaves them blank.
+    assert [rows[d].outcome for d in ("2026-10-31", "2026-11-02")] == ["none", "none"]
+
+
+def test_the_ledger_never_replaces_a_day_the_api_recorded(tmp_path):
+    h, clock = history(tmp_path, "2026-11-02T10:00:00")
+    h.record_api("account", replace(PROFILE, balance=700.0))
+    clock.now = stamp("2026-11-03T10:00:00")
+    h.record_api("account", replace(PROFILE, balance=930.0))
+    h.record_ledger("account", 930.0, [(stamp("2026-11-03T00:05:00"), 200)])
+
+    assert [(d.day, d.values["balance"], d.outcome) for d in h.days("account")] == [
+        ("2026-11-02", 700.0, "api"),
+        ("2026-11-03", 930.0, "api"),
+    ]
+
+
+def test_ledger_balances_need_todays_totals_for_earned_and_spent(tmp_path):
+    h, _ = history(tmp_path, "2026-11-03T10:00:00")
+    h.record_ledger(
+        "account",
+        930.0,
+        [(stamp("2026-11-03T00:05:00"), 150), (stamp("2026-11-02T00:05:00"), 140)],
+    )
+
+    (day,) = h.days("account")
+    assert day.day == "2026-11-02" and day.values == {"balance": 780.0}
+
+
+def test_a_snapshot_with_the_zen_ledger_fills_earlier_days(tmp_path, monkeypatch):
+    from datetime import UTC, timedelta
+
+    from tests.test_web_profile import ORIGIN, prepared, snapshot
+
+    _, setup = prepared(tmp_path, monkeypatch)
+    workspace = setup.profile_workspace()
+    workspace.refresh(setup.settings.indexer.url, "fake-key")
+    code = workspace.pairing()["code"]
+    token = workspace.receive("/api/companion/pair", ORIGIN, "", {"code": code, "accountId": "42"})
+    yesterday = datetime.now(UTC) - timedelta(days=1)
+    body = {
+        **snapshot(),
+        "zenLedger": [
+            {"createdAt": datetime.now(UTC).isoformat(), "delta": 23},
+            {"createdAt": yesterday.isoformat(), "delta": 50},
+        ],
+    }
+    workspace.receive("/api/companion/snapshot", ORIGIN, "Bearer " + token["token"], body)
+
+    first = workspace.history_days()[0]
+    assert first.ledger and first.values["balance"] == 123 - 23
+    assert "zenLedger" not in workspace.state()["companion"]
+
+
+@pytest.mark.parametrize(
+    "ledger",
+    [
+        "not a list",
+        [{"createdAt": "yesterday", "delta": 5}],
+        [{"createdAt": "2026-11-02T00:00:00Z", "delta": "5"}],
+        [{"createdAt": "2026-11-02T00:00:00Z", "delta": 5, "reason": "x"}],
+        [{"createdAt": "2026-11-02T00:00:00Z", "delta": 5}] * 501,
+    ],
+)
+def test_a_malformed_zen_ledger_rejects_the_snapshot(tmp_path, monkeypatch, ledger):
+    from tests.test_web_profile import ORIGIN, prepared, snapshot
+
+    _, setup = prepared(tmp_path, monkeypatch)
+    workspace = setup.profile_workspace()
+    workspace.refresh(setup.settings.indexer.url, "fake-key")
+    code = workspace.pairing()["code"]
+    token = workspace.receive("/api/companion/pair", ORIGIN, "", {"code": code, "accountId": "42"})
+    with pytest.raises(ValueError):
+        workspace.receive(
+            "/api/companion/snapshot",
+            ORIGIN,
+            "Bearer " + token["token"],
+            {**snapshot(), "zenLedger": ledger},
+        )

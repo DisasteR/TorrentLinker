@@ -205,39 +205,49 @@ def point(d: ProfileDay) -> dict[str, Any]:
 
 
 def period_figures(days: Sequence[ProfileDay]) -> dict[str, Any] | None:
-    """Change, average per day and measured Zen over the days with API values.
+    """Change, average per day and measured Zen over the days with API or ledger values.
 
-    None with fewer than two such days: history is still being collected.
+    Each figure is measured between the first and last days that know it: ledger days
+    carry only Zen. None with fewer than two such days: history is still being collected.
     """
-    series = [point(d) for d in days if d.api and d.values]
+    series = [point(d) for d in days if (d.api or d.ledger) and d.values]
     if len(series) < 2:
         return None
-    first, last = series[0], series[-1]
-    elapsed = max(1, (date.fromisoformat(last["day"]) - date.fromisoformat(first["day"])).days)
+
+    def ends(name: str) -> tuple[dict[str, Any], dict[str, Any], int] | None:
+        points = [p for p in series if known(p[name])]
+        if len(points) < 2:
+            return None
+        first, last = points[0], points[-1]
+        elapsed = (date.fromisoformat(last["day"]) - date.fromisoformat(first["day"])).days
+        return first, last, max(1, elapsed)
+
     names = ("uploaded", "downloaded", "buffer", "ratio", "balance", "active_seeds")
-    change = {n: difference(last[n], first[n]) for n in names}
+    spans = {n: ends(n) for n in (*names, "earned")}
+    change = {n: difference(s[1][n], s[0][n]) if (s := spans[n]) else None for n in names}
     # Zen measured: what the balance gained plus what was spent meanwhile.
-    spent = difference(last["spent"], first["spent"])
-    earned = difference(last["earned"], first["earned"])
-    if change["balance"] is not None and spent is not None:
-        measured: float | None = (change["balance"] + spent) / elapsed
-    elif earned is not None:
-        measured = earned / elapsed
-    else:
-        measured = None
+    measured: float | None = None
+    if (span := spans["balance"]) and known(span[0]["spent"]) and known(span[1]["spent"]):
+        first, last, elapsed = span
+        measured = (last["balance"] - first["balance"] + last["spent"] - first["spent"]) / elapsed
+    elif span := spans["earned"]:
+        measured = (span[1]["earned"] - span[0]["earned"]) / span[2]
     purchases = 0
     for before, after in zip(series, series[1:], strict=False):
         if known(before["spent"]) and known(after["spent"]):
             purchases += after["spent"] > before["spent"]
         elif known(before["balance"]) and known(after["balance"]):
             purchases += after["balance"] < before["balance"]
+    first, last = series[0], series[-1]
     return {
         "first": first["day"],
         "last": last["day"],
-        "elapsed": elapsed,
+        "elapsed": max(
+            1, (date.fromisoformat(last["day"]) - date.fromisoformat(first["day"])).days
+        ),
         "change": change,
         "average": {
-            n: value / elapsed if (value := change[n]) is not None else None
+            n: value / span[2] if (value := change[n]) is not None and (span := spans[n]) else None
             for n in ("uploaded", "downloaded", "balance")
         },
         "measured_zen": measured,

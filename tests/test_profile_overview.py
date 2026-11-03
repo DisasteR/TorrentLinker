@@ -260,6 +260,21 @@ def test_period_ignores_days_without_api_values():
     assert [p["day"] for p in result["series"]] == ["2026-10-30", "2026-11-01"]
 
 
+def test_ledger_days_extend_zen_without_shortening_transfer_figures():
+    rows = [
+        ProfileDay("2026-10-20", {"balance": 100, "earned": 1000, "spent": 900}, ledger=True),
+        day("2026-10-30", uploaded_actual=1000, downloaded_actual=100, balance=400, spent=900),
+        day("2026-11-01", uploaded_actual=1200, downloaded_actual=100, balance=500, spent=900),
+    ]
+    result = period_figures(rows)
+
+    assert [p["day"] for p in result["series"]] == ["2026-10-20", "2026-10-30", "2026-11-01"]
+    assert result["change"]["balance"] == 400
+    assert result["change"]["uploaded"] == 200
+    assert result["average"]["uploaded"] == 100  # over its own two days, not twelve
+    assert result["measured_zen"] == pytest.approx(400 / 12)
+
+
 def test_window_keeps_the_chosen_days():
     from torrentlinker.profile_overview import window
 

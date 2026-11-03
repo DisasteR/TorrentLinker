@@ -2,6 +2,7 @@ import { collectProfile } from "./collect.js";
 import { collectDescriptors } from "./descriptor.js";
 
 const PERIOD = 120000;
+const LEDGER_PERIOD = 6 * 3600000; // the Zen ledger changes about once a day
 const ready = chrome.storage.local.setAccessLevel({
   accessLevel: "TRUSTED_CONTEXTS",
 });
@@ -169,10 +170,11 @@ async function step() {
   }
 }
 async function sync() {
-  const { connection, lastAttempt = 0 } = await chrome.storage.local.get([
-    "connection",
-    "lastAttempt",
-  ]);
+  const {
+    connection,
+    lastAttempt = 0,
+    lastLedger = 0,
+  } = await chrome.storage.local.get(["connection", "lastAttempt", "lastLedger"]);
   if (!connection || connection.paused || Date.now() - lastAttempt < PERIOD)
     return;
   const tabs = await chrome.tabs.query({
@@ -191,7 +193,13 @@ async function sync() {
       target: { tabId: tabs[0].id },
       world: "ISOLATED",
       func: collectProfile,
-      args: [{ details: true, seeds: true }],
+      args: [
+        {
+          details: true,
+          seeds: true,
+          ledger: Date.now() - lastLedger >= LEDGER_PERIOD,
+        },
+      ],
     });
     const snapshot = result[0]?.result;
     if (!snapshot?.account?.id)
@@ -202,6 +210,7 @@ async function sync() {
       );
     await request(connection, "snapshot", snapshot);
     await chrome.storage.local.set({ lastSync: Date.now() });
+    if (snapshot.zenLedger) await chrome.storage.local.set({ lastLedger: Date.now() });
     await note("Connected. Profile updates automatically every two minutes.");
   } catch (error) {
     if (error.status === 403) {
