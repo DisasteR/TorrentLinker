@@ -41,6 +41,8 @@ def test_stall_is_logged_with_the_gui_stack(qtbot, caplog):
     QTimer.singleShot(0, slow_database_call)
     qtbot.wait(400)
     watchdog.running = False
+    # A watchdog left running would report the next test's teardown as a stall.
+    watchdog.worker.join(timeout=1)
     messages = [r.getMessage() for r in caplog.records]
     assert any("stalled" in m and "slow_database_call" in m for m in messages)
 
