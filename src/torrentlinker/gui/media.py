@@ -1017,7 +1017,9 @@ class MediaTab(QWidget):
         self.subtitles.currentIndexChanged.connect(self._select_subtitle)
         self.queue_disclosure = QPushButton(self.tr("Queue & playlists"), self.player_panel)
         self.queue_disclosure.setCheckable(True)
-        self.queue_action.triggered.connect(self.queue_disclosure.setChecked)
+        self.queue_action.triggered.connect(
+            lambda checked: self.queue_disclosure.setChecked(checked)
+        )
         for widget in (
             self.shuffle,
             self.repeat,

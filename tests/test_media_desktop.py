@@ -661,6 +661,17 @@ def test_native_media_layout_shortcut_emits_only_user_changes(qtbot):
     assert tab.hero.isHidden()
 
 
+def test_player_menu_opens_and_closes_the_queue_and_playlists(qtbot):
+    from torrentlinker.gui.media import MediaTab
+
+    tab = MediaTab(lambda: None, lambda: "default", lambda: None)
+    qtbot.addWidget(tab)
+    tab.queue_action.trigger()
+    assert tab.queue_disclosure.isChecked()
+    tab.queue_action.trigger()
+    assert not tab.queue_disclosure.isChecked()
+
+
 def test_native_multitrack_switching_decodes_audio_and_subtitles_and_keeps_choices(qtbot, tmp_path):
     import shutil
     import struct
