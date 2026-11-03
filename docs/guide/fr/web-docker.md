@@ -117,6 +117,31 @@ Dans une pile Portainer, ou si vous préférez éviter un fichier, remplacez la 
 
 Les fichiers secrets Docker sont pris en charge avec `TL_INDEXER_API_KEY_FILE`, `TL_QBIT_PASSWORD_FILE`, `TL_QBIT_API_KEY_FILE`, `TL_DELUGE_PASSWORD_FILE`, `TL_TRANSMISSION_PASSWORD_FILE`, `TL_UTORRENT_PASSWORD_FILE` , `TL_ANNOUNCE_URL_FILE` et `TL_PROXY_PASSWORD_FILE`. Leur contenu n'est pas renvoyé au navigateur.
 
+## Connexion par un reverse proxy
+
+Un reverse proxy qui authentifie déjà les utilisateurs (Traefik, Caddy, nginx ou un autre), par forward auth vers un fournisseur d'identité comme Authentik ou par authentification basique, peut remplacer le mot de passe de l'interface web. Définissez `TL_WEB_AUTH=proxy` et indiquez les adresses du proxy dans `TL_TRUSTED_PROXIES` (séparées par des virgules, CIDR accepté), ou passez `--web-auth proxy --trusted-proxy ADRESSE`. Le serveur n'a alors plus besoin de mot de passe et refuse de démarrer sans proxy de confiance.
+
+Toute requête venant de ces adresses agit comme le propriétaire ; les autres adresses reçoivent `403`. Ne faites confiance qu'à l'adresse du proxy lui-même, pas à son réseau Docker, et ne publiez aucun port : une requête par un port publié arrive depuis la passerelle Docker, qui fait partie de ce réseau. Donnez au proxy une adresse fixe hors de la plage dynamique du réseau (`--ip-range`), pour qu'aucun autre conteneur ne la reçoive pendant que le proxy est arrêté. Tout conteneur qui peut rejoindre ce réseau est dans le périmètre de confiance.
+
+Chaque mode ignore les réglages de l'autre : en mode proxy, `TL_WEB_PASSWORD` et `TL_WEB_PASSWORD_FILE` ne protègent rien, et en mode mot de passe, `TL_TRUSTED_PROXIES` n'est pas lu.
+
+Deux clients ne peuvent pas passer par la connexion du proxy et s'authentifient eux-mêmes :
+
+- Les agents se connectent à `/mcp`. Ce sont des programmes, pas des navigateurs : ils ne peuvent pas suivre une page de connexion. Chaque requête porte le jeton d'agent que vous créez, et pouvez révoquer, dans l'interface web.
+- Le compagnon du navigateur, l'extension qui lit votre session c411 pour le Profil, utilise cinq chemins sous `/api/companion/`. Il tourne en arrière-plan et n'envoie aucun cookie : il ne porte donc jamais la session du proxy. Chaque requête porte le jeton reçu lors de l'appairage depuis le Profil, et doit venir de l'extension appairée.
+
+Pour qu'ils fonctionnent, faites contourner la connexion du proxy à ces seuls chemins : `/mcp` et tout ce qui est sous `/mcp/`, et exactement `/api/companion/pair`, `/api/companion/snapshot`, `/api/companion/disconnect`, `/api/companion/commands` et `/api/companion/result`. Ne contournez jamais un préfixe plus large : une requête qui contourne la connexion arrive quand même depuis l'adresse du proxy, et tout autre chemin sous `/api/` la traiterait comme le propriétaire. Avec l'authentification basique, les agents ont besoin de ce contournement, car leur en-tête `Authorization` porte leur jeton. N'ajoutez pas le contournement d'un client que vous n'utilisez pas.
+
+La déconnexion se fait sur le proxy : dans ce mode, l'interface masque son bouton **Déconnexion**.
+
+Pour Traefik, [deploy/compose.traefik.yaml](../../../deploy/compose.traefik.yaml) est un exemple prêt à l'emploi :
+
+```bash
+docker compose -f compose.yaml -f deploy/compose.traefik.yaml up -d
+```
+
+Sans les sources, copiez l'override à côté de votre `compose.yaml` et passez `-f compose.traefik.yaml`. Gardez-y un seul middleware : le forward auth d'Authentik, ou un fichier d'utilisateurs pour l'authentification basique. Son routeur optionnel `torrentlinker-tokens` est le contournement des jetons décrit ci-dessus.
+
 ## Sans Docker
 
 ```bash

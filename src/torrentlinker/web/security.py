@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import os
 import secrets
@@ -120,3 +121,21 @@ class Sessions:
     def logout(self, token: str) -> None:
         with self.lock:
             self.tokens.pop(token, None)
+
+
+class TrustedProxies:
+    """Let the reverse proxy that signs users in stand for the owner, and nobody else."""
+
+    def __init__(self, networks: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]):
+        if not networks:
+            raise ValueError("Set the trusted proxy networks for reverse-proxy sign-in.")
+        self.networks = networks
+
+    def allows(self, host: str | None) -> bool:
+        try:
+            address = ipaddress.ip_address(host or "")
+        except ValueError:
+            return False
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+            address = address.ipv4_mapped
+        return any(address in network for network in self.networks)

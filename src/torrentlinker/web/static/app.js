@@ -1378,6 +1378,7 @@ async function reseedAllMatches() {
 }
 async function enter() {
   await refreshSetup();
+  $("logout").hidden = state.setup.web_auth === "proxy";
   $("login-screen").hidden = true;
   $("workspace").hidden = false;
   await navigate(state.setup.configured ? "torrents" : "setup");
