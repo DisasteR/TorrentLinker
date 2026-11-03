@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+from itertools import pairwise
 
 from PySide6.QtCore import QObject, QTimer
 
@@ -56,7 +57,7 @@ def test_quick_ticks_log_nothing(qtbot, caplog):
     watchdog.running = False
     watchdog.worker.join(timeout=1)
     ticks.append(time.perf_counter())
-    longest = max(later - earlier for earlier, later in zip(ticks, ticks[1:]))
+    longest = max(later - earlier for earlier, later in pairwise(ticks))
     if longest <= watchdog.threshold:
         assert not [r for r in caplog.records if "stalled" in r.getMessage()]
 
