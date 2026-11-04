@@ -38,7 +38,7 @@ docker compose up -d --build
 
 Without `--build`, Compose uses the published image named by `TL_IMAGE_TAG` (`latest` by default; `TL_IMAGE_TAG=beta` for the preview).
 
-Open `http://localhost:8787` and sign in. The default port binding is host-only. Set `TL_BIND_ADDRESS` to your host's LAN address for LAN access. For remote access, use an HTTPS reverse proxy and `TL_SECURE_COOKIE=1`. Do not expose the plain HTTP port directly to the Internet.
+Open `http://localhost:8787` and sign in. The default port binding is host-only. Set `TL_BIND_ADDRESS` to your host's LAN address for LAN access. For remote access, use an HTTPS reverse proxy and `TL_SECURE_COOKIE=1`; that proxy can also replace this password (see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy)). Do not expose the plain HTTP port directly to the Internet.
 
 ## Container user and permissions
 
@@ -109,7 +109,7 @@ After an abrupt restart, unfinished jobs are marked interrupted and are not repl
 
 UI-entered credentials are encrypted in `credentials.enc`. Back up it and `credentials.key` together and protect the configuration volume. Someone who can read both files can decrypt the credentials. Desktop credentials still use the operating system keyring.
 
-The Web UI password comes from `TL_WEB_PASSWORD_FILE` (recommended). Where files are impractical, such as a Portainer stack, set `TL_WEB_PASSWORD` instead. The file wins if both are set. Environment variables are visible through `docker inspect`, so prefer the file when you can.
+Unless a reverse proxy signs users in, the Web UI password comes from `TL_WEB_PASSWORD_FILE` (recommended). Where files are impractical, such as a Portainer stack, set `TL_WEB_PASSWORD` instead. The file wins if both are set. Environment variables are visible through `docker inspect`, so prefer the file when you can.
 
 In a Portainer stack, or anywhere you would rather not manage a file, replace the `TL_WEB_PASSWORD_FILE` line and the `web_password` secret with `TL_WEB_PASSWORD: ${WEB_PASSWORD}` and define `WEB_PASSWORD` in the stack's environment variables.
 
@@ -121,7 +121,7 @@ A reverse proxy that already signs users in (Traefik, Caddy, nginx or another), 
 
 Every request from those addresses acts as the owner; any other address gets `403`. Trust only the proxy's own address, not its Docker network, and publish no port: a request through a published port comes from the Docker gateway, which is inside that network. Give the proxy a fixed address outside the network's dynamic range (`--ip-range`), so no other container receives it while the proxy is stopped. Every container that can join that network is inside the trust boundary.
 
-The two modes ignore each other's settings: in proxy mode `TL_WEB_PASSWORD` and `TL_WEB_PASSWORD_FILE` protect nothing, and in password mode `TL_TRUSTED_PROXIES` is not read.
+The two modes ignore each other's settings: in proxy mode `TL_WEB_PASSWORD` and `TL_WEB_PASSWORD_FILE` protect nothing, and in password mode `TL_TRUSTED_PROXIES` is not read. Any other `TL_WEB_AUTH` value than `password` or `proxy` stops the server at start, so a typo cannot fall back to the password silently.
 
 Two clients cannot pass the proxy's sign-in, and sign in on their own instead:
 
@@ -129,6 +129,8 @@ Two clients cannot pass the proxy's sign-in, and sign in on their own instead:
 - The browser companion, the extension that reads your c411 session for Profile, uses five paths under `/api/companion/`. It runs in the background and sends no cookies, so it never carries the proxy's session; each request carries the token it received when you paired it from Profile, and must come from the paired extension.
 
 To keep them working, route only these paths around the proxy's sign-in: `/mcp` and everything under `/mcp/`, and exactly `/api/companion/pair`, `/api/companion/snapshot`, `/api/companion/disconnect`, `/api/companion/commands` and `/api/companion/result`. Never bypass a wider prefix: a request routed around the sign-in still arrives from the proxy's address, so any other path under `/api/` would treat it as the owner. With basic auth, agents need this bypass, since their `Authorization` header carries their token. Leave out the bypass for a client you do not use.
+
+With `TL_ROOT_PATH`, the bypass matches the public paths, for example `/torrentlinker/mcp` and `/torrentlinker/api/companion/pair`.
 
 Sign out from the proxy: the Web UI hides its own **Sign out** button in this mode.
 

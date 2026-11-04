@@ -38,7 +38,7 @@ docker compose up -d --build
 
 Sans `--build`, Compose utilise l'image publiée indiquée par `TL_IMAGE_TAG` (`latest` par défaut ; `TL_IMAGE_TAG=beta` pour la préversion).
 
-Ouvrez `http://localhost:8787` et saisissez ce mot de passe. Le serveur est accessible uniquement depuis la machine hôte par défaut. Pour un accès sur le réseau local, définissez `TL_BIND_ADDRESS` avec l'adresse LAN de l'hôte. Pour l'accès distant, utilisez un reverse proxy HTTPS et `TL_SECURE_COOKIE=1` ; n'exposez pas directement un port HTTP sur Internet.
+Ouvrez `http://localhost:8787` et saisissez ce mot de passe. Le serveur est accessible uniquement depuis la machine hôte par défaut. Pour un accès sur le réseau local, définissez `TL_BIND_ADDRESS` avec l'adresse LAN de l'hôte. Pour l'accès distant, utilisez un reverse proxy HTTPS et `TL_SECURE_COOKIE=1`, qui peut aussi remplacer ce mot de passe (voir [Connexion par un reverse proxy](#connexion-par-un-reverse-proxy)) ; n'exposez pas directement un port HTTP sur Internet.
 
 ## Utilisateur du conteneur et permissions
 
@@ -111,7 +111,7 @@ Après un arrêt brutal du serveur, une tâche inachevée est marquée interromp
 
 Les identifiants saisis dans l'interface sont chiffrés dans `credentials.enc`. La clé de chiffrement `credentials.key` est dans le même volume : protégez le volume et sauvegardez les deux fichiers ensemble. Le chiffrement ne protège pas contre quelqu'un qui peut lire tout le volume. L'application de bureau continue d'utiliser le trousseau système.
 
-Le mot de passe de l’interface web provient de `TL_WEB_PASSWORD_FILE` (recommandé). Si les fichiers sont peu pratiques, par exemple avec une pile Portainer, définissez `TL_WEB_PASSWORD`. Le fichier l’emporte si les deux sont définis. Les variables d’environnement sont visibles via `docker inspect` : préférez le fichier quand c’est possible.
+Sauf si un reverse proxy authentifie les utilisateurs, le mot de passe de l’interface web provient de `TL_WEB_PASSWORD_FILE` (recommandé). Si les fichiers sont peu pratiques, par exemple avec une pile Portainer, définissez `TL_WEB_PASSWORD`. Le fichier l’emporte si les deux sont définis. Les variables d’environnement sont visibles via `docker inspect` : préférez le fichier quand c’est possible.
 
 Dans une pile Portainer, ou si vous préférez éviter un fichier, remplacez la ligne `TL_WEB_PASSWORD_FILE` et le secret `web_password` par `TL_WEB_PASSWORD: ${WEB_PASSWORD}`, puis définissez `WEB_PASSWORD` dans les variables d’environnement de la pile.
 
@@ -123,7 +123,7 @@ Un reverse proxy qui authentifie déjà les utilisateurs (Traefik, Caddy, nginx 
 
 Toute requête venant de ces adresses agit comme le propriétaire ; les autres adresses reçoivent `403`. Ne faites confiance qu'à l'adresse du proxy lui-même, pas à son réseau Docker, et ne publiez aucun port : une requête par un port publié arrive depuis la passerelle Docker, qui fait partie de ce réseau. Donnez au proxy une adresse fixe hors de la plage dynamique du réseau (`--ip-range`), pour qu'aucun autre conteneur ne la reçoive pendant que le proxy est arrêté. Tout conteneur qui peut rejoindre ce réseau est dans le périmètre de confiance.
 
-Chaque mode ignore les réglages de l'autre : en mode proxy, `TL_WEB_PASSWORD` et `TL_WEB_PASSWORD_FILE` ne protègent rien, et en mode mot de passe, `TL_TRUSTED_PROXIES` n'est pas lu.
+Chaque mode ignore les réglages de l'autre : en mode proxy, `TL_WEB_PASSWORD` et `TL_WEB_PASSWORD_FILE` ne protègent rien, et en mode mot de passe, `TL_TRUSTED_PROXIES` n'est pas lu. Toute valeur de `TL_WEB_AUTH` autre que `password` ou `proxy` arrête le serveur au démarrage : une faute de frappe ne peut pas revenir en silence au mot de passe.
 
 Deux clients ne peuvent pas passer par la connexion du proxy et s'authentifient eux-mêmes :
 
@@ -131,6 +131,8 @@ Deux clients ne peuvent pas passer par la connexion du proxy et s'authentifient 
 - Le compagnon du navigateur, l'extension qui lit votre session c411 pour le Profil, utilise cinq chemins sous `/api/companion/`. Il tourne en arrière-plan et n'envoie aucun cookie : il ne porte donc jamais la session du proxy. Chaque requête porte le jeton reçu lors de l'appairage depuis le Profil, et doit venir de l'extension appairée.
 
 Pour qu'ils fonctionnent, faites contourner la connexion du proxy à ces seuls chemins : `/mcp` et tout ce qui est sous `/mcp/`, et exactement `/api/companion/pair`, `/api/companion/snapshot`, `/api/companion/disconnect`, `/api/companion/commands` et `/api/companion/result`. Ne contournez jamais un préfixe plus large : une requête qui contourne la connexion arrive quand même depuis l'adresse du proxy, et tout autre chemin sous `/api/` la traiterait comme le propriétaire. Avec l'authentification basique, les agents ont besoin de ce contournement, car leur en-tête `Authorization` porte leur jeton. N'ajoutez pas le contournement d'un client que vous n'utilisez pas.
+
+Avec `TL_ROOT_PATH`, le contournement porte sur les chemins publics, par exemple `/torrentlinker/mcp` et `/torrentlinker/api/companion/pair`.
 
 La déconnexion se fait sur le proxy : dans ce mode, l'interface masque son bouton **Déconnexion**.
 

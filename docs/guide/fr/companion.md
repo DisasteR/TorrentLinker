@@ -68,6 +68,11 @@ une adresse comme `http://100.x.y.z:8787` ne peut pas se connecter. Avec
 Tailscale, lancez `tailscale serve --bg 8787` sur le serveur, ouvrez l'adresse
 `https://….ts.net` affichée, puis retéléchargez l'extension depuis cette adresse.
 
+Si un reverse proxy authentifie les utilisateurs de l'interface web, l'extension
+n'envoie aucun cookie et ne peut pas passer cette connexion. Faites contourner
+ses cinq chemins, comme décrit dans
+[Connexion par un reverse proxy](web-docker.md#connexion-par-un-reverse-proxy).
+
 ## Activer les téléchargements par session
 
 Après la connexion, cochez **Télécharger les .torrent avec ma session c411** dans

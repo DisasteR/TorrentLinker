@@ -62,6 +62,10 @@ an address like `http://100.x.y.z:8787` cannot connect. On Tailscale, run
 `tailscale serve --bg 8787` on the server and open the `https://….ts.net`
 address it prints, then download the extension again from there.
 
+When a reverse proxy signs users in for the WebUI, the extension sends no cookies
+and cannot pass that sign-in. Route its five paths around it, as described in
+[Sign in through a reverse proxy](web-docker.md#sign-in-through-a-reverse-proxy).
+
 ## Enable session downloads
 
 After connecting, enable **Download .torrent files with my c411 session** in

@@ -14,7 +14,7 @@ On desktop and WebUI, **Agent access** stays inside Settings. **Connections** li
 
 On desktop, proposals approved while Settings is open run after it closes, and changed settings can invalidate a proposal. WebUI approvals run immediately through the shared authorization checks.
 
-The desktop endpoint is `http://127.0.0.1:8790/mcp/`. For the Web UI, use `/mcp/` on its server address. A remote connection needs HTTPS. MCP uses its own token, not the Web UI's login cookie.
+The desktop endpoint is `http://127.0.0.1:8790/mcp/`. For the Web UI, use `/mcp/` on its server address. A remote connection needs HTTPS. MCP uses its own token, not the Web UI's login cookie. When a reverse proxy signs users in for the Web UI, route `/mcp` around its sign-in: see [Sign in through a reverse proxy](web-docker.md#sign-in-through-a-reverse-proxy).
 
 Assistants must support Streamable HTTP with custom bearer headers. Compatibility depends on the assistant; browser-cookie or OAuth-only connectors cannot use this endpoint directly.
 

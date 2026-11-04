@@ -14,7 +14,7 @@ Sur le bureau et le web, **Accès des agents** reste dans les paramètres. **Con
 
 Sur le bureau, les propositions approuvées dans les paramètres démarrent après leur fermeture ; des paramètres modifiés peuvent invalider une proposition. Sur le web, les approbations démarrent immédiatement avec les mêmes contrôles d’autorisation.
 
-Sur le bureau, l'adresse est `http://127.0.0.1:8790/mcp/`. Sur le web, utilisez `/mcp/` à l'adresse du serveur. Une connexion distante nécessite HTTPS. Le jeton MCP est distinct de la session de connexion au site web.
+Sur le bureau, l'adresse est `http://127.0.0.1:8790/mcp/`. Sur le web, utilisez `/mcp/` à l'adresse du serveur. Une connexion distante nécessite HTTPS. Le jeton MCP est distinct de la session de connexion au site web. Si un reverse proxy authentifie les utilisateurs de l'interface web, faites contourner sa connexion à `/mcp` : voir [Connexion par un reverse proxy](web-docker.md#connexion-par-un-reverse-proxy).
 
 L'assistant doit accepter Streamable HTTP avec un en-tête Bearer personnalisé. Les connecteurs qui exigent OAuth ou une session de navigateur ne sont pas directement compatibles.
 
