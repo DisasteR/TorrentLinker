@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 
 from torrentlinker import reseed
 from torrentlinker.category_tags import CATEGORY_TAG_PREFIX, category_path, category_tag
+from torrentlinker.client_limits import delete_refusal
 from torrentlinker.domain import Torrent
 from torrentlinker.downloads import IndexerCategory
 from torrentlinker.qbit import Qbit
@@ -127,6 +128,11 @@ def manage(
         raise ValueError("Unknown torrent action")
     if action.endswith("_files") and not file_indexes:
         return []
+    if action == "delete" and (refusal := delete_refusal(client)):
+        refused = [ActionResult(hash, hash, "failed", refusal) for hash in dict.fromkeys(hashes)]
+        for result in refused:
+            progress(result)
+        return refused
     results = []
     for hash in dict.fromkeys(hashes):
         name = hash

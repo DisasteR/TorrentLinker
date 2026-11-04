@@ -476,8 +476,8 @@ $("plan-send").onclick = () =>
         element(
           "h3",
           say(
-            "µTorrent: rename these files on disk",
-            "µTorrent : renommer ces fichiers sur le disque",
+            "Your Torrent Client cannot rename files inside a torrent: these files will be renamed on disk",
+            "Votre client torrent ne sait pas renommer un fichier dans un torrent : ces fichiers seront renommés sur le disque",
           ),
         ),
         element(

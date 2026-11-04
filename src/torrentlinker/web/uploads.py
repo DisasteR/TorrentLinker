@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from torrentlinker.client_limits import client_name
 from torrentlinker.options import category_options, options_body
 from torrentlinker.paths import PathMapper
 from torrentlinker.scan import scan_item
@@ -326,6 +327,9 @@ class Uploads:
         item = scan_item(prepared.saved.item_path)
         client = self.library.client()
         if client.requires_disk_renames:
-            raise ValueError("Review µTorrent Upload disk renames in the desktop application.")
+            raise ValueError(
+                f"{client_name(client)} cannot rename files inside a torrent. Seed this "
+                "Upload from the desktop application, which shows the files to rename on disk."
+            )
         result = seed_upload(client, self.setup.store, item, prepared)
         return {"hash": result, "status": "verifying"}

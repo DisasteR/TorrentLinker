@@ -823,6 +823,16 @@ class TorrentsTab(QWidget):
 
         run_in_background(lambda: self.client().file_listing(hash), done, failed)
 
+    def _refuse_delete(self, client: str) -> None:
+        QMessageBox.information(
+            self,
+            self.tr("Delete torrent and files"),
+            self.tr(
+                "{0} cannot delete a torrent's files. Remove the torrent instead, which keeps "
+                "its files, then delete them yourself if you no longer need them."
+            ).format(client or self.tr("Your torrent client")),
+        )
+
     def _confirm_delete(self, selected: list[Torrent]) -> bool:
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Warning)
@@ -852,6 +862,9 @@ class TorrentsTab(QWidget):
     def perform(self, action: str) -> None:
         selected = self.selected()
         if not selected or self._acting:
+            return
+        if action == "delete" and not getattr(self.client(), "can_delete_files", True):
+            self._refuse_delete(getattr(self.client(), "client_name", ""))
             return
         if action == "delete" and not self._confirm_delete(selected):
             return

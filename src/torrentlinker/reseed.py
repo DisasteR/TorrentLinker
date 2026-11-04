@@ -214,8 +214,8 @@ def _start_disk_reseed(
         if qbit.torrent(meta.infohash) is not None:
             if not created:
                 raise ReseedAborted(
-                    "This torrent appeared in µTorrent during setup. The renamed files and "
-                    "recovery journal were kept; inspect the torrent before restoring names."
+                    "This torrent appeared in the Torrent Client during setup. The renamed files "
+                    "and recovery journal were kept; inspect the torrent before restoring names."
                 ) from None
             qbit.remove(meta.infohash)
         undo_disk_renames(folder, meta.infohash)

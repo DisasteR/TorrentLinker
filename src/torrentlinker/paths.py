@@ -107,6 +107,18 @@ class MappedQbit:
         return bool(getattr(self._inner, "requires_disk_renames", False))
 
     @property
+    def client_name(self) -> str:
+        return str(getattr(self._inner, "client_name", ""))
+
+    @property
+    def supports_partial_reseeds(self) -> bool:
+        return bool(getattr(self._inner, "supports_partial_reseeds", True))
+
+    @property
+    def can_delete_files(self) -> bool:
+        return bool(getattr(self._inner, "can_delete_files", True))
+
+    @property
     def reseed_client_id(self) -> str:
         return str(getattr(self._inner, "reseed_client_id", ""))
 

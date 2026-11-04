@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from torrentlinker.batch import MAX_WAITS
+from torrentlinker.client_limits import disk_renames_elsewhere, partial_refusal
 from torrentlinker.domain import ItemState
 from torrentlinker.indexer import Candidate, RateLimited
 from torrentlinker.library import LibraryEntry, LibraryResult, build_library, indexer_contents
@@ -513,11 +514,10 @@ class Library:
                 " the desktop application."
             )
         client = self.client()
+        if refusal := (None if checked.match.is_full else partial_refusal(client)):
+            raise ValueError(refusal)
         if client.requires_disk_renames and checked.match.renames and approve_disk_renames is None:
-            raise ValueError(
-                "This µTorrent Reseed requires disk renames. Review and approve "
-                "those in the desktop application."
-            )
+            raise ValueError(disk_renames_elsewhere(client))
         hash = start_reseed(
             client,
             self.setup.store,

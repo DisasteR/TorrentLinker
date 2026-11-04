@@ -6,6 +6,7 @@ import secrets
 import time
 from typing import Any
 
+from torrentlinker.client_limits import delete_refusal
 from torrentlinker.web.operations import JobRequest
 from torrentlinker.web.setup import Setup
 
@@ -19,6 +20,8 @@ class Confirmations:
         return str(self.setup.snapshot()) + body.model_dump_json(exclude={"confirmation"})
 
     def preview(self, body: JobRequest) -> dict[str, Any]:
+        if body.action == "delete" and (refusal := delete_refusal(self.setup.client())):
+            raise ValueError(refusal)
         rows = []
         for hash in body.hashes:
             torrent = self.setup.client().torrent(hash, with_files=False)

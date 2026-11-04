@@ -49,3 +49,18 @@ Les remises en partage complètes et le partage des uploads ajoutent le torrent 
 Les correspondances partielles, y compris celles auxquelles il manque des fichiers ignorés, restent indisponibles car cette WebUI ne fournit pas les pièces vérifiées. Cet adaptateur ne fournit pas encore de durée de partage pour les estimations Zen.
 
 Pour le développement, `tests/test_utorrent_integration.py` s’exécute uniquement si `TL_UTORRENT_CONNECTION` désigne un fichier JSON contenant `url`, `username` et `password`, et si `TL_UTORRENT_DATA` désigne le chemin local du dossier de téléchargement par défaut. Utilisez une instance de test vide et dédiée. Les tests créent des fichiers jetables uniques, exercent l’API, retirent leurs propres torrents et vérifient que les fichiers sont intacts.
+
+## rTorrent
+
+Choisissez **rTorrent** dans Paramètres → Connexions. Saisissez l’adresse XML-RPC indiquée par votre seedbox ou ruTorrent, souvent terminée par `/RPC2` (ajouté à une adresse sans chemin), avec l’identifiant et le mot de passe du serveur web placé devant. Si vous joignez directement le port SCGI de rTorrent, saisissez `scgi://hôte:port` ; l’application de bureau accepte aussi un socket local sous la forme `scgi:///chemin/du/socket`. rTorrent 0.15.2 est testé.
+
+TorrentLinker range ses propres étiquettes dans un champ distinct de rTorrent : votre label ruTorrent reste inchangé. Téléchargements, Plans, vue Partage, démarrage et arrêt, vérification, priorités de fichiers et retrait fonctionnent comme avec les autres clients. Avant de démarrer un téléchargement, TorrentLinker demande à rTorrent de créer le dossier sur sa propre machine : un torrent démarré dont le dossier manque reste inactif sans explication.
+
+rTorrent a ses propres limites (voir l’[ADR-0017](../../adr/0017-rtorrent-through-xml-rpc-with-disk-renames.md)) :
+
+- **Il ne sait pas renommer un fichier à l’intérieur d’un torrent.** Si les noms diffèrent, la remise en partage demande la même confirmation de renommage sur le disque qu’avec µTorrent : chaque chemin est affiché, les données locales sont vérifiées d’abord, et les noms d’origine reviennent en cas d’échec.
+- **Les correspondances partielles sont refusées**, car la vérification de rTorrent crée dans votre dossier chaque fichier manquant du torrent.
+- **Pas de téléchargement séquentiel** : films et séries se téléchargent dans l’ordre habituel de rTorrent.
+- **Retirer un torrent ne supprime jamais ses fichiers** ; supprimez-les vous-même si vous le souhaitez.
+
+Pour le développement, `tests/test_rtorrent_integration.py` s’exécute contre un rTorrent jetable dans Docker : voir `scripts/rtorrent_sandbox.py`.

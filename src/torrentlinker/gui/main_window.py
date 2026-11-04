@@ -82,6 +82,7 @@ from torrentlinker.gui.settings_dialog import (
     PROXY_PASSWORD,
     QBIT_API_KEY,
     QBIT_PASSWORD,
+    RTORRENT_PASSWORD,
     TMDB_API_KEY,
     TRANSMISSION_PASSWORD,
     UTORRENT_PASSWORD,
@@ -299,7 +300,7 @@ class MainWindow(QMainWindow):
         library_layout.addWidget(self.library_view)
         self._fill_folder_filter()
 
-        self.reseed_consent = ReseedConsent(self)
+        self.reseed_consent = ReseedConsent(self, lambda: self.settings.client.display_name)
         self.review = ReviewPanel(
             store,
             self.indexer,
@@ -872,6 +873,9 @@ class MainWindow(QMainWindow):
         elif s.client is TorrentClient.TRANSMISSION:
             t = s.transmission
             key = (s.client, t.host, t.username, get_secret(s.secret_name(TRANSMISSION_PASSWORD)))
+        elif s.client is TorrentClient.RTORRENT:
+            r = s.rtorrent
+            key = (s.client, r.host, r.username, get_secret(s.secret_name(RTORRENT_PASSWORD)))
         elif s.client in {TorrentClient.UTORRENT, TorrentClient.BITTORRENT}:
             u = s.utorrent
             key = (s.client, u.host, u.username, get_secret(s.secret_name(UTORRENT_PASSWORD)))

@@ -212,6 +212,22 @@ class ClientOverview(QWidget):
         ]
         if not selected:
             return
+        if action == "delete":
+            refusing = {
+                self.settings.profile(identifier).client.display_name
+                for identifier, _ in selected
+                if not self.connections.client(self.settings, identifier).can_delete_files
+            }
+            if refusing:
+                QMessageBox.information(
+                    self,
+                    self.tr("Delete torrent and files"),
+                    self.tr(
+                        "{0} cannot delete a torrent's files. Remove the torrent instead, which "
+                        "keeps its files, then delete them yourself if you no longer need them."
+                    ).format(", ".join(sorted(refusing))),
+                )
+                return
         if action in {"remove", "delete"}:
             names = "\n".join(
                 f"{self.settings.profile(identifier).name}: {hash}" for identifier, hash in selected

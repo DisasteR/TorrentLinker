@@ -1601,6 +1601,14 @@ Passer en mode Exécuter dans les limites ? Cette question ne sera plus posée.<
 <context>
     <name>ClientOverview</name>
     <message>
+        <source>Delete torrent and files</source>
+        <translation>Supprimer le torrent et les fichiers</translation>
+    </message>
+    <message>
+        <source>{0} cannot delete a torrent&apos;s files. Remove the torrent instead, which keeps its files, then delete them yourself if you no longer need them.</source>
+        <translation>{0} ne sait pas supprimer les fichiers d’un torrent. Retirez plutôt le torrent, ce qui garde ses fichiers, puis supprimez-les vous-même si vous n’en avez plus besoin.</translation>
+    </message>
+    <message>
         <location filename="../gui/client_overview.py" line="52"/>
         <source>Filter torrents or clients…</source>
         <translation>Filtrer les torrents ou les clients…</translation>
@@ -1967,18 +1975,22 @@ Passer en mode Exécuter dans les limites ? Cette question ne sera plus posée.<
 <context>
     <name>DiskRenameDialog</name>
     <message>
+        <source>Your torrent client</source>
+        <translation>Votre client torrent</translation>
+    </message>
+    <message>
         <location filename="../gui/reseed_consent.py" line="27"/>
-        <source>µTorrent: rename files on disk?</source>
-        <translation>µTorrent : renommer les fichiers sur le disque ?</translation>
+        <source>{0}: rename files on disk?</source>
+        <translation>{0} : renommer les fichiers sur le disque ?</translation>
     </message>
     <message>
         <location filename="../gui/reseed_consent.py" line="32"/>
-        <source>µTorrent cannot rename files inside a torrent through its WebUI. To seed this torrent, TorrentLinker must rename the files on disk listed below. This can break other torrents, readers or shortcuts using the old paths.
+        <source>{0} cannot rename files inside a torrent. To seed this torrent, TorrentLinker must rename the files on disk listed below. This can break other torrents, readers or shortcuts using the old paths.
 
-File contents stay unchanged. Existing destinations are never overwritten. The files are checked before renaming and again in µTorrent before seeding. If setup or verification fails, TorrentLinker restores the old names when the files are unchanged and those names are still available.</source>
-        <translation>µTorrent ne peut pas renommer les fichiers dans un torrent via sa WebUI. Pour partager ce torrent, TorrentLinker doit renommer sur le disque les fichiers ci-dessous. Cela peut casser d’autres torrents, lecteurs ou raccourcis utilisant les anciens chemins.
+File contents stay unchanged. Existing destinations are never overwritten. The files are checked before renaming and again in {0} before seeding. If setup or verification fails, TorrentLinker restores the old names when the files are unchanged and those names are still available.</source>
+        <translation>{0} ne peut pas renommer les fichiers dans un torrent. Pour partager ce torrent, TorrentLinker doit renommer sur le disque les fichiers ci-dessous. Cela peut casser d’autres torrents, lecteurs ou raccourcis utilisant les anciens chemins.
 
-Le contenu des fichiers reste inchangé. Une destination existante n’est jamais écrasée. Les fichiers sont vérifiés avant le renommage, puis dans µTorrent avant le partage. Si la préparation ou la vérification échoue, TorrentLinker restaure les anciens noms lorsque les fichiers sont inchangés et que ces noms sont encore disponibles.</translation>
+Le contenu des fichiers reste inchangé. Une destination existante n’est jamais écrasée. Les fichiers sont vérifiés avant le renommage, puis dans {0} avant le partage. Si la préparation ou la vérification échoue, TorrentLinker restaure les anciens noms lorsque les fichiers sont inchangés et que ces noms sont encore disponibles.</translation>
     </message>
     <message>
         <location filename="../gui/reseed_consent.py" line="48"/>
@@ -6585,6 +6597,14 @@ La mettre à la corbeille ?</translation>
 <context>
     <name>ReviewPanel</name>
     <message>
+        <source>Your torrent client</source>
+        <translation>Votre client torrent</translation>
+    </message>
+    <message>
+        <source>{0} cannot reseed a Partial Match: it cannot check only the files you have without touching the missing ones. Choose a Full Match, or reseed this one with qBittorrent, Transmission or Deluge.</source>
+        <translation>{0} ne sait pas remettre en partage une correspondance partielle : il ne peut pas vérifier uniquement vos fichiers sans toucher aux fichiers manquants. Choisissez une correspondance complète, ou remettez celle-ci en partage avec qBittorrent, Transmission ou Deluge.</translation>
+    </message>
+    <message>
         <source>Found in the local Catalogue by its exact size, without spending a search.</source>
         <translation>Trouvé dans le Catalogue local par sa taille exacte, sans consommer de recherche.</translation>
     </message>
@@ -8115,12 +8135,20 @@ Le torrent est ensuite ajouté à votre client torrent avec les fichiers décomp
 <context>
     <name>SettingsDialog</name>
     <message>
+        <source>XML-RPC address</source>
+        <translation>Adresse XML-RPC</translation>
+    </message>
+    <message>
+        <source>The XML-RPC address your seedbox or ruTorrent gives, often ending in /RPC2, or rTorrent&apos;s own SCGI port as scgi://host:port. rTorrent cannot rename files inside a torrent: if names differ, a confirmation lists the files to rename on disk. Partial Matches are unavailable, because rTorrent creates missing files while it checks. Sequential download is not available.</source>
+        <translation>L’adresse XML-RPC indiquée par votre seedbox ou ruTorrent, souvent terminée par /RPC2, ou le port SCGI de rTorrent sous la forme scgi://hôte:port. rTorrent ne sait pas renommer un fichier à l’intérieur d’un torrent : si les noms diffèrent, une confirmation liste les fichiers à renommer sur le disque. Les correspondances partielles sont indisponibles, car rTorrent crée les fichiers manquants pendant sa vérification. Le téléchargement séquentiel n’est pas disponible.</translation>
+    </message>
+    <message>
         <source>Download films and series in order, so they play while downloading</source>
         <translation>Télécharger films et séries dans l’ordre, pour les lire pendant le téléchargement</translation>
     </message>
     <message>
-        <source>Turns on sequential download, first and last pieces first, for torrents whose largest file is a video. Not available with µTorrent.</source>
-        <translation>Active le téléchargement séquentiel, premiers et derniers morceaux d’abord, pour les torrents dont le plus gros fichier est une vidéo. Indisponible avec µTorrent.</translation>
+        <source>Turns on sequential download, first and last pieces first, for torrents whose largest file is a video. Not available with µTorrent or rTorrent.</source>
+        <translation>Active le téléchargement séquentiel, premiers et derniers morceaux d’abord, pour les torrents dont le plus gros fichier est une vidéo. Indisponible avec µTorrent ou rTorrent.</translation>
     </message>
     <message>
         <source>Restart TorrentLinker to apply the new interface size.</source>
@@ -9712,6 +9740,14 @@ Seeders annoncés par le tracker : {1}</translation>
 </context>
 <context>
     <name>TorrentsTab</name>
+    <message>
+        <source>Your torrent client</source>
+        <translation>Votre client torrent</translation>
+    </message>
+    <message>
+        <source>{0} cannot delete a torrent&apos;s files. Remove the torrent instead, which keeps its files, then delete them yourself if you no longer need them.</source>
+        <translation>{0} ne sait pas supprimer les fichiers d’un torrent. Retirez plutôt le torrent, ce qui garde ses fichiers, puis supprimez-les vous-même si vous n’en avez plus besoin.</translation>
+    </message>
     <message>
         <location filename="../gui/torrents_view.py" line="330"/>
         <source>Find a torrent…</source>

@@ -1,6 +1,6 @@
 # Multiple Torrent Clients
 
-Use **Clients…** beside the desktop's target selector to add a connection, edit its settings or choose the default. Give each connection a short name, such as NAS or Seedbox. Several qBittorrent instances and mixed qBittorrent, Deluge, Transmission, µTorrent Classic and BitTorrent Classic connections are supported.
+Use **Clients…** beside the desktop's target selector to add a connection, edit its settings or choose the default. Give each connection a short name, such as NAS or Seedbox. Several qBittorrent instances and mixed qBittorrent, Deluge, Transmission, rTorrent, µTorrent Classic and BitTorrent Classic connections are supported.
 
 ![Named Torrent Clients](../images/en/clients.png)
 

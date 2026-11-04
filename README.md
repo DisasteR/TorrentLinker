@@ -4,7 +4,7 @@ Français · [English](README.en.md) · [Documentation](docs/README.md)
 
 Dépôt principal : [GitHub](https://github.com/Vietnoirien/TorrentLinker) · [Miroir du dépôt](https://git.mma.dev/Vietnoirien/TorrentLinker)
 
-Retrouvez les torrents qui correspondent à vos fichiers et remettez-les en seed dans **qBittorrent, Deluge ou Transmission**, avec une prise en charge expérimentale de **µTorrent Classic et BitTorrent Classic**. TorrentLinker recherche les correspondances auprès d’un indexeur Torznab comme **c411**, puis fait vérifier les fichiers par le client torrent avant de lancer le partage.
+Retrouvez les torrents qui correspondent à vos fichiers et remettez-les en seed dans **qBittorrent, Deluge, Transmission ou rTorrent**, avec une prise en charge expérimentale de **µTorrent Classic et BitTorrent Classic**. TorrentLinker recherche les correspondances auprès d’un indexeur Torznab comme **c411**, puis fait vérifier les fichiers par le client torrent avant de lancer le partage.
 
 ![TorrentLinker : suivi Zen, catégories et notes des torrents](docs/guide/images/zen.png)
 
@@ -22,7 +22,7 @@ Retrouvez les torrents qui correspondent à vos fichiers et remettez-les en seed
 - **Torrents** : gérer les téléchargements et le partage, avec une arborescence par tracker et catégorie.
 - **Upload** : préparer les fichiers, la description et le NFO d’un brouillon c411, à relire et publier sur le site.
 
-Avec qBittorrent, Deluge et Transmission, les fichiers existants ne sont pas renommés sur le disque. Avec µTorrent Classic et BitTorrent Classic, un renommage sur le disque peut être nécessaire et demande une confirmation explicite. Sur l’application de bureau, les clés API et mots de passe sont conservés dans le trousseau système. L’interface est disponible en français et en anglais, avec un thème système, clair ou sombre.
+Avec qBittorrent, Deluge et Transmission, les fichiers existants ne sont pas renommés sur le disque. Avec rTorrent, µTorrent Classic et BitTorrent Classic, un renommage sur le disque peut être nécessaire et demande une confirmation explicite. Sur l’application de bureau, les clés API et mots de passe sont conservés dans le trousseau système. L’interface est disponible en français et en anglais, avec un thème système, clair ou sombre.
 
 ## Télécharger
 

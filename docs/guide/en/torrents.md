@@ -49,3 +49,18 @@ Full Reseeds and Upload seeding add the torrent stopped, request a hash check an
 Partial Matches, including matches missing ignored files, remain unsupported because this WebUI does not expose verified pieces. Zen seeding-age estimates cannot use a client-reported seeding duration from this adapter yet.
 
 For development, `tests/test_utorrent_integration.py` runs only when `TL_UTORRENT_CONNECTION` names a JSON file with `url`, `username` and `password`, and `TL_UTORRENT_DATA` names the local view of the default download folder. Use an empty, dedicated test instance. Tests create unique disposable files, exercise the API, remove their own torrent jobs, and verify the files keep their bytes.
+
+## rTorrent
+
+Choose **rTorrent** in Settings → Connections. Enter the XML-RPC address your seedbox or ruTorrent gives, often ending in `/RPC2` (`/RPC2` is added to an address without a path), with the username and password of the web server in front of it. If you reach rTorrent's own SCGI port instead, enter it as `scgi://host:port`; the desktop also accepts a local socket as `scgi:///path/to/socket`. rTorrent 0.15.2 is tested.
+
+TorrentLinker keeps its own tags in a separate rTorrent field, so your ruTorrent label stays as it is. Downloads, Plans, the Seeding view, start/stop, recheck, file priorities and removal work as with the other clients. Before a download starts, rTorrent is asked to create its folder on its own machine, because a started torrent whose folder is missing stays inactive without saying why.
+
+rTorrent has limits of its own (see [ADR-0017](../../adr/0017-rtorrent-through-xml-rpc-with-disk-renames.md)):
+
+- **It cannot rename files inside a torrent.** When names differ, a Reseed needs the same disk-rename confirmation as µTorrent: every path is listed, the local data is checked first, and the original names come back if anything fails.
+- **Partial Matches are refused**, because rTorrent's check creates every missing file of the torrent in your folder.
+- **No sequential download**: films and series download in rTorrent's normal order.
+- **Removing a torrent never deletes its files**; remove them yourself if you want them gone.
+
+For development, `tests/test_rtorrent_integration.py` runs against a throwaway rTorrent in Docker: see `scripts/rtorrent_sandbox.py`.

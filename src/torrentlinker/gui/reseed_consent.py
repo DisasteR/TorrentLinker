@@ -1,8 +1,9 @@
-"""Ask on the GUI thread before a worker renames µTorrent's local files."""
+"""Ask on the GUI thread before a worker renames local files for µTorrent or rTorrent."""
 
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
@@ -22,21 +23,24 @@ from torrentlinker.disk_rename import DiskRenamePlan
 
 
 class DiskRenameDialog(QDialog):
-    def __init__(self, plan: DiskRenamePlan, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, plan: DiskRenamePlan, parent: QWidget | None = None, client: str = ""
+    ) -> None:
         super().__init__(parent)
-        self.setWindowTitle(self.tr("µTorrent: rename files on disk?"))
+        client = client or self.tr("Your torrent client")
+        self.setWindowTitle(self.tr("{0}: rename files on disk?").format(client))
         self.resize(800, 450)
         layout = QVBoxLayout(self)
         warning = QLabel(
             self.tr(
-                "µTorrent cannot rename files inside a torrent through its WebUI. "
+                "{0} cannot rename files inside a torrent. "
                 "To seed this torrent, TorrentLinker must rename the files on disk listed below. "
                 "This can break other torrents, readers or shortcuts using the old paths.\n\n"
                 "File contents stay unchanged. Existing destinations are never overwritten. "
-                "The files are checked before renaming and again in µTorrent before seeding. "
+                "The files are checked before renaming and again in {0} before seeding. "
                 "If setup or verification fails, TorrentLinker restores the old names when "
                 "the files are unchanged and those names are still available."
-            )
+            ).format(client)
         )
         warning.setWordWrap(True)
         layout.addWidget(warning)
@@ -77,9 +81,10 @@ class _Request:
 class ReseedConsent(QObject):
     requested = Signal(object)
 
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: QWidget, client: Callable[[], str] = lambda: "") -> None:
         super().__init__(parent)
         self.window = parent
+        self.client = client  # the Torrent Client's name, for the dialog
         self.closed = threading.Event()
         self.dialog: DiskRenameDialog | None = None
         self.requested.connect(self._show, Qt.ConnectionType.QueuedConnection)
@@ -105,7 +110,7 @@ class ReseedConsent(QObject):
         try:
             if self.closed.is_set():
                 return
-            self.dialog = DiskRenameDialog(request.plan, self.window)
+            self.dialog = DiskRenameDialog(request.plan, self.window, self.client())
             request.approved = self.dialog.exec() == QDialog.DialogCode.Accepted
         finally:
             if self.dialog is not None:

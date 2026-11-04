@@ -11,7 +11,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from torrentlinker import net
 from torrentlinker.clients import connect
@@ -39,13 +39,18 @@ CLIENT_SETTINGS = {
     "transmission": "transmission",
     "utorrent": "utorrent",
     "bittorrent": "utorrent",
+    "rtorrent": "rtorrent",
 }
 
 
 def http_url(value: str) -> str:
+    return _url(value, {"http", "https"})
+
+
+def _url(value: str, schemes: set[str]) -> str:
     parsed = urlsplit(value)
     if (
-        parsed.scheme not in {"http", "https"}
+        parsed.scheme not in schemes
         or not parsed.hostname
         or parsed.username
         or parsed.password
@@ -69,7 +74,19 @@ class Connection(BaseModel):
     # The user agreed to untick Transmission's "Append .part to incomplete files' names".
     turn_off_partial_names: bool = False
 
-    _host = field_validator("host")(http_url)
+    @field_validator("host")
+    @classmethod
+    def valid_host(cls, value: str) -> str:
+        # rTorrent's SCGI port is reached over TCP only here, never a socket path.
+        return _url(value, {"http", "https", "scgi"})
+
+    @model_validator(mode="after")
+    def scgi_for_rtorrent(self) -> Connection:
+        if self.host.startswith("scgi:") and self.client is not TorrentClient.RTORRENT:
+            raise ValueError("Use an HTTP(S) address.")
+        if self.host.startswith("scgi:") and urlsplit(self.host).port is None:
+            raise ValueError("Enter rTorrent's SCGI address as scgi://host:port")
+        return self
 
 
 class PartialNamesRefused(ValueError):

@@ -67,7 +67,7 @@ Tini is included in the image to forward shutdown signals and reap orphaned chil
 
 ![Connection wizard in English](../images/web/setup-en.png)
 
-1. Choose qBittorrent, Deluge, Transmission or µTorrent. Test its address and credentials, then save. Deluge uses its Web UI password.
+1. Choose qBittorrent, Deluge, Transmission, rTorrent or µTorrent. Test its address and credentials, then save. Deluge uses its Web UI password.
 2. Review folders reported by the client. API-only seedbox users can continue without mounted files.
 3. Add your c411 key, or do this later. Search needs `torznab:read`; the Zen profile needs `profile:read`.
 4. Review available features and open Torrents. Each connection remains editable in Settings.
@@ -167,7 +167,7 @@ The server targets Linux and Linux NAS systems. Install the desktop from source 
 
 ## Initial interface limits
 
-Archive extraction and µTorrent disk-renaming confirmations remain in the desktop application. Web Uploads support category rules, hosted images, descriptions, NFO, options and Draft creation. The desktop retains the 3D renderer. Publish Drafts on c411 after review. A prepared Upload can be seeded during the same server session; after a restart, inspect the Draft and use the desktop workflow if needed.
+Archive extraction and the disk-renaming confirmations of µTorrent and rTorrent remain in the desktop application. Web Uploads support category rules, hosted images, descriptions, NFO, options and Draft creation. The desktop retains the 3D renderer. Publish Drafts on c411 after review. A prepared Upload can be seeded during the same server session; after a restart, inspect the Draft and use the desktop workflow if needed.
 
 Run API tests with `pytest tests/test_web_setup.py tests/test_web_jobs.py`. For the real browser flow, install `.[browser-test]`, run `playwright install chromium`, then `TL_WEB_BROWSER=1 pytest tests/test_web_browser.py`. Tests use fake clients and temporary media.
 

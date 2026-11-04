@@ -663,14 +663,17 @@ class ReviewPanel(QWidget):
         if len(chosen) == 1 and chosen[0].unpack is not None:
             self._unpack_and_reseed(entry, chosen[0])
             return
+        qbit, store = self.qbit(), self.store
         for v in chosen:
             assert v.match is not None
-            if not v.match.is_full and not self._confirm_partial(
-                len(v.match.absent), v.match.coverage
-            ):
+            if v.match.is_full:
+                continue
+            if not getattr(qbit, "supports_partial_reseeds", True):
+                self._refuse_partial(getattr(qbit, "client_name", "") or "")
+                return
+            if not self._confirm_partial(len(v.match.absent), v.match.coverage):
                 return
         renames = {k: n for v in chosen if v.match for k, n in v.match.renames.items()}
-        qbit, store = self.qbit(), self.store
         if (
             renames
             and not getattr(qbit, "requires_disk_renames", False)
@@ -819,6 +822,17 @@ class ReviewPanel(QWidget):
             self,
             self.tr("Unpack and Reseed"),
             self.tr("Could not unpack and Reseed: {0}").format(error_text(error)),
+        )
+
+    def _refuse_partial(self, client: str) -> None:
+        QMessageBox.information(
+            self,
+            self.tr("Partial Match"),
+            self.tr(
+                "{0} cannot reseed a Partial Match: it cannot check only the files you have "
+                "without touching the missing ones. Choose a Full Match, or reseed this one "
+                "with qBittorrent, Transmission or Deluge."
+            ).format(client or self.tr("Your torrent client")),
         )
 
     def _confirm_partial(self, missing: int, coverage: float) -> bool:

@@ -1,4 +1,4 @@
-"""Explicitly approved µTorrent disk renames, with a durable undo journal.
+"""Explicitly approved disk renames for µTorrent and rTorrent, with a durable undo journal.
 
 No file contents are written. Targets must be absent; overlapping renames and
 symlinks are refused. Journal recovery never overwrites an occupied original path.
@@ -72,7 +72,7 @@ def _path(base: Path, relative: str) -> Path:
 
 def plan_disk_renames(item: LocalItem, meta: TorrentMeta, match: Match) -> DiskRenamePlan:
     if match.unwanted or set(match.pairs) != set(meta.files):
-        raise DiskRenameError("µTorrent disk renames require every torrent file to be present")
+        raise DiskRenameError("Disk renames require every torrent file to be present")
     if len(set(match.pairs.values())) != len(match.pairs):
         raise DiskRenameError("One local file cannot be renamed to several torrent files")
     moves = []
@@ -147,7 +147,7 @@ def _rename_noreplace(source: Path, target: Path) -> None:
             error = ctypes.get_errno()
             raise OSError(error, os.strerror(error), str(target))
     else:
-        raise DiskRenameError("µTorrent disk renames are supported on Windows and Linux only")
+        raise DiskRenameError("Disk renames are supported on Windows and Linux only")
 
 
 def journal_path(folder: Path, infohash: str) -> Path:

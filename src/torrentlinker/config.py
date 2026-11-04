@@ -56,6 +56,12 @@ class UtorrentSettings:
 
 
 @dataclass
+class RtorrentSettings:
+    host: str = "http://localhost/RPC2"  # its XML-RPC, or scgi://host:port
+    username: str = ""
+
+
+@dataclass
 class IndexerSettings:
     url: str = "https://c411.org/api/torznab"
 
@@ -89,6 +95,7 @@ CLIENT_FIELDS = {
     TorrentClient.TRANSMISSION: "transmission",
     TorrentClient.UTORRENT: "utorrent",
     TorrentClient.BITTORRENT: "utorrent",  # same WebUI protocol; secrets scoped per profile
+    TorrentClient.RTORRENT: "rtorrent",
 }
 CLIENT_SECRET_NAMES = {
     "qbit-password",
@@ -96,6 +103,7 @@ CLIENT_SECRET_NAMES = {
     "deluge-password",
     "transmission-password",
     "utorrent-password",
+    "rtorrent-password",
 }
 
 
@@ -122,6 +130,7 @@ class Settings:
     deluge: DelugeSettings = field(default_factory=DelugeSettings)
     transmission: TransmissionSettings = field(default_factory=TransmissionSettings)
     utorrent: UtorrentSettings = field(default_factory=UtorrentSettings)
+    rtorrent: RtorrentSettings = field(default_factory=RtorrentSettings)
     indexer: IndexerSettings = field(default_factory=IndexerSettings)
     proxy: ProxySettings = field(default_factory=ProxySettings)
     matching: MatchingSettings = field(default_factory=MatchingSettings)
@@ -242,6 +251,7 @@ class Settings:
             "deluge": asdict(self.deluge),
             "transmission": asdict(self.transmission),
             "utorrent": asdict(self.utorrent),
+            "rtorrent": asdict(self.rtorrent),
             "indexer": asdict(self.indexer),
             "proxy": asdict(self.proxy),
             "matching": asdict(self.matching),
@@ -284,6 +294,7 @@ class Settings:
             deluge=DelugeSettings(**data.get("deluge", {})),
             transmission=TransmissionSettings(**data.get("transmission", {})),
             utorrent=UtorrentSettings(**data.get("utorrent", {})),
+            rtorrent=RtorrentSettings(**data.get("rtorrent", {})),
             indexer=IndexerSettings(**data.get("indexer", {})),
             proxy=ProxySettings(**data.get("proxy", {})),
             matching=MatchingSettings(**data.get("matching", {})),

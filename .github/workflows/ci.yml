@@ -244,3 +244,30 @@ jobs:
           TL_TRANSMISSION_DOCKER_DATA: ${{ runner.temp }}/nas
       - if: failure()
         run: docker logs tl-transmission; docker logs tl-transmission-paths
+
+  rtorrent:
+    name: Reseed and Plans against rTorrent 0.15 in Docker
+    runs-on: ubuntu-24.04
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Qt runtime libraries
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - run: pip install -e '.[dev]'
+      - name: Start rTorrent, seeing a host folder at its own path
+        run: |
+          mkdir -p "$RUNNER_TEMP/same"
+          docker build -q -t tl-rtorrent scripts/rtorrent
+          docker run -d --name tl-rtorrent -u $(id -u):$(id -g) -p 127.0.0.1:15000:5000 \
+            -v "$RUNNER_TEMP/same:$RUNNER_TEMP/same" tl-rtorrent
+          python scripts/rtorrent_sandbox.py scgi://127.0.0.1:15000
+      - run: pytest -q tests/test_rtorrent_integration.py -rs
+        env:
+          TL_RTORRENT_SANDBOX: scgi://127.0.0.1:15000
+          TL_RTORRENT_DATA: ${{ runner.temp }}/same
+      - if: failure()
+        run: docker logs tl-rtorrent

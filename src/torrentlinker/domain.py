@@ -30,6 +30,7 @@ class TorrentClient(StrEnum):
     TRANSMISSION = "transmission"
     UTORRENT = "utorrent"
     BITTORRENT = "bittorrent"
+    RTORRENT = "rtorrent"
 
     @property
     def display_name(self) -> str:
@@ -39,6 +40,7 @@ class TorrentClient(StrEnum):
             "transmission": "Transmission",
             "utorrent": "µTorrent Classic",
             "bittorrent": "BitTorrent Classic",
+            "rtorrent": "rTorrent",
         }[self.value]
 
 

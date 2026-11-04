@@ -67,7 +67,7 @@ Tini est inclus dans l'image pour transmettre les signaux d'arrêt et récupére
 
 ![Assistant de connexion en français](../images/web/setup-fr.png)
 
-1. Choisissez qBittorrent, Deluge, Transmission ou µTorrent. Indiquez son adresse, testez la connexion, puis enregistrez-la. Deluge utilise le mot de passe de son interface Web.
+1. Choisissez qBittorrent, Deluge, Transmission, rTorrent ou µTorrent. Indiquez son adresse, testez la connexion, puis enregistrez-la. Deluge utilise le mot de passe de son interface Web.
 2. Les dossiers fournis par le client sont proposés. Vous pouvez continuer sans accès aux fichiers pour gérer une seedbox à distance.
 3. Ajoutez votre clé c411 ou choisissez de la configurer plus tard. La recherche nécessite `torznab:read` ; le profil Zen nécessite `profile:read`.
 4. L'écran final indique les fonctions configurées. Les paramètres restent accessibles à tout moment.
@@ -169,7 +169,7 @@ Le serveur vise Linux et les NAS Linux. Pour installer l'interface de bureau dep
 
 ## Limites de cette première interface
 
-L'extraction d'archives et les renommages sur disque nécessaires à certains reseeds µTorrent restent dans l'application de bureau. L'éditeur web prépare les descriptions, NFO, options de catégorie, images hébergées et brouillons ; la prévisualisation 3D reste dans l'application de bureau. La publication finale d'un brouillon se fait sur c411. Un Upload préparé peut être envoyé au client depuis la même session serveur ; après un redémarrage, vérifiez d'abord le brouillon et utilisez l'application de bureau si nécessaire.
+L'extraction d'archives et les renommages sur disque nécessaires à certains reseeds µTorrent et rTorrent restent dans l'application de bureau. L'éditeur web prépare les descriptions, NFO, options de catégorie, images hébergées et brouillons ; la prévisualisation 3D reste dans l'application de bureau. La publication finale d'un brouillon se fait sur c411. Un Upload préparé peut être envoyé au client depuis la même session serveur ; après un redémarrage, vérifiez d'abord le brouillon et utilisez l'application de bureau si nécessaire.
 
 ## Corriger les dossiers et utiliser le cache
 

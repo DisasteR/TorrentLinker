@@ -71,6 +71,7 @@ QBIT_API_KEY = "qbit-api-key"
 DELUGE_PASSWORD = "deluge-password"
 TRANSMISSION_PASSWORD = "transmission-password"
 UTORRENT_PASSWORD = "utorrent-password"
+RTORRENT_PASSWORD = "rtorrent-password"
 INDEXER_API_KEY = "indexer-api-key"
 # Up to 4 more keys of the same c411 account, each within its own limits (ADR-0008).
 EXTRA_INDEXER_KEYS = tuple(f"indexer-api-key-{n}" for n in range(2, 6))
@@ -399,6 +400,7 @@ class SettingsDialog(QDialog):
         self.client_forms.addWidget(self._deluge_form())
         self.client_forms.addWidget(self._transmission_form())
         self.client_forms.addWidget(self._utorrent_form())
+        self.client_forms.addWidget(self._rtorrent_form())
         self._show_client_form()
         self.client.currentIndexChanged.connect(self._show_client_form)
         layout.addWidget(self.client_forms)
@@ -466,8 +468,32 @@ class SettingsDialog(QDialog):
 
         field = CLIENT_FIELDS[self._chosen_client()]
         self.client_forms.setCurrentIndex(
-            ["qbit", "deluge", "transmission", "utorrent"].index(field)
+            ["qbit", "deluge", "transmission", "utorrent", "rtorrent"].index(field)
         )
+
+    def _rtorrent_form(self) -> QWidget:
+        page = QWidget()
+        form = QFormLayout(page)
+        form.setContentsMargins(0, 0, 0, 0)
+        self.rtorrent_host = QLineEdit(self.settings.rtorrent.host)
+        self.rtorrent_host.setPlaceholderText("https://seedbox.example/RPC2")
+        self.rtorrent_user = QLineEdit(self.settings.rtorrent.username)
+        self.rtorrent_password = self._secret_field(RTORRENT_PASSWORD)
+        form.addRow(self.tr("XML-RPC address"), self.rtorrent_host)
+        form.addRow(self.tr("Username"), self.rtorrent_user)
+        form.addRow(self.tr("Password"), self.rtorrent_password)
+        note = QLabel(
+            self.tr(
+                "The XML-RPC address your seedbox or ruTorrent gives, often ending in /RPC2, "
+                "or rTorrent's own SCGI port as scgi://host:port. rTorrent cannot rename files "
+                "inside a torrent: if names differ, a confirmation lists the files to rename "
+                "on disk. Partial Matches are unavailable, because rTorrent creates missing "
+                "files while it checks. Sequential download is not available."
+            )
+        )
+        note.setWordWrap(True)
+        form.addRow("", note)
+        return page
 
     def _utorrent_form(self) -> QWidget:
         page = QWidget()
@@ -528,6 +554,13 @@ class SettingsDialog(QDialog):
                 self.transmission_host.text(),
                 self.transmission_user.text(),
                 self.transmission_password.text(),
+            )
+        if client is TorrentClient.RTORRENT:
+            return connect(
+                client,
+                self.rtorrent_host.text(),
+                self.rtorrent_user.text(),
+                self.rtorrent_password.text(),
             )
         if client in {TorrentClient.UTORRENT, TorrentClient.BITTORRENT}:
             return connect(
@@ -772,7 +805,7 @@ class SettingsDialog(QDialog):
         self.sequential_video.setToolTip(
             self.tr(
                 "Turns on sequential download, first and last pieces first, for torrents "
-                "whose largest file is a video. Not available with µTorrent."
+                "whose largest file is a video. Not available with µTorrent or rTorrent."
             )
         )
         layout.addWidget(self.sequential_video)
@@ -837,6 +870,7 @@ class SettingsDialog(QDialog):
             self.deluge_host.text(),
             self.transmission_host.text(),
             self.utorrent_host.text(),
+            self.rtorrent_host.text(),
         )
 
     def _import_client_folders(self) -> None:
@@ -1347,6 +1381,7 @@ class SettingsDialog(QDialog):
             DELUGE_PASSWORD: self.deluge_password.text(),
             TRANSMISSION_PASSWORD: self.transmission_password.text(),
             UTORRENT_PASSWORD: self.utorrent_password.text(),
+            RTORRENT_PASSWORD: self.rtorrent_password.text(),
             INDEXER_API_KEY: self.indexer_key.text().strip(),
             TMDB_API_KEY: self.tmdb_key.text().strip(),
             PROXY_PASSWORD: self.proxy_password.text(),
@@ -1395,6 +1430,7 @@ class SettingsDialog(QDialog):
                 "deluge": self.deluge_host,
                 "transmission": self.transmission_host,
                 "utorrent": self.utorrent_host,
+                "rtorrent": self.rtorrent_host,
             }[CLIENT_FIELDS[self._chosen_client()]]
             .text()
             .strip()
@@ -1432,6 +1468,8 @@ class SettingsDialog(QDialog):
         s.transmission.username = self.transmission_user.text().strip()
         s.utorrent.host = self.utorrent_host.text().strip()
         s.utorrent.username = self.utorrent_user.text().strip()
+        s.rtorrent.host = self.rtorrent_host.text().strip()
+        s.rtorrent.username = self.rtorrent_user.text().strip()
         s.qbit.host = self.qbit_host.text().strip()
         s.qbit.username = self.qbit_user.text().strip()
         s.indexer.url = self.indexer_url.text().strip()

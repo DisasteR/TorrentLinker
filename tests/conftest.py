@@ -59,6 +59,10 @@ USER_CLIENTS = {
     for scheme in ("http", "https")
     for host in ("localhost", "127.0.0.1")
     for port in (8080, 8081, 8112, 9091)
+} | {
+    f"{scheme}://{host}{port}"
+    for scheme, port in (("http", "/RPC2"), ("https", "/RPC2"), ("scgi", ":5000"))
+    for host in ("localhost", "127.0.0.1")
 }
 NOWHERE = "http://127.0.0.1:9"  # discard port: refused at once
 
@@ -67,10 +71,11 @@ NOWHERE = "http://127.0.0.1:9"  # discard port: refused at once
 def never_reach_the_users_own_clients(monkeypatch):  # type: ignore[no-untyped-def]
     from torrentlinker.deluge import DelugeApi
     from torrentlinker.qbit import QbitApi
+    from torrentlinker.rtorrent import RtorrentApi
     from torrentlinker.transmission import TransmissionApi
     from torrentlinker.utorrent import UtorrentApi
 
-    for cls in (QbitApi, DelugeApi, TransmissionApi, UtorrentApi):
+    for cls in (QbitApi, DelugeApi, TransmissionApi, UtorrentApi, RtorrentApi):
         original = cls.__init__
 
         def guarded(self, host, *args, __original=original, **kwargs):  # type: ignore[no-untyped-def]

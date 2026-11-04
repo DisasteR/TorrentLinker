@@ -111,6 +111,7 @@ def main() -> int:
                 "deluge-password",
                 "transmission-password",
                 "utorrent-password",
+                "rtorrent-password",
                 "indexer-api-key",
                 "announce-url",
                 "proxy-password",

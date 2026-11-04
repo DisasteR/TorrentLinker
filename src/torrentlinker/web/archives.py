@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import Any
 
 from torrentlinker.archives import ArchiveError
+from torrentlinker.client_limits import disk_renames_elsewhere
 from torrentlinker.review import (
     CheckedCandidate,
     candidate_key,
@@ -67,10 +68,7 @@ class ArchiveReseeds:
             )
         client = self.library.client()
         if client.requires_disk_renames and match.renames:
-            raise ValueError(
-                "This µTorrent Reseed requires disk renames. Review and approve "
-                "those in the desktop application."
-            )
+            raise ValueError(disk_renames_elsewhere(client))
         if client.torrent(meta.infohash) is not None:
             raise ValueError("This torrent already exists in the Torrent Client.")
         stat = archive.stat()

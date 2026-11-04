@@ -57,12 +57,12 @@ A user decision that a given Candidate is not the Orphan, remembered so it is ne
 ### Seeding
 
 **Torrent Client**:
-The program that seeds, qBittorrent, Deluge, Transmission, µTorrent Classic or BitTorrent Classic, as the user chooses; Reseeds and Plans are added to it, and its torrents decide which Local Items are Seeded.
+The program that seeds, qBittorrent, Deluge, Transmission, rTorrent, µTorrent Classic or BitTorrent Classic, as the user chooses; Reseeds and Plans are added to it, and its torrents decide which Local Items are Seeded.
 _Avoid_: Client (alone, when the Indexer's API client could be meant), qBit (outside code)
 
 **Reseed**:
 Adding a Match to the Torrent Client pointed at the existing data, renaming inside the torrent so its paths line up with the local files, then verifying by hash check before seeding.
-For µTorrent Classic and BitTorrent Classic, differing names require a per-torrent confirmation to rename files on disk. Other clients keep the existing files at their original paths. See ADR-0013.
+For µTorrent Classic, BitTorrent Classic and rTorrent, differing names require a per-torrent confirmation to rename files on disk. Other clients keep the existing files at their original paths. See ADR-0013 and ADR-0017.
 _Avoid_: Inject, cross-seed, relink
 
 **Verification**:

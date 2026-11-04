@@ -82,6 +82,7 @@ def _same_path(first: str, second: str) -> bool:
 class UtorrentApi:
     supports_category_tags = False  # one label must not be replaced by category tags
     requires_disk_renames = True
+    supports_partial_reseeds = False  # the WebUI does not report verified pieces
 
     def __init__(
         self,

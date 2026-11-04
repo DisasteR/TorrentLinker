@@ -1,0 +1,10 @@
+# Daemon mode, XML-RPC on an SCGI port, and no DHT, PeX or UDP trackers.
+directory.default.set = /tmp
+session.path.set = /tmp/session
+execute.throw = mkdir, -p, /tmp/session
+network.scgi.open_port = 0.0.0.0:5000
+network.xmlrpc.size_limit.set = 16M
+dht.mode.set = disable
+protocol.pex.set = no
+trackers.use_udp.set = no
+system.daemon.set = true
