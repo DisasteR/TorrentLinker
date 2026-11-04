@@ -68,6 +68,21 @@ NOWHERE = "http://127.0.0.1:9"  # discard port: refused at once
 
 
 @pytest.fixture(autouse=True)
+def never_take_the_running_apps_assistant_port(monkeypatch):  # type: ignore[no-untyped-def]
+    """The desktop Assistant listens on 8790. A test server there kept the user's own
+    running TorrentLinker from opening its Assistant and Media center, so a test gets a
+    free port unless it names one."""
+    from torrentlinker.agent.desktop import DesktopServer
+
+    original = DesktopServer.__init__
+
+    def guarded(self, *args, port: int = 0, **kwargs):  # type: ignore[no-untyped-def]
+        original(self, *args, port=port, **kwargs)
+
+    monkeypatch.setattr(DesktopServer, "__init__", guarded)
+
+
+@pytest.fixture(autouse=True)
 def never_reach_the_users_own_clients(monkeypatch):  # type: ignore[no-untyped-def]
     from torrentlinker.deluge import DelugeApi
     from torrentlinker.qbit import QbitApi
