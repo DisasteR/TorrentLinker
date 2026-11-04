@@ -53,6 +53,9 @@ def argument_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = argument_parser()
     args = parser.parse_args()
+    # argparse checks choices only on the command line, not on a default from TL_WEB_AUTH.
+    if args.web_auth not in ("password", "proxy"):
+        parser.error(f"TL_WEB_AUTH must be password or proxy, not {args.web_auth!r}.")
     password = None
     proxies: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = ()
     if args.web_auth == "proxy":

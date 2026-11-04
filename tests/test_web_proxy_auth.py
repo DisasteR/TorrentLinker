@@ -134,5 +134,12 @@ def test_a_proxy_address_does_not_sign_in_the_password_mode(tmp_path):
 
 
 def test_an_unknown_web_auth_mode_refuses_to_start(monkeypatch, tmp_path):
+    # With a password set, a mistyped mode must not quietly start in password mode.
     with pytest.raises(SystemExit):
-        start(monkeypatch, tmp_path, TL_WEB_AUTH="none", TL_TRUSTED_PROXIES="172.18.0.0/16")
+        start(
+            monkeypatch,
+            tmp_path,
+            TL_WEB_AUTH="proxi",
+            TL_TRUSTED_PROXIES="172.18.0.0/16",
+            TL_WEB_PASSWORD="test-password-long",
+        )
