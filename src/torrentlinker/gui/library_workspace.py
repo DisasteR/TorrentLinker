@@ -6,6 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 from PySide6.QtCore import QSignalBlocker, Qt
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -17,7 +18,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSpinBox,
-    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -158,6 +158,37 @@ class FolderEditor(QWidget):
         self.path.clear()
 
 
+class PaneGrip(QWidget):
+    """Drag handle that sets the height of the pane above it.
+
+    Unlike a splitter it never takes room from the pane below: the page grows
+    and the workspace scrolls, so both panes stay readable on short windows.
+    """
+
+    def __init__(self, pane: QWidget):
+        super().__init__()
+        self.pane = pane
+        self._start: tuple[float, int] | None = None
+        self.setObjectName("paneGrip")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+        self.setFixedHeight(6)
+        self.setCursor(Qt.CursorShape.SplitVCursor)
+
+    def resize_pane(self, height: int) -> None:
+        self.pane.setFixedHeight(max(self.pane.minimumSizeHint().height(), height))
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        self._start = (event.globalPosition().y(), self.pane.height())
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._start is not None:
+            y, height = self._start
+            self.resize_pane(height + round(event.globalPosition().y() - y))
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self._start = None
+
+
 class LibraryWorkspace(QWidget):
     def __init__(self, window, items: QWidget, toolbar: QWidget, matches: QWidget):
         super().__init__()
@@ -202,12 +233,11 @@ class LibraryWorkspace(QWidget):
         self.combine = combine
         stack.addWidget(combine, 0, Qt.AlignmentFlag.AlignLeft)
         stack.addWidget(matches)
-        self.split = QSplitter(Qt.Orientation.Vertical)
-        self.split.setChildrenCollapsible(False)
-        self.split.addWidget(items)
-        self.split.addWidget(window.review)
-        self.split.setSizes([340, 350])
-        stack.addWidget(self.split, 1)
+        self.grip = PaneGrip(items)
+        self.grip.resize_pane(340)
+        stack.addWidget(items)
+        stack.addWidget(self.grip)
+        stack.addWidget(window.review, 1)
         body.addWidget(content, 1)
         self.sections.addTab(explorer, self.tr("Local Items"))
         self.editor = FolderEditor(window.settings.library_folders)
@@ -239,7 +269,7 @@ class LibraryWorkspace(QWidget):
 
     def expand_review(self) -> None:
         expanded = not self.items.isHidden()
-        for widget in (self.items, self.toolbar, self.matches, self.combine):
+        for widget in (self.items, self.grip, self.toolbar, self.matches, self.combine):
             widget.setVisible(not expanded)
         self.owner.review.expand_button.setText(
             self.tr("Back to Local Items") if expanded else self.tr("Expand review")

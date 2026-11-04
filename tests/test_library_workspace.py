@@ -52,6 +52,30 @@ def test_candidate_review_can_expand_without_losing_the_local_item(qtbot, tmp_pa
     ]
 
 
+def test_short_window_scrolls_the_page_instead_of_crushing_the_review(qtbot, tmp_path, monkeypatch):
+    window, _ = window_for(qtbot, tmp_path, monkeypatch)
+    window.resize(1400, 700)
+    window.tabs.setCurrentIndex(1)
+    window.show()
+    qtbot.waitExposed(window)
+    workspace = window.library_workspace
+    review = window.review.height()
+    assert review >= window.review.minimumSizeHint().height()
+    for height in (400, 600, 900):
+        workspace.grip.resize_pane(height)
+        qtbot.wait(10)
+        assert workspace.items.geometry().bottom() < workspace.grip.y()  # no overlap
+        assert workspace.grip.geometry().bottom() < window.review.y()
+        assert window.review.height() >= review  # the page scrolls instead
+    assert window.library_view.height() > 800
+    assert window.workspace_scroll.verticalScrollBar().maximum() > 0
+    workspace.grip.resize_pane(0)
+    assert workspace.items.height() == workspace.items.minimumSizeHint().height()
+    window.resize(1400, 1400)
+    qtbot.wait(10)
+    assert window.review.height() > 600  # a tall window still goes to the review
+
+
 def test_desktop_review_preserves_candidate_selection_across_local_items(
     qtbot, tmp_path, monkeypatch, library_theme
 ):

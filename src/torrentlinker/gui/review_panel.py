@@ -231,6 +231,11 @@ class ReviewPanel(QWidget):
         self.files.setColumnWidth(2, 130)
         self.set_entry(None)
 
+    def hasHeightForWidth(self) -> bool:
+        # A vertical layout treats a height-for-width child's preferred height as
+        # its minimum, which crushes the Local Items above the review.
+        return False
+
     # Selection -------------------------------------------------------------
 
     def set_entry(self, entry: LibraryEntry | None) -> None:

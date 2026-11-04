@@ -342,7 +342,7 @@ def _update_theme(app: QApplication, scheme: Qt.ColorScheme) -> None:
             background: {selection}; color: {text}; }}
         QToolBar {{ border: 0; spacing: 6px; background: transparent; padding: 0; }}
         QScrollArea {{ border: 0; background: transparent; }}
-        QSplitter::handle {{ background: {border}; }}
+        QSplitter::handle, QWidget#paneGrip {{ background: {border}; }}
         QStatusBar {{ color: {muted}; border-top: 1px solid {border}; }}
         QProgressBar {{ border: 1px solid {border}; border-radius: 5px; background: {alt};
             text-align: center; }}
