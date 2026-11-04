@@ -31,3 +31,25 @@ Utilisez le sélecteur en haut de la page. Les paramètres proposent **Ajouter u
 Le serveur doit accéder aux fichiers pour l'analyse, le reseed et la préparation d'uploads. Les téléchargements web nécessitent toujours un dossier monté et vérifié. Une seedbox accessible uniquement par son API permet la gestion des torrents.
 
 ![Destinations du Plan dans l'interface web](../images/web-clients.png)
+
+## Fichiers d'une seedbox en SFTP, FTPS ou FTP
+
+Sans accès à ses fichiers, une seedbox permet la gestion des torrents, Zen et la recherche. Pour analyser, comparer, faire un reseed, utiliser le centre multimédia ou préparer un upload, montez le dossier de téléchargement de la seedbox sur cet ordinateur avec [rclone](https://rclone.org/), puis ajoutez une correspondance de chemins. TorrentLinker ne crée pas ce montage lui-même.
+
+Préférez SFTP, puis FTPS. Le FTP simple envoie votre mot de passe en clair. Lancez `rclone config` et créez un remote nommé `seedbox` : type `sftp`, ou type `ftp` avec TLS explicite pour FTPS. Saisissez l'hôte, l'utilisateur et le mot de passe fournis par l'hébergeur. Montez-le ensuite en lecture seule :
+
+```bash
+rclone mount seedbox:/home/user/downloads /mnt/seedbox --read-only --vfs-cache-mode full --vfs-cache-max-size 20G
+```
+
+Remplacez `/home/user/downloads` par le dossier où le client torrent télécharge, tel que la seedbox le voit. Sous Windows, rclone nécessite [WinFsp](https://winfsp.dev/) et monte sur une lettre de lecteur comme `S:`. Sous macOS, il nécessite macFUSE.
+
+Dans les correspondances de chemins du client, reliez `/mnt/seedbox` sur cet ordinateur à `/home/user/downloads` côté client, ou utilisez **Détecter** (**Detect matching folders** dans l'interface web) une fois le montage actif. Utilisez les dossiers montés comme dossiers de bibliothèque et de téléchargement.
+
+Limites à prévoir :
+
+- La première analyse parcourt chaque dossier par le réseau et peut durer plusieurs minutes sur une grande bibliothèque.
+- La préparation d'un upload lit chaque octet pour calculer les hashes, ce qui télécharge toute la release à travers le montage. Le centre multimédia ne lit que ce qu'il joue ; le cache ci-dessus garde jusqu'à 20 Go sur cet ordinateur.
+- Un montage FTP ne peut pas indiquer l'espace libre de la seedbox : rclone affiche une taille inventée. Fixez le budget de ce client dans **Destinations du Plan** au lieu de zéro. SFTP indique l'espace libre si l'hébergeur le permet.
+- Un montage en lecture seule ne peut pas être vérifié avec un fichier temporaire. La vérification utilise alors un fichier d'un torrent existant : gardez au moins un torrent dans le dossier relié.
+- Si le montage s'arrête, son dossier devient vide ou indisponible, et une analyse n'y trouve alors rien. Vérifiez que le montage tourne avant d'analyser.

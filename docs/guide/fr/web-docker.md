@@ -97,6 +97,19 @@ Utilisez l'adresse HTTPS et les identifiants fournis par l'hébergeur, en conser
 
 Sans montage, vous pouvez gérer les torrents, suivre les estimations Zen et rechercher sur c411. Pour analyser, comparer, préparer un Upload, télécharger avec protection contre les écrasements ou planifier selon l'espace disponible, montez le stockage de la seedbox sur l'hôte, puis utilisez le même exemple Compose. TorrentLinker ne crée pas automatiquement de montage SSHFS/NFS/SMB.
 
+Une seedbox accessible en SFTP, FTPS ou FTP peut être montée sur l'hôte avec rclone, comme l'explique [Plusieurs clients torrent](clients.md#fichiers-dune-seedbox-en-sftp-ftps-ou-ftp). Ajoutez `--allow-other` à la commande `rclone mount` pour que l'utilisateur du conteneur puisse lire le montage ; sous Linux, cela nécessite `user_allow_other` dans `/etc/fuse.conf`. Démarrez le montage avant le conteneur, et liez-le avec une propagation esclave pour que le conteneur retrouve le montage après un redémarrage de rclone :
+
+```yaml
+    volumes:
+      - config:/config
+      - type: bind
+        source: /mnt/seedbox
+        target: /data
+        read_only: true
+        bind:
+          propagation: rslave
+```
+
 Un chemin saisi ne rend pas les fichiers accessibles. Si le dossier n'est pas monté, TorrentLinker affiche ce qui manque et refuse l'opération concernée. Il ne prend pas l'espace libre du conteneur pour celui de la seedbox.
 
 ## Clients sur le même hôte

@@ -89,6 +89,19 @@ The folder browser lists server directories within configured storage roots. Web
 
 For a hosted seedbox, use the provider's HTTPS URL, including any URL prefix. Without a mount, management, Zen and Search remain available. Scan, comparison, Upload preparation, safe downloads and planning require access to the seedbox's actual files. Mount its storage on the host first, then use the same Compose override. TorrentLinker does not mount SSHFS/NFS/SMB shares automatically.
 
+A seedbox that offers SFTP, FTPS or FTP can be mounted on the host with rclone, as [Multiple Torrent Clients](clients.md#seedbox-files-over-sftp-ftps-or-ftp) describes. Add `--allow-other` to the `rclone mount` command so the container's user can read the mount; on Linux this needs `user_allow_other` in `/etc/fuse.conf`. Start the mount before the container, and bind it with slave propagation so the container sees the mount again after rclone restarts:
+
+```yaml
+    volumes:
+      - config:/config
+      - type: bind
+        source: /mnt/seedbox
+        target: /data
+        read_only: true
+        bind:
+          propagation: rslave
+```
+
 Remove an old folder from Settings before disconnecting its storage. Folder removal remains possible if the mount is already unavailable. Download and Plan jobs validate the destination using an existing sample or the temporary-file check. Successful probes are remembered for five minutes for the same client, paths and mounted directory identity; they are not saved across restarts. A failed check blocks the operation.
 
 Entering a path does not provide access. Missing storage is never treated as empty, and container free space is never substituted for seedbox capacity.
