@@ -9,12 +9,12 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from torrentlinker.domain import PathMapping, Torrent, TorrentFile
 from torrentlinker.matching import Match
 from torrentlinker.qbit import Qbit
-from torrentlinker.torrent_meta import TorrentMeta
+from torrentlinker.torrent_meta import TorrentMeta, read_torrent
 
 
 def _is_windows(path: str) -> bool:
@@ -79,12 +79,24 @@ class PathMapper:
         return None if best is None else _join(best[1], best[2])
 
 
+def is_video(data: bytes) -> bool:
+    """Whether a torrent is a film or episodes: its largest file is a video."""
+    from torrentlinker.media import VIDEO
+
+    files = read_torrent(data).files
+    if not files:
+        return False
+    largest = max(files, key=lambda name: files[name])
+    return PurePosixPath(largest).suffix.lower() in VIDEO
+
+
 class MappedQbit:
     """The Qbit port seen through Path Mappings: callers only ever handle local paths."""
 
-    def __init__(self, inner: Qbit, mapper: PathMapper) -> None:
+    def __init__(self, inner: Qbit, mapper: PathMapper, *, sequential_video: bool = False) -> None:
         self._inner = inner
         self._mapper = mapper
+        self.sequential_video = sequential_video  # films and episodes download in order
 
     @property
     def supports_category_tags(self) -> bool:
@@ -121,8 +133,13 @@ class MappedQbit:
         prepare = getattr(self._inner, "reseed_layout", None)
         return prepare(meta, match) if prepare else match
 
-    def download(self, data: bytes, save_path: str, tags: list[str]) -> str:
-        return self._inner.download(data, self._mapper.to_qbit(save_path), tags)
+    def download(
+        self, data: bytes, save_path: str, tags: list[str], *, sequential: bool = False
+    ) -> str:
+        target = self._mapper.to_qbit(save_path)
+        if sequential or (self.sequential_video and is_video(data)):
+            return self._inner.download(data, target, tags, sequential=True)
+        return self._inner.download(data, target, tags)
 
     def rename_file(self, hash: str, old: str, new: str) -> None:
         self._inner.rename_file(hash, old, new)

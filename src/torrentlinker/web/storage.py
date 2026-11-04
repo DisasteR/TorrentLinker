@@ -10,10 +10,16 @@ from torrentlinker.web.setup import Setup
 
 class DownloadClient(MappedQbit):
     def __init__(self, setup: Setup):
-        super().__init__(setup.client(), PathMapper(setup.settings.path_mappings))
+        super().__init__(
+            setup.client(),
+            PathMapper(setup.settings.path_mappings),
+            sequential_video=setup.settings.sequential_video,
+        )
         self.setup = setup
 
-    def download(self, data: bytes, save_path: str, tags: list[str]) -> str:
+    def download(
+        self, data: bytes, save_path: str, tags: list[str], *, sequential: bool = False
+    ) -> str:
         if self.setup.download_guard is not None:
             try:
                 self.setup.download_guard(data, save_path)
@@ -29,4 +35,4 @@ class DownloadClient(MappedQbit):
                 if current.is_symlink():
                     raise Refused("A torrent path crosses a symbolic link.")
                 current = current.parent
-        return super().download(data, str(root), tags)
+        return super().download(data, str(root), tags, sequential=sequential)

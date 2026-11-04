@@ -1191,7 +1191,7 @@ def test_series_card_unfolds_its_seasons_and_episodes(qtbot, tmp_path):
     tab.stop()
 
 
-def test_toolbar_refreshes_the_library_and_first_open_refreshes_once(qtbot, tmp_path):
+def test_toolbar_refreshes_the_library_and_reopening_rescans_quietly(qtbot, tmp_path):
     import threading
 
     from torrentlinker.config import Settings
@@ -1233,10 +1233,22 @@ def test_toolbar_refreshes_the_library_and_first_open_refreshes_once(qtbot, tmp_
     release.set()
     qtbot.waitUntil(lambda: not tab.refresh_icon.isChecked())
     qtbot.waitUntil(lambda: tab.results.count() == 1 or bool(tab.home_row_widgets))
-    tab.activate()  # opening Media again does not refresh again
-    assert len(scans) == 1
-    tab.refresh_icon.click()
+    reloads = []
+    real_refresh = tab.refresh
+    tab.refresh = lambda *a, **k: (reloads.append(1), real_refresh(*a, **k))  # type: ignore[method-assign]
+    tab._set_notice("")
+    tab.activate()  # opening Media again rescans quietly
     qtbot.waitUntil(lambda: len(scans) == 2)
+    qtbot.waitUntil(lambda: tab.scan_stop is None)
+    assert "Scanning" not in tab.notice.text()
+    assert len(reloads) == 1  # only the open itself: nothing changed on disk
+    (root / "Film.2021.mkv").write_bytes(b"\0" * 64)
+    tab.auto_refresh.timeout.emit()  # the next automatic refresh finds the new film
+    qtbot.waitUntil(lambda: len(scans) == 3)
+    qtbot.waitUntil(lambda: len(reloads) == 2)
+    assert tab.auto_refresh.isActive()
+    tab.refresh_icon.click()
+    qtbot.waitUntil(lambda: len(scans) == 4)
     qtbot.waitUntil(lambda: not tab.refresh_icon.isChecked())
     assert tab.refresh_icon.toolTip() == "Refresh library"
     tab.stop()

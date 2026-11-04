@@ -8115,6 +8115,14 @@ Le torrent est ensuite ajouté à votre client torrent avec les fichiers décomp
 <context>
     <name>SettingsDialog</name>
     <message>
+        <source>Download films and series in order, so they play while downloading</source>
+        <translation>Télécharger films et séries dans l’ordre, pour les lire pendant le téléchargement</translation>
+    </message>
+    <message>
+        <source>Turns on sequential download, first and last pieces first, for torrents whose largest file is a video. Not available with µTorrent.</source>
+        <translation>Active le téléchargement séquentiel, premiers et derniers morceaux d’abord, pour les torrents dont le plus gros fichier est une vidéo. Indisponible avec µTorrent.</translation>
+    </message>
+    <message>
         <source>Restart TorrentLinker to apply the new interface size.</source>
         <translation>Redémarrez TorrentLinker pour appliquer la nouvelle taille de l’interface.</translation>
     </message>

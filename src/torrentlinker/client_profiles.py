@@ -36,7 +36,9 @@ class Connections:
             self._clients[key] = connect(
                 s.client, config.host, getattr(config, "username", ""), password, api_key
             )
-        return MappedQbit(self._clients[key], PathMapper(s.path_mappings))
+        return MappedQbit(
+            self._clients[key], PathMapper(s.path_mappings), sequential_video=s.sequential_video
+        )
 
 
 def pending_work(settings: Settings, store, identifier: str) -> bool:

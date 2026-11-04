@@ -45,9 +45,12 @@ class Qbit(Protocol):
         """Rename a file inside the torrent (paths relative to the save path)."""
         ...
 
-    def download(self, data: bytes, save_path: str, tags: list[str]) -> str:
+    def download(
+        self, data: bytes, save_path: str, tags: list[str], *, sequential: bool = False
+    ) -> str:
         """Add started, to download into `save_path` with the original layout and
-        automatic management off; return hash."""
+        automatic management off; return hash. `sequential` downloads pieces in order,
+        first and last first, so a video plays while it downloads."""
         ...
 
     def set_file_priority(self, hash: str, indexes: list[int], priority: int) -> None: ...
@@ -294,11 +297,16 @@ class QbitApi:
     def add(self, data: bytes, save_path: str, tags: list[str]) -> str:
         return self._add(data, save_path, tags, stopped=True)
 
-    def download(self, data: bytes, save_path: str, tags: list[str]) -> str:
-        return self._add(data, save_path, tags, stopped=False)
+    def download(
+        self, data: bytes, save_path: str, tags: list[str], *, sequential: bool = False
+    ) -> str:
+        return self._add(data, save_path, tags, stopped=False, sequential=sequential)
 
-    def _add(self, data: bytes, save_path: str, tags: list[str], stopped: bool) -> str:
+    def _add(
+        self, data: bytes, save_path: str, tags: list[str], stopped: bool, sequential=False
+    ) -> str:
         h = read_torrent(data).infohash
+        order = {"is_sequential_download": True, "is_first_last_piece_priority": True}
         try:
             result = self._client.torrents_add(
                 torrent_files=data,
@@ -307,6 +315,7 @@ class QbitApi:
                 use_auto_torrent_management=False,
                 content_layout="Original",
                 tags=tags,
+                **(order if sequential else {}),
             )
         except qbittorrentapi.Conflict409Error:
             result = "Fails."

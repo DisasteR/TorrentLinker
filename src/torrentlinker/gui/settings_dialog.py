@@ -765,6 +765,17 @@ class SettingsDialog(QDialog):
         )
         note.setWordWrap(True)
         layout.addWidget(note)
+        self.sequential_video = QCheckBox(
+            self.tr("Download films and series in order, so they play while downloading")
+        )
+        self.sequential_video.setChecked(self.settings.sequential_video)
+        self.sequential_video.setToolTip(
+            self.tr(
+                "Turns on sequential download, first and last pieces first, for torrents "
+                "whose largest file is a video. Not available with µTorrent."
+            )
+        )
+        layout.addWidget(self.sequential_video)
         default_row = QHBoxLayout()
         self.default_download = QLineEdit(self.settings.download_folders.default)
         self.default_download.setPlaceholderText(
@@ -1428,6 +1439,7 @@ class SettingsDialog(QDialog):
         s.kind_categories = self._read_categories()
         s.zen = self._read_zen()
         s.free_space_margin = self.margin.value() / 100
+        s.sequential_video = self.sequential_video.isChecked()
         s.indexer_categories = dict(self._categories)
         s.download_folders = self._read_download_folders()
         s.path_mappings = self._read_mappings()

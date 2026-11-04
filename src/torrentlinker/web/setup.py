@@ -265,6 +265,7 @@ class Setup:
                         for cid in self.settings.indexer_categories
                     },
                 },
+                "sequential_video": self.settings.sequential_video,
                 "mappings": [asdict(m) for m in self.settings.path_mappings],
                 "capabilities": {
                     "manage": self.configured,
@@ -476,6 +477,13 @@ class Setup:
             self._client = None
             self._indexer = None
             return {"ok": True}
+
+    def set_sequential_video(self, enabled: bool) -> None:
+        root = self._root or self
+        with root.lock:
+            root.settings.sequential_video = enabled
+            root.save()
+        self.settings.sequential_video = enabled
 
     def path_under_root(self, value: str, *, directory: bool = True) -> Path:
         path = Path(value)

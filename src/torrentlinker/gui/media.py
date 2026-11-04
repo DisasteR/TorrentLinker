@@ -86,6 +86,7 @@ from torrentlinker.gui.tasks import run_in_background
 # The Media Center chat panel and the media beside it never shrink below these.
 CHAT_MIN_WIDTH = 320
 MEDIA_MIN_WIDTH = 520
+AUTO_REFRESH_MS = 60_000  # Media rescans the Library Folders this often while open
 
 
 class VerifiedPrefixDevice(QIODevice):
@@ -355,6 +356,7 @@ class MediaTab(QWidget):
         self.current_playlist = ""
         self.assistant: Any = None
         self.scan_stop: threading.Event | None = None
+        self.scan_quiet = False  # an automatic refresh shows no progress
         self.pending_seek: int | None = None
         self.last_source = ""
         self.current_row: dict[str, Any] = {}
@@ -1116,6 +1118,10 @@ class MediaTab(QWidget):
         self.heartbeat = QTimer(self)
         self.heartbeat.setInterval(1000)
         self.heartbeat.timeout.connect(self.report)
+        # New films and episodes appear on their own while Media is open.
+        self.auto_refresh = QTimer(self)
+        self.auto_refresh.setInterval(AUTO_REFRESH_MS)
+        self.auto_refresh.timeout.connect(self._auto_scan)
         self.set_media_layout("cinematic")
         self._update_panes()
 
@@ -1771,6 +1777,8 @@ class MediaTab(QWidget):
                     if folders:
                         QTimer.singleShot(0, self.start_scan)
             self.refresh()
+            QTimer.singleShot(0, self, self._auto_scan)  # dropped if the tab is deleted
+            self.auto_refresh.start()
         except Exception as error:
             self._set_notice(str(error))
 
@@ -3329,15 +3337,24 @@ class MediaTab(QWidget):
             except Exception as error:
                 self._set_notice(str(error))
 
-    def start_scan(self) -> None:
+    def _auto_scan(self) -> None:
+        """Rescan quietly; the screen reloads only when the library changed."""
+        if not self.isVisible() or self.library is None:
+            return
+        if self.library.setup(self.session_client).settings.library_folders:
+            self.start_scan(quiet=True)
+
+    def start_scan(self, quiet: bool = False) -> None:
         if self.library is None or self.scan_stop is not None:
             return
+        self.scan_quiet = quiet
         self.scan_stop = threading.Event()
         stop = self.scan_stop
         self.refresh_button.setEnabled(False)
         self.cancel_scan.setEnabled(True)
         self._scan_icon(True)
-        self._set_notice(self.tr("Scanning Library Folders…"))
+        if not quiet:
+            self._set_notice(self.tr("Scanning Library Folders…"))
         run_in_background(
             lambda: self.library.scan(self.session_client, stop, self.scan_progress.emit),
             self._scan_done,
@@ -3345,6 +3362,8 @@ class MediaTab(QWidget):
         )
 
     def _scan_progress(self, value: Any) -> None:
+        if self.scan_quiet:
+            return
         if isinstance(value, dict) and "film_details" in value:
             self._set_notice(
                 self.tr("Fetching film details from c411… {0} / {1}").format(
@@ -3354,14 +3373,15 @@ class MediaTab(QWidget):
         elif isinstance(value, dict) and "items" in value:
             self._set_notice(self.tr("Scanning Library Folders… {0} files").format(value["items"]))
 
-    def _scan_done(self, _result: Any) -> None:
+    def _scan_done(self, result: Any) -> None:
         if not isValid(self):
             return
         self.scan_stop = None
         self.refresh_button.setEnabled(True)
         self.cancel_scan.setEnabled(False)
         self._scan_icon(False)
-        self.refresh()
+        if not self.scan_quiet or (isinstance(result, dict) and result.get("changed")):
+            self.refresh()
 
     def _toggle_scan(self) -> None:
         """The toolbar ⟳ refreshes the library; while it runs, the same button cancels."""
@@ -3381,8 +3401,10 @@ class MediaTab(QWidget):
     def _scan_failed(self, error: Exception) -> None:
         if not isValid(self):
             return
+        quiet = self.scan_quiet
         self._scan_done(None)
-        self._set_notice(str(error))
+        if not quiet:
+            self._set_notice(str(error))
 
     def toggle_chat(self, checked: bool = True) -> None:
         if checked:
@@ -3467,6 +3489,7 @@ class MediaTab(QWidget):
         self._clear_track_source()
         self.report()
         self.heartbeat.stop()
+        self.auto_refresh.stop()
         self.player.stop()
         self._close_preview()
         self.art_stop.set()

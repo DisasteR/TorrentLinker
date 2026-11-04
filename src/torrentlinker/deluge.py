@@ -285,8 +285,13 @@ class DelugeApi:
             {"add_paused": True, "auto_managed": False, "max_download_speed": GUARD_SPEED},
         )
 
-    def download(self, data: bytes, save_path: str, tags: list[str]) -> str:
-        return self._add(data, save_path, tags, {"add_paused": False})
+    def download(
+        self, data: bytes, save_path: str, tags: list[str], *, sequential: bool = False
+    ) -> str:
+        options: dict[str, Any] = {"add_paused": False}
+        if sequential:
+            options.update(sequential_download=True, prioritize_first_last_pieces=True)
+        return self._add(data, save_path, tags, options)
 
     def _add(self, data: bytes, save_path: str, tags: list[str], options: dict[str, Any]) -> str:
         if tags:

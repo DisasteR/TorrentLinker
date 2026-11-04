@@ -249,6 +249,18 @@ def test_subtitle_conversion_and_range_rejection_do_not_read_outside_library(tmp
         )
 
 
+def test_a_refresh_says_whether_the_library_changed(tmp_path):
+    app, root = media_app(tmp_path)
+    with TestClient(app) as browser:
+        login(browser)
+        assert scan(browser)["result"]["changed"] is True
+        assert scan(browser)["result"]["changed"] is False  # nothing new: no reload
+        (root / "Film.2026.mp4").write_bytes(b"generated-test-video")
+        assert scan(browser)["result"]["changed"] is True
+        (root / "Film.2026.mp4").unlink()
+        assert scan(browser)["result"]["changed"] is True
+
+
 def test_refresh_picks_up_new_video_sidecars_without_changing_video(tmp_path):
     app, root = media_app(tmp_path)
     (root / "Film.2026.mp4").write_bytes(b"generated-test-video")

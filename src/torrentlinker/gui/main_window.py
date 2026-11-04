@@ -881,7 +881,9 @@ class MainWindow(QMainWindow):
             key += (get_secret(s.secret_name(QBIT_API_KEY)),)
         if self._qbit is None or self._qbit[2] != net.current() or self._qbit[0] != key:
             self._qbit = (key, connect(s.client, *key[1:]), net.current())
-        return MappedQbit(self._qbit[1], PathMapper(s.path_mappings))
+        return MappedQbit(
+            self._qbit[1], PathMapper(s.path_mappings), sequential_video=s.sequential_video
+        )
 
     def indexer(self) -> Indexer:
         """One Indexer instance, so every search shares the same rate limiter.

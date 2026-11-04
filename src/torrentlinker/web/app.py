@@ -51,6 +51,10 @@ class Announce(BaseModel):
     value: str = Field(max_length=4096)
 
 
+class SequentialVideo(BaseModel):
+    enabled: bool
+
+
 class Login(BaseModel):
     password: str = Field(max_length=1024)
 
@@ -551,6 +555,12 @@ def create_app(
             result = service.proxy(body)
             reset_clients()
             return result
+
+    @app.post("/api/setup/sequential-video")
+    def save_sequential_video(body: SequentialVideo) -> dict:
+        with jobs.lock:
+            service.set_sequential_video(body.enabled)
+            return {"ok": True}
 
     @app.post("/api/setup/announce")
     def save_announce(body: Announce) -> dict:

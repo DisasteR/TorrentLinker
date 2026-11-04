@@ -183,10 +183,26 @@ class MediaLibrary:
                 raise ValueError("A media refresh is already running for this client.")
             self.scanning.add(client_id)
         try:
-            return self._scan(client_id, setup, stop, progress)
+            before = self.revision(client_id)
+            result = self._scan(client_id, setup, stop, progress)
+            if not result.get("cancelled"):
+                # Lets an automatic refresh reload the screen only when something changed.
+                result["changed"] = self.revision(client_id) != before
+            return result
         finally:
             with self.lock:
                 self.scanning.discard(client_id)
+
+    def revision(self, client_id) -> str:
+        """Changes whenever an item of the library, or what is known of it, changes."""
+        digest = hashlib.sha256()
+        with self.lock:
+            for row in self.db.execute(
+                "SELECT id, size, modified, body FROM media_items WHERE client=? ORDER BY id",
+                (client_id,),
+            ):
+                digest.update(json.dumps(tuple(row)).encode())
+        return digest.hexdigest()
 
     def cached_metadata(self, client_id, observed):
         """Reuse saved verified release facts only for an exact local torrent file."""

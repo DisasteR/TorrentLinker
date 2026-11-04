@@ -142,6 +142,8 @@ class Settings:
     download_folders: DownloadFolders = field(default_factory=DownloadFolders)
     uploads: int = 0  # the user's uploads, for the rough Reuploader estimate
     free_space_margin: float = 0.10  # share of each disk a Plan leaves free
+    # Films and series sent to the Torrent Client download in order, to play early.
+    sequential_video: bool = False
     plan_categories: list[int] | None = None  # categories a Plan draws from; None = all
     plan_options: PlanOptions = field(default_factory=PlanOptions)
     # Normalized title words a Plan must never propose, e.g. ["mein", "kampf"].
@@ -253,6 +255,7 @@ class Settings:
             "zen": asdict(self.zen),
             "uploads": self.uploads,
             "free_space_margin": self.free_space_margin,
+            "sequential_video": self.sequential_video,
             "plan_categories": self.plan_categories,
             "plan_options": asdict(self.plan_options),
             "plan_exclusions": self.plan_exclusions,
@@ -301,6 +304,7 @@ class Settings:
             zen=_zen_from_json(data.get("zen", {})),
             uploads=int(data.get("uploads", 0)),
             free_space_margin=float(data.get("free_space_margin", 0.10)),
+            sequential_video=data.get("sequential_video") is True,
             plan_categories=(
                 [int(c) for c in data["plan_categories"]]
                 if data.get("plan_categories") is not None

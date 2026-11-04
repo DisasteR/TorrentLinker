@@ -657,7 +657,7 @@ async function navigate(view, section = "connections") {
     await settingsSection(section);
   }
   if (view === "assistant") await loadAssistant();
-  if (view === "media") await loadMedia();
+  if (view === "media") { await loadMedia(); guard(mediaAutoScan); }
   if (view !== "setup") clearAgentToken();
   if (view === "documentation") await loadGuides();
   if (view === "torrents") await loadTorrents();

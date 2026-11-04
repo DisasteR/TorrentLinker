@@ -38,7 +38,12 @@ class Library:
         self.folder_errors: list[ScanError] = []
 
     def client(self) -> MappedQbit:
-        return MappedQbit(self.setup.client(), PathMapper(self.setup.settings.path_mappings))
+        settings = self.setup.settings
+        return MappedQbit(
+            self.setup.client(),
+            PathMapper(settings.path_mappings),
+            sequential_video=settings.sequential_video,
+        )
 
     def check_tree(self, path: Path, stop: threading.Event) -> None:
         self.setup.path_under_root(str(path), directory=path.is_dir())

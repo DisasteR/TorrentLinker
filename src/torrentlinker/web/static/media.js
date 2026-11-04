@@ -1,7 +1,7 @@
 /* The player lives outside navigation views, so browsing never replaces its DOM. */
 const media = {kind: "video", view: "recent", rows: [], homeRows: [], gridMode: false, selected: null, session: null,
   playerClient: "", queue: [], index: 0, shuffle: false, repeat: "off", ack: 0,
-  busy: false, preview: null, playbackGeneration: 0, featureId: null, continueRows: [], next: null, chat: false, scan: "", request: 0};
+  busy: false, preview: null, playbackGeneration: 0, featureId: null, continueRows: [], next: null, chat: false, scan: "", scanQuiet: false, request: 0};
 const mediaTab = Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, "0")).join("");
 const mediaChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("torrentlinker-media") : null;
 const mediaClaims = new Set();
@@ -730,12 +730,18 @@ async function mediaPlaylists() {
   }
   mediaQueueRender();
 }
-async function mediaScan() {
-  $("media-library-options").open = false;
-  const job = await api("media/scan", {client_id: mediaClient()}); media.scan = job.id;
+async function mediaScan(quiet = false) {
+  if (!quiet) $("media-library-options").open = false;
+  const job = await api("media/scan", {client_id: mediaClient()}); media.scan = job.id; media.scanQuiet = quiet;
   $("media-cancel-scan").hidden = false; $("media-refresh").disabled = true;
   mediaScanIcon();
-  mediaStatus("Scanning Library Folders...");
+  if (!quiet) mediaStatus("Scanning Library Folders...");
+}
+// New films and episodes appear on their own: a quiet rescan reloads only what changed.
+const MEDIA_AUTO_REFRESH = 60000;
+async function mediaAutoScan() {
+  if (state.view !== "media" || $("workspace").hidden || media.scan || !state.setup?.capabilities?.scan) return;
+  await mediaScan(true);
 }
 // The toolbar ⟳ refreshes the library; while a refresh runs, the same button cancels it.
 function mediaScanIcon() {
@@ -746,8 +752,13 @@ function mediaScanIcon() {
 async function mediaPollScan() {
   if (!media.scan) return;
   const job = await api(`jobs/${encodeURIComponent(media.scan)}`);
-  mediaStatus(job.progress?.message || (job.progress?.items !== undefined ? `Scanning Library Folders... ${job.progress.items} items found` : job.message || `Scan ${job.status}`));
-  if (!["queued", "running"].includes(job.status)) { media.scan = ""; mediaScanIcon(); $("media-cancel-scan").hidden = true; $("media-refresh").disabled = false; await loadMedia(); if (job.error) mediaStatus(job.error); }
+  const quiet = media.scanQuiet;
+  if (!quiet) mediaStatus(job.progress?.message || (job.progress?.items !== undefined ? `Scanning Library Folders... ${job.progress.items} items found` : job.message || `Scan ${job.status}`));
+  if (!["queued", "running"].includes(job.status)) {
+    media.scan = ""; media.scanQuiet = false; mediaScanIcon(); $("media-cancel-scan").hidden = true; $("media-refresh").disabled = false;
+    if (!quiet || job.result?.changed) await loadMedia();
+    if (job.error && !quiet) mediaStatus(job.error);
+  }
 }
 const MEDIA_CHAT_MIN = 320, MEDIA_SIDE_MIN = 480;
 function mediaChatWidth(width) {
@@ -935,3 +946,4 @@ document.addEventListener("fullscreenchange", () => mediaPositionPlayerMenu());
 $("media-save-playlist").onsubmit = e => { e.preventDefault(); guard(async () => { await api("media/playlists", {client_id: media.playerClient || mediaClient(), name: $("media-playlist-name").value, media_ids: media.queue}); $("media-playlist-name").value = ""; await mediaPlaylists(); }); };
 for (const player of [$("media-video"), $("media-audio")]) { player.onerror = mediaCodecError; player.onwaiting = () => { if (media.preview && player.currentTime > 0) mediaStatus(say("The fixed partial preview has no more playable data here. Wait for more download progress, then refresh preview.", "L’aperçu partiel fixe ne contient plus de données lisibles à cet endroit. Attendez la progression du téléchargement, puis actualisez l’aperçu.")); }; player.onended = () => guard(async () => { if (media.preview) { mediaStatus(say("End of fixed partial preview. Wait for more data, then refresh preview.", "Fin de l’aperçu partiel fixe. Attendez davantage de données, puis actualisez l’aperçu.")); } else if (media.repeat === "one") { player.currentTime = 0; await mediaTryPlay(player); } else await mediaAdvance(1); await mediaHeartbeat(); }); }
 setInterval(() => { guard(mediaHeartbeat); guard(mediaPollScan); }, 1000);
+setInterval(() => guard(mediaAutoScan), MEDIA_AUTO_REFRESH);

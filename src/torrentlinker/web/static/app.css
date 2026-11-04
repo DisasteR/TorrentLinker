@@ -1151,6 +1151,7 @@ select.assistant-chip:hover { background: var(--tint); color: var(--ink); }
 #upload-form .form-grid { margin-top:16px; }
 #upload-form label { display:grid; gap:6px; }
 #upload-form label.check { display:flex; flex-direction:row; align-items:flex-start; gap:8px; }
+#library-download-form + label.check { display:flex; flex-direction:row; align-items:center; gap:8px; margin-top:10px; }
 .upload-footer { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; border-top:1px solid var(--line); padding-top:16px; margin-top:20px; }
 .upload-footer #upload-save-local { margin-right:auto; }
 .upload-more { position:relative; }

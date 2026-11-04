@@ -253,6 +253,8 @@ function renderLibraryDownloads() {
   select.value=current;
   select.parentElement.querySelector(".category-picker")?.remove();
   select.after(categoryPicker(select,categories));
+  const sequential=$("library-sequential-video");sequential.checked=!!state.setup.sequential_video;
+  sequential.onchange=()=>guard(async()=>{await api("setup/sequential-video",{enabled:sequential.checked});await refreshSetup();});
   const host=$("library-download-destinations");host.replaceChildren();
   for(const [id,path] of [["",folders.default],...Object.entries(folders.by_category)]) {
     const row=element("div",undefined,"library-folder-row");

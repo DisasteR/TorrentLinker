@@ -328,7 +328,10 @@ class UtorrentApi:
     def piece_states(self, hash: str) -> list[int]:
         raise self._error("Piece verification is not yet supported with µTorrent Classic")
 
-    def download(self, data: bytes, save_path: str, tags: list[str]) -> str:
+    def download(
+        self, data: bytes, save_path: str, tags: list[str], *, sequential: bool = False
+    ) -> str:
+        # µTorrent's Web UI cannot set sequential download: it is left off.
         with self._lock:
             hash = self._add_stopped(data, save_path, tags, reseed=False)
             try:

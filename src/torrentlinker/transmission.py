@@ -230,16 +230,22 @@ class TransmissionApi:
         self._require_whole_names()
         return self._add(data, save_path, tags, paused=True)
 
-    def download(self, data: bytes, save_path: str, tags: list[str]) -> str:
-        return self._add(data, save_path, tags, paused=False)
+    def download(
+        self, data: bytes, save_path: str, tags: list[str], *, sequential: bool = False
+    ) -> str:
+        return self._add(data, save_path, tags, paused=False, sequential=sequential)
 
-    def _add(self, data: bytes, save_path: str, tags: list[str], paused: bool) -> str:
+    def _add(
+        self, data: bytes, save_path: str, tags: list[str], paused: bool, sequential=False
+    ) -> str:
+        # Transmission 4.1 reads sequential_download; older versions ignore it.
         reply = self._call(
             "torrent-add",
             metainfo=base64.b64encode(data).decode(),
             paused=paused,
             labels=tags,
             **{"download-dir": save_path},
+            **({"sequential_download": True} if sequential else {}),
         )
         if "torrent-duplicate" in reply:
             raise AlreadyInClient()
