@@ -682,8 +682,8 @@ def test_accepted_send_errors_are_uncertain_and_cannot_be_retried_or_removed(
     meta = read_torrent(data)
 
     class AcceptedThenTimeout(FakeQbit):
-        def download(self, data, save_path, tags):
-            result = super().download(data, save_path, tags)
+        def download(self, data, save_path, tags, *, sequential=False):
+            result = super().download(data, save_path, tags, sequential=sequential)
             if failure == "timeout":
                 raise TimeoutError("Client accepted the request but its response was lost")
             return result

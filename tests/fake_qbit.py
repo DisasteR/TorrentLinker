@@ -23,6 +23,7 @@ class FakeQbit:
     calls: list[str] = field(default_factory=list)
     pieces: dict[str, list[int]] = field(default_factory=dict)
     downloads: list[str] = field(default_factory=list)
+    sequential: list[str] = field(default_factory=list)
     default_path: str = "/downloads"
 
     def default_save_path(self) -> str:
@@ -61,8 +62,12 @@ class FakeQbit:
         )
         return meta.infohash
 
-    def download(self, data: bytes, save_path: str, tags: list[str]) -> str:
+    def download(
+        self, data: bytes, save_path: str, tags: list[str], *, sequential: bool = False
+    ) -> str:
         h = self.add(data, save_path, tags)
+        if sequential:
+            self.sequential.append(h)
         self._set(h, state="downloading")
         self.downloads.append(h)
         return h

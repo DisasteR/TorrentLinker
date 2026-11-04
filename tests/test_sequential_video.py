@@ -97,21 +97,23 @@ def test_transmission_gets_sequential_download(tmp_path: Path, monkeypatch) -> N
     assert "sequential_download" not in adds[1]
 
 
-def test_the_choice_is_saved_and_off_by_default(tmp_path: Path) -> None:
+def test_the_choice_is_saved_and_on_by_default(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
     settings = Settings()
-    assert settings.sequential_video is False
-    settings.sequential_video = True
-    settings.save(path)
+    assert settings.sequential_video is True
+    path.write_text("{}")
     assert Settings.load(path).sequential_video is True
+    settings.sequential_video = False
+    settings.save(path)
+    assert Settings.load(path).sequential_video is False
 
 
-def test_the_web_ui_turns_it_on_for_every_client(tmp_path: Path) -> None:
+def test_the_web_ui_turns_it_off_for_every_client(tmp_path: Path) -> None:
     app, _root = media_app(tmp_path)
     with TestClient(app) as browser:
         login(browser)
-        assert browser.get("/api/setup").json()["sequential_video"] is False
-        response = browser.post("/api/setup/sequential-video", json={"enabled": True})
-        assert response.is_success, response.text
         assert browser.get("/api/setup").json()["sequential_video"] is True
-    assert Settings.load(tmp_path / "config/settings.json").sequential_video is True
+        response = browser.post("/api/setup/sequential-video", json={"enabled": False})
+        assert response.is_success, response.text
+        assert browser.get("/api/setup").json()["sequential_video"] is False
+    assert Settings.load(tmp_path / "config/settings.json").sequential_video is False
