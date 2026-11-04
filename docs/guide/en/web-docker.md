@@ -115,6 +115,31 @@ In a Portainer stack, or anywhere you would rather not manage a file, replace th
 
 Secret-file overrides: `TL_INDEXER_API_KEY_FILE`, `TL_QBIT_PASSWORD_FILE`, `TL_QBIT_API_KEY_FILE`, `TL_DELUGE_PASSWORD_FILE`, `TL_TRANSMISSION_PASSWORD_FILE`, `TL_UTORRENT_PASSWORD_FILE`, `TL_ANNOUNCE_URL_FILE`, `TL_PROXY_PASSWORD_FILE`. Credentials never appear in setup API responses.
 
+## Sign in through a reverse proxy
+
+A reverse proxy that already signs users in (Traefik, Caddy, nginx or another), through forward auth to an identity provider such as Authentik or through basic auth, can replace the Web UI password. Set `TL_WEB_AUTH=proxy` and list the proxy's addresses in `TL_TRUSTED_PROXIES` (comma-separated, CIDR allowed), or pass `--web-auth proxy --trusted-proxy ADDRESS`. The server then needs no password and refuses to start without trusted proxies.
+
+Every request from those addresses acts as the owner; any other address gets `403`. Trust only the proxy's own address, not its Docker network, and publish no port: a request through a published port comes from the Docker gateway, which is inside that network. Give the proxy a fixed address outside the network's dynamic range (`--ip-range`), so no other container receives it while the proxy is stopped. Every container that can join that network is inside the trust boundary.
+
+The two modes ignore each other's settings: in proxy mode `TL_WEB_PASSWORD` and `TL_WEB_PASSWORD_FILE` protect nothing, and in password mode `TL_TRUSTED_PROXIES` is not read.
+
+Two clients cannot pass the proxy's sign-in, and sign in on their own instead:
+
+- Agents connect to `/mcp`. They are programs, not browsers, so they cannot follow a sign-in page; each request carries the agent token you create, and can revoke, in the Web UI.
+- The browser companion, the extension that reads your c411 session for Profile, uses five paths under `/api/companion/`. It runs in the background and sends no cookies, so it never carries the proxy's session; each request carries the token it received when you paired it from Profile, and must come from the paired extension.
+
+To keep them working, route only these paths around the proxy's sign-in: `/mcp` and everything under `/mcp/`, and exactly `/api/companion/pair`, `/api/companion/snapshot`, `/api/companion/disconnect`, `/api/companion/commands` and `/api/companion/result`. Never bypass a wider prefix: a request routed around the sign-in still arrives from the proxy's address, so any other path under `/api/` would treat it as the owner. With basic auth, agents need this bypass, since their `Authorization` header carries their token. Leave out the bypass for a client you do not use.
+
+Sign out from the proxy: the Web UI hides its own **Sign out** button in this mode.
+
+For Traefik, [deploy/compose.traefik.yaml](../../../deploy/compose.traefik.yaml) is a ready example:
+
+```bash
+docker compose -f compose.yaml -f deploy/compose.traefik.yaml up -d
+```
+
+Without the source, copy the override next to your `compose.yaml` and pass `-f compose.traefik.yaml`. Keep one middleware in it: Authentik's forward auth, or a basic-auth users file. Its optional `torrentlinker-tokens` router is the token bypass described above.
+
 ## Run without Docker
 
 ```bash

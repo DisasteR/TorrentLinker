@@ -8,6 +8,7 @@ from collections import Counter
 from contextlib import asynccontextmanager
 from functools import partial
 from html import escape
+from ipaddress import IPv4Network, IPv6Network
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -28,7 +29,7 @@ from torrentlinker.web.confirmations import Confirmations
 from torrentlinker.web.documentation import render
 from torrentlinker.web.jobs import Jobs
 from torrentlinker.web.operations import DownloadFolderRequired, JobRequest, Operations
-from torrentlinker.web.security import ServerSecrets, Sessions
+from torrentlinker.web.security import ServerSecrets, Sessions, TrustedProxies
 from torrentlinker.web.setup import (
     Connection,
     Connector,
@@ -57,7 +58,8 @@ class Login(BaseModel):
 def create_app(
     directory: Path,
     *,
-    password: str,
+    password: str | None,
+    trusted_proxies: tuple[IPv4Network | IPv6Network, ...] = (),
     roots: tuple[Path, ...] = (),
     connector: Connector = connect,
     secret_files: dict[str, Path] | None = None,
@@ -69,7 +71,28 @@ def create_app(
 ) -> FastAPI:
     app_version = escape(installed_version())
     directory.mkdir(parents=True, exist_ok=True)
-    sessions = Sessions(password)
+    # Exactly one owner check: the Web UI password, or the reverse proxy's networks.
+    if (password is None) == (not trusted_proxies):
+        raise ValueError("Set a Web UI password or trusted proxies, not both.")
+    sessions = Sessions(password) if password is not None else None
+    if sessions is None:
+        proxies = TrustedProxies(trusted_proxies)
+
+        def signed_in(request: Request) -> bool:
+            return proxies.allows(request.client.host if request.client else None)
+
+    else:
+
+        def signed_in(request: Request) -> bool:
+            return sessions.valid(request.cookies.get("tl_session", ""))
+
+    def sign_in_required() -> JSONResponse:
+        if sessions is None:
+            return JSONResponse(
+                {"detail": "Open TorrentLinker through its reverse proxy."}, status_code=403
+            )
+        return JSONResponse({"detail": "Sign in to TorrentLinker."}, status_code=401)
+
     service = service_override or Setup(
         directory, roots, ServerSecrets(directory, secret_files), connector
     )
@@ -249,10 +272,8 @@ def create_app(
             route = route[len(prefix) :]
         if route in COMPANION_ROUTES:
             return await companion_request(request, route, service)
-        if route.startswith("/documentation/") and not sessions.valid(
-            request.cookies.get("tl_session", "")
-        ):
-            return JSONResponse({"detail": "Sign in to TorrentLinker."}, status_code=401)
+        if route.startswith("/documentation/") and not signed_in(request):
+            return sign_in_required()
         if route.startswith("/api/"):
             length = request.headers.get("content-length", "0")
             limit = 12_000_000 if route in {"/api/jobs", "/api/zen/plan/review"} else 256_000
@@ -260,8 +281,8 @@ def create_app(
                 return JSONResponse({"detail": "Request too large."}, status_code=413)
             if request.method != "GET" and request.headers.get("X-TorrentLinker") != "1":
                 return JSONResponse({"detail": "Browser request header required."}, status_code=403)
-            if route != "/api/login" and not sessions.valid(request.cookies.get("tl_session", "")):
-                return JSONResponse({"detail": "Sign in to TorrentLinker."}, status_code=401)
+            if route != "/api/login" and not signed_in(request):
+                return sign_in_required()
         try:
             response = await call_next(request)
         except Exception as error:
@@ -286,6 +307,8 @@ def create_app(
 
     @app.post("/api/login")
     def login(body: Login) -> JSONResponse:
+        if sessions is None:
+            return JSONResponse({"detail": "The reverse proxy signs users in."}, status_code=404)
         try:
             token = sessions.login(body.password)
         except PermissionError as error:
@@ -305,7 +328,8 @@ def create_app(
 
     @app.post("/api/logout")
     def logout(request: Request) -> JSONResponse:
-        sessions.logout(request.cookies.get("tl_session", ""))
+        if sessions is not None:
+            sessions.logout(request.cookies.get("tl_session", ""))
         response = JSONResponse({"ok": True})
         response.delete_cookie("tl_session")
         return response
@@ -349,7 +373,8 @@ def create_app(
 
     @app.get("/api/setup")
     def setup(client_id: str = "") -> dict:
-        return for_client(client_id).setup.snapshot()
+        snapshot = for_client(client_id).setup.snapshot()
+        return {**snapshot, "web_auth": "password" if sessions is not None else "proxy"}
 
     @app.get("/api/diagnostics")
     def diagnostics() -> Response:

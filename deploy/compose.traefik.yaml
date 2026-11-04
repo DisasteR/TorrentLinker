@@ -1,0 +1,42 @@
+# Traefik example of reverse-proxy sign-in (Authentik forward auth or basic auth) instead of the Web UI password.
+# Other proxies follow the same rules: see "Sign in through a reverse proxy" in docs/guide/en/web-docker.md.
+#   docker compose -f compose.yaml -f deploy/compose.traefik.yaml up -d
+# Needs Docker Compose 2.24 or later for !reset.
+# Traefik must have a fixed address on an external network, for example:
+#   docker network create --subnet 172.30.0.0/24 --ip-range 172.30.0.128/25 proxy
+#   (dynamic addresses stay in .128-.255, so no other container can take Traefik's address)
+#   and, in Traefik's own Compose file: networks: { proxy: { ipv4_address: 172.30.0.2 } }
+services:
+  torrentlinker:
+    # No published port: a request through it would come from the Docker gateway, not Traefik.
+    ports: !reset []
+    secrets: !reset []  # the Web UI password is not read in proxy mode
+    environment:
+      TL_WEB_AUTH: proxy
+      TL_TRUSTED_PROXIES: 172.30.0.2/32  # Traefik's address only, never the whole network
+    networks: [default, proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.services.torrentlinker.loadbalancer.server.port: "8787"
+      traefik.http.routers.torrentlinker.rule: Host(`torrentlinker.example.com`)
+      traefik.http.routers.torrentlinker.entrypoints: websecure
+      traefik.http.routers.torrentlinker.tls: "true"
+      # Keep one sign-in middleware.
+      # Authentik: the middleware your Authentik outpost declares for forward auth.
+      traefik.http.routers.torrentlinker.middlewares: authentik@docker
+      # Basic auth: create the file with `htpasswd -nB owner` and mount it into Traefik.
+      # traefik.http.routers.torrentlinker.middlewares: torrentlinker-basic
+      # traefik.http.middlewares.torrentlinker-basic.basicauth.usersfile: /etc/traefik/torrentlinker.htpasswd
+      # Optional: agents (MCP) and the browser companion send their own tokens and cannot follow
+      # a sign-in page. This router lets them through without the middleware above.
+      # Exact companion paths: anything else under /api/ must still pass the sign-in. Traefik v3 syntax.
+      # traefik.http.routers.torrentlinker-tokens.rule: Host(`torrentlinker.example.com`) && (Path(`/mcp`) || PathPrefix(`/mcp/`) || PathRegexp(`^/api/companion/(pair|snapshot|disconnect|commands|result)$`))
+      # traefik.http.routers.torrentlinker-tokens.priority: "1000"  # above the main router's
+      # traefik.http.routers.torrentlinker-tokens.entrypoints: websecure
+      # traefik.http.routers.torrentlinker-tokens.tls: "true"
+      # traefik.http.routers.torrentlinker-tokens.service: torrentlinker
+
+networks:
+  proxy:
+    external: true

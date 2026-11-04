@@ -19,6 +19,8 @@ services:
       # Behind an HTTPS reverse proxy:
       # TL_SECURE_COOKIE: "1"
       # TL_ROOT_PATH: /torrentlinker
+      # A reverse proxy can sign users in instead of this password: see the Web UI guide;
+      # compose.traefik.yaml is a Traefik example.
       # Optional secret files instead of typing keys in the web UI:
       # TL_INDEXER_API_KEY_FILE: /run/secrets/indexer_api_key
     secrets:
