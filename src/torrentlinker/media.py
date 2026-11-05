@@ -38,8 +38,44 @@ SEASON_FOLDER = re.compile(
 )
 
 
+# Anime releases number episodes their own way: "Session 01", "e01m", "OAV 2". An OAV is
+# kept apart from the series' episodes.
+ANIME_MARK = re.compile(
+    r"(?i)(?<![a-z0-9])(?:(?P<oav>oav|ova|oad)[ ._-]?|session[ ._-]?|ep?[ ._-]?(?=\d{2}))"
+    r"(?P<number>\d{1,3})m?(?![a-z0-9])"
+)
+ANIME_FOLDERS = {"anime", "animes", "animé", "animés", "japanimation", "manga", "mangas"}
+
+
+def anime_episode(path: Path) -> tuple[int, bool] | None:
+    """The episode number of an anime-style file name, and whether it is an OAV."""
+    found = ANIME_MARK.search(path.stem)
+    return (int(found["number"]), bool(found["oav"])) if found else None
+
+
 def is_episode(path: Path) -> bool:
-    return bool(EPISODE_MARK.search(path.name) or SEASON_FOLDER.search(path.parent.name))
+    return bool(
+        EPISODE_MARK.search(path.name)
+        or SEASON_FOLDER.search(path.parent.name)
+        or anime_episode(path)
+    )
+
+
+def is_anime_details(details) -> bool:
+    """Japanese animation, as c411's TMDb details describe it."""
+    genres = details.get("genres") or []
+    keywords = details.get("keywords") or []
+    countries = details.get("countries") or []
+    return "anime" in keywords or "Animation" in genres and "Japan" in countries
+
+
+def is_anime(body, path) -> bool:
+    """c411's details decide; without them, a folder named Anime (or Manga) does."""
+    if body.get("anime") is not None:
+        return bool(body["anime"])
+    if body.get("kind") != "video":
+        return False
+    return any(part.casefold() in ANIME_FOLDERS for part in Path(path).parent.parts)
 
 
 def film_title(guessed, path: Path) -> str:
@@ -475,6 +511,7 @@ class MediaLibrary:
         """
         from torrentlinker.indexer import KeyRefused, RateLimited
 
+        self._tell_anime_apart(client_id)
         try:
             indexer = setup.indexer()
         except Exception:
@@ -567,6 +604,30 @@ class MediaLibrary:
                 progress({"film_details": done, "of": len(wanted)})
         return status
 
+    def _tell_anime_apart(self, client_id):
+        """Films and series described before anime was told apart: their cached c411
+        details say whether they are anime, with no request."""
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT id, body FROM media_items WHERE client=?", (client_id,)
+            ).fetchall()
+        for row in rows:
+            body = json.loads(row["body"])
+            if not body.get("release_details") or "anime" in body:
+                continue
+            with self.lock:
+                saved = self.db.execute(
+                    "SELECT body FROM media_options WHERE key=?",
+                    ("c411-details:" + body["release_details"],),
+                ).fetchone()
+            if saved:
+                body["anime"] = is_anime_details(json.loads(saved[0]))
+                with self.lock, self.db:
+                    self.db.execute(
+                        "UPDATE media_items SET body=? WHERE client=? AND id=?",
+                        (json.dumps(body), client_id, row["id"]),
+                    )
+
     @staticmethod
     def _apply_release_details(body, details, release):
         def text(name, limit=16000):
@@ -578,6 +639,7 @@ class MediaLibrary:
             return str(value or "").strip()[:limit]
 
         body["release_details"] = release
+        body["anime"] = is_anime_details(details)
         if body.get("series"):
             body["series"] = text("title", 500) or body["series"]
         else:
@@ -674,7 +736,22 @@ class MediaLibrary:
             except Exception:
                 pass
         else:
-            if is_episode(path):
+            anime = None if EPISODE_MARK.search(path.name) else anime_episode(path)
+            if anime:
+                guessed = guessit(path.name, {"type": "episode"})
+                title = str(guessed.get("title") or path.stem)
+                # The guesser keeps the mark in the title: "tenjo tenge e01m".
+                title = ANIME_MARK.split(title)[0].strip(" ._-")
+                title = re.sub(r"(?i)[ ._-]*(?:session|oav|ova|oad)$", "", title) or path.stem
+                body.update(
+                    title=title,
+                    series=title,
+                    year=str(guessed.get("year") or ""),
+                    season=0 if anime[1] else None,
+                    episode=anime[0],
+                    oav=anime[1],
+                )
+            elif is_episode(path):
                 guessed = guessit(path.name, {"type": "episode"})
                 season, episode = guessed.get("season"), guessed.get("episode")
                 body.update(
@@ -800,6 +877,8 @@ class MediaLibrary:
         public.update(
             id=record["id"],
             added=record["added"],
+            anime=is_anime(body, record["path"]),
+            oav=bool(body.get("oav")),
             position=saved["position"] if saved else 0,
             watched=bool(saved["watched"]) if saved else False,
             artwork_url=(
@@ -856,6 +935,8 @@ class MediaLibrary:
         offset=0,
         limit=100,
         adult=False,
+        anime=None,
+        oav=None,
         **unused,
     ):
         self.setup(client_id)
@@ -903,6 +984,8 @@ class MediaLibrary:
             and (not availability or r["availability"] == availability)
             and (not album_id or (r["album_id"] or r["id"]) == album_id)
             and (not artist or r["artist"] == artist)
+            and (anime is None or r["anime"] == bool(anime))
+            and (oav is None or r["oav"] == bool(oav))
             and (view != "continue" or r["position"] > 0 and not r["watched"])
             and (view != "films" or not r["series"])
             and (view != "series" or r["series"])
@@ -977,17 +1060,20 @@ class MediaLibrary:
     def _series_cards(rows):
         """One card per series instead of every episode: the first episode stands for the
         series, with how many episodes and seasons it has."""
-        cards: dict[str, dict] = {}
+        cards: dict[tuple[str, bool], dict] = {}
         for row in sorted(rows, key=lambda r: (r["season"] or 0, r["episode"] or 0)):
-            card = cards.get(row["series"])
+            # A series' OAVs make a card of their own.
+            key = (row["series"], bool(row.get("oav")))
+            card = cards.get(key)
             if card is None:
-                card = cards[row["series"]] = {
+                card = cards[key] = {
                     **row,
-                    "title": row["series"],
+                    "title": row["series"] + (" (OAV)" if key[1] else ""),
                     "series_card": True,
                     "episode_count": 0,
                     "seasons": [],
-                    "content_id": "series:" + identity(row["series"].casefold()),
+                    "content_id": ("oav:" if key[1] else "series:")
+                    + identity(row["series"].casefold()),
                 }
             card["episode_count"] += 1
             if row["season"] is not None and row["season"] not in card["seasons"]:
@@ -996,8 +1082,8 @@ class MediaLibrary:
                 card["artwork_url"] = row["artwork_url"]
             if not card.get("description") and row.get("description"):
                 card["description"] = row["description"]
-        order = {row["series"]: index for index, row in enumerate(rows)}
-        return sorted(cards.values(), key=lambda card: order[card["series"]])
+        order = {(row["series"], bool(row.get("oav"))): i for i, row in enumerate(rows)}
+        return sorted(cards.values(), key=lambda card: order[card["series"], card["oav"]])
 
     def home_rows(self, client_id, *, kind="video", limit=20, genres=8, scope="home"):
         """Video browsing as rows. The home: what to continue, what is new, the main genres,
@@ -1046,14 +1132,23 @@ class MediaLibrary:
             genre_rows("all", adult=True)
             add("unwatched", "", view="unwatched", adult=True)
             return {"rows": rows}
+        if scope == "anime":
+            # The Anime panel: its series, their OAVs and its films, apart from the rest.
+            add("recent", "", view="recent", anime=True)
+            add("series", "", view="series", anime=True, oav=False)
+            add("oav", "", view="series", anime=True, oav=True)
+            add("films", "", view="films", anime=True)
+            genre_rows("all", least=2, anime=True)
+            return {"rows": rows}
         base = scope if scope in {"films", "series"} else "films"
+        apart = {} if scope == "home" else {"anime": False}
         if scope == "home":
             add("continue", "", view="continue")
             add("recent", "", view="recent")
         else:
-            add("recent", "", view=base)
+            add("recent", "", view=base, **apart)
         # Libraries hold far fewer series than films.
-        genre_rows(base, least=2 if base == "series" else 3)
+        genre_rows(base, least=2 if base == "series" else 3, **apart)
         if scope == "home":
             add("series", "", view="series")
             add("rated", "", view="rated")
@@ -1069,7 +1164,11 @@ class MediaLibrary:
         others = [self.row(r, check=False) for r in records]
         releases = [r for r in others if r["content_id"] == item["content_id"]]
         episodes = sorted(
-            [r for r in others if item["series"] and r["series"] == item["series"]],
+            [
+                r
+                for r in others
+                if item["series"] and r["series"] == item["series"] and r["oav"] == item["oav"]
+            ],
             key=lambda r: (r["season"] or 0, r["episode"] or 0),
         )
         limit = min(200, max(1, int(limit)))

@@ -230,4 +230,7 @@ def test_series_view_shows_one_card_per_series_and_films_stay_films(tmp_path):
     episodes = media.detail("default", series[0]["id"])["episodes"]
     assert [(e["season"], e["episode"]) for e in episodes] == [(1, 1), (1, 2), (2, 1)]
     rows = media.home_rows("default", scope="series")["rows"]
-    assert [r["key"] for r in rows] == ["recent"] and rows[0]["filters"] == {"view": "series"}
+    assert [r["key"] for r in rows] == ["recent"] and rows[0]["filters"] == {
+        "view": "series",
+        "anime": False,
+    }

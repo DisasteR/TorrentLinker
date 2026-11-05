@@ -4622,6 +4622,16 @@ La mettre à la corbeille ?</translation>
         <translation>Les mieux notés</translation>
     </message>
     <message>
+        <location filename="../gui/media.py" line="514"/>
+        <source>Anime</source>
+        <translation>Animés</translation>
+    </message>
+    <message>
+        <location filename="../gui/media.py" line="2366"/>
+        <source>OAV</source>
+        <translation>OAV</translation>
+    </message>
+    <message>
         <location filename="../gui/media.py" line="1810"/>
         <location filename="../gui/media.py" line="2322"/>
         <source>Not watched yet</source>

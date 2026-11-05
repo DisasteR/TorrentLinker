@@ -85,7 +85,7 @@ from torrentlinker.gui.tasks import run_in_background
 
 # The Media Center chat panel and the media beside it never shrink below these.
 CHAT_MIN_WIDTH = 320
-MEDIA_MIN_WIDTH = 520
+MEDIA_MIN_WIDTH = 560
 AUTO_REFRESH_MS = 60_000  # Media rescans the Library Folders this often while open
 
 
@@ -390,6 +390,7 @@ class MediaTab(QWidget):
     def _build_presentation(self, add_folder) -> None:
         self.media_layout = "cinematic"
         self.adult = False  # the XXX tab, once adult content is enabled in Settings
+        self.anime_filters: dict[str, Any] = {}  # an Anime row's See all: series, OAV, films
         self.featured_id = ""
         self.picture_cache: OrderedDict[str, QImage] = OrderedDict()
         self._picture_cache_bytes = 0
@@ -511,6 +512,7 @@ class MediaTab(QWidget):
             ("all", self.tr("Home")),
             ("films", self.tr("Films")),
             ("series", self.tr("Series")),
+            ("anime", self.tr("Anime")),
             ("adult", "XXX"),
         ):
             button = QPushButton(label)
@@ -1833,6 +1835,7 @@ class MediaTab(QWidget):
                 (self.tr("Continue watching"), "continue"),
                 (self.tr("Films"), "films"),
                 (self.tr("Series"), "series"),
+                (self.tr("Anime"), "anime"),
                 (self.tr("Highly rated"), "rated"),
                 (self.tr("Not watched yet"), "unwatched"),
                 *((("XXX", "adult"),) if self.adult else ()),
@@ -2086,11 +2089,15 @@ class MediaTab(QWidget):
         generation = self.browse_generation
         library, client, offset = self.library, self.session_client, self.offset
         home = self._home_active() and not keep_page
-        scope = {"films": "films", "series": "series", "adult": "adult"}.get(
+        scope = {"films": "films", "series": "series", "anime": "anime", "adult": "adult"}.get(
             self.view.currentData(), "home"
         )
         if context["view"] == "adult":  # the XXX panel: its folders only, newest first
             context.update(view="recent", adult=True)
+        elif context["view"] == "anime":  # the Anime panel, or one of its rows' See all
+            context.update(view="recent", anime=True, **self.anime_filters)
+        elif context["view"] in {"films", "series"}:
+            context.update(anime=False)  # anime has its own panel
         self.results.setEnabled(False)
         self._set_notice(self.tr("Loading saved media…"))
 
@@ -2331,7 +2338,7 @@ class MediaTab(QWidget):
     def _home_active(self) -> bool:
         return (
             self.kind.currentData() == "video"
-            and self.view.currentData() in {"all", "films", "series", "adult"}
+            and self.view.currentData() in {"all", "films", "series", "anime", "adult"}
             and not self.grid_mode
             and self.media_layout == "cinematic"
             and not self.search.text().strip()
@@ -2350,6 +2357,8 @@ class MediaTab(QWidget):
         titles = {
             "recent": self.tr("Recently added"),
             "series": self.tr("Series"),
+            "oav": self.tr("OAV"),
+            "films": self.tr("Films"),
             "rated": self.tr("Highly rated"),
             "unwatched": self.tr("Not watched yet"),
         }
@@ -2400,7 +2409,18 @@ class MediaTab(QWidget):
                 if genre.findData(filters["genre"]) < 0:
                     genre.addItem(filters["genre"], filters["genre"])
                 genre.setCurrentIndex(genre.findData(filters["genre"]))
-        view = "adult" if filters.get("adult") else filters.get("view", "all")
+        self.anime_filters = (
+            {key: filters[key] for key in ("view", "oav") if key in filters}
+            if filters.get("anime")
+            else {}
+        )
+        view = (
+            "adult"
+            if filters.get("adult")
+            else "anime"
+            if filters.get("anime")
+            else filters.get("view", "all")
+        )
         index = max(0, self.view.findData(view))
         if index == self.view.currentIndex():
             self.refresh()
@@ -2409,6 +2429,7 @@ class MediaTab(QWidget):
     def _browse(self, view: str) -> None:
         """A browse tab returns to its rows, so it clears the filters a row's See all set."""
         self.grid_mode = False
+        self.anime_filters = {}
         for combo in self.filters.values():
             with QSignalBlocker(combo):
                 combo.setCurrentIndex(0)

@@ -73,6 +73,8 @@ def media_routes(app, agent, assistant):
         offset: int = Query(0, ge=0),
         limit: int = Query(100, ge=1, le=200),
         adult: bool = False,
+        anime: bool | None = None,
+        oav: bool | None = None,
     ):
         return media.listing(
             client(client_id),
@@ -88,13 +90,15 @@ def media_routes(app, agent, assistant):
             album_id=album_id,
             artist=artist,
             adult=adult,
+            anime=anime,
+            oav=oav,
         )
 
     @app.get("/api/media/home")
     def home(
         client_id: str = "",
         limit: int = Query(20, ge=1, le=50),
-        scope: str = Query("home", pattern="^(home|films|series|adult)$"),
+        scope: str = Query("home", pattern="^(home|films|series|anime|adult)$"),
     ):
         return media.home_rows(client(client_id), kind="video", limit=limit, scope=scope)
 
