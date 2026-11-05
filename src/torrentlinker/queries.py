@@ -157,6 +157,7 @@ CATEGORY_RANGES: dict[ContentKind, list[range]] = {
     ContentKind.EBOOK: [range(7000, 8000)],
     ContentKind.GAME: [range(1000, 2000), range(4050, 4060)],
     ContentKind.MODEL_3D: [range(8000, 9000)],  # c411 files 3D printing as 8010 (Other/Misc)
+    ContentKind.ADULT: [range(6000, 7000)],
 }
 
 

@@ -389,6 +389,7 @@ class MediaTab(QWidget):
 
     def _build_presentation(self, add_folder) -> None:
         self.media_layout = "cinematic"
+        self.adult = False  # the XXX tab, once adult content is enabled in Settings
         self.featured_id = ""
         self.picture_cache: OrderedDict[str, QImage] = OrderedDict()
         self._picture_cache_bytes = 0
@@ -510,6 +511,7 @@ class MediaTab(QWidget):
             ("all", self.tr("Home")),
             ("films", self.tr("Films")),
             ("series", self.tr("Series")),
+            ("adult", "XXX"),
         ):
             button = QPushButton(label)
             set_role(button, "tab")
@@ -520,6 +522,7 @@ class MediaTab(QWidget):
             self.video_tab_group.addButton(button)
             self.video_tabs[value] = button
             video_navigation_box.addWidget(button)
+        self.video_tabs["adult"].hide()
         header.addWidget(self.video_navigation)
         header.addStretch()
         self.search = QLineEdit()
@@ -1187,6 +1190,19 @@ class MediaTab(QWidget):
         self.set_media_layout(value)
         self.layout_changed.emit(value)
 
+    def set_adult(self, enabled: bool) -> None:
+        """Show or hide the XXX tab (Settings → Adult content)."""
+        if enabled == self.adult:
+            return
+        self.adult = enabled
+        self.video_tabs["adult"].setVisible(enabled)
+        if not enabled and self.view.currentData() == "adult":
+            self.view.setCurrentIndex(0)
+        if self.kind.currentData() == "video":
+            current = self.view.currentData()
+            self._kind_changed()
+            self.view.setCurrentIndex(max(0, self.view.findData(current)))
+
     def set_media_layout(self, value: str) -> None:
         value = value if value in {"cinematic", "focus", "collection"} else "cinematic"
         self.media_layout = value
@@ -1819,6 +1835,7 @@ class MediaTab(QWidget):
                 (self.tr("Series"), "series"),
                 (self.tr("Highly rated"), "rated"),
                 (self.tr("Not watched yet"), "unwatched"),
+                *((("XXX", "adult"),) if self.adult else ()),
             )
             if self.kind.currentData() == "video"
             else (
@@ -2069,7 +2086,11 @@ class MediaTab(QWidget):
         generation = self.browse_generation
         library, client, offset = self.library, self.session_client, self.offset
         home = self._home_active() and not keep_page
-        scope = {"films": "films", "series": "series"}.get(self.view.currentData(), "home")
+        scope = {"films": "films", "series": "series", "adult": "adult"}.get(
+            self.view.currentData(), "home"
+        )
+        if context["view"] == "adult":  # the XXX panel: its folders only, newest first
+            context.update(view="recent", adult=True)
         self.results.setEnabled(False)
         self._set_notice(self.tr("Loading saved media…"))
 
@@ -2310,7 +2331,7 @@ class MediaTab(QWidget):
     def _home_active(self) -> bool:
         return (
             self.kind.currentData() == "video"
-            and self.view.currentData() in {"all", "films", "series"}
+            and self.view.currentData() in {"all", "films", "series", "adult"}
             and not self.grid_mode
             and self.media_layout == "cinematic"
             and not self.search.text().strip()
@@ -2379,7 +2400,8 @@ class MediaTab(QWidget):
                 if genre.findData(filters["genre"]) < 0:
                     genre.addItem(filters["genre"], filters["genre"])
                 genre.setCurrentIndex(genre.findData(filters["genre"]))
-        index = max(0, self.view.findData(filters.get("view", "all")))
+        view = "adult" if filters.get("adult") else filters.get("view", "all")
+        index = max(0, self.view.findData(view))
         if index == self.view.currentIndex():
             self.refresh()
         self.view.setCurrentIndex(index)

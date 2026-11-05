@@ -586,6 +586,12 @@ def create_app(
             service.set_sequential_video(body.enabled)
             return {"ok": True}
 
+    @app.post("/api/setup/adult-content")
+    def save_adult_content(body: SequentialVideo) -> dict:
+        with jobs.lock:
+            service.set_adult_content(body.enabled)
+            return {"ok": True}
+
     @app.post("/api/setup/announce")
     def save_announce(body: Announce) -> dict:
         parsed = urlsplit(body.value)

@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from torrentlinker.domain import ContentKind, LibraryFolder
-from torrentlinker.gui.settings_dialog import kind_label
+from torrentlinker.gui.settings_dialog import kind_label, offered_kinds
 from torrentlinker.gui.tasks import run_in_background
 from torrentlinker.item_detection import DetectedItem, detect_items
 
@@ -37,7 +37,7 @@ def grouping(box: QSpinBox) -> int | None:
 
 
 class LibraryFolderDialog(QDialog):
-    def __init__(self, path: Path, parent: QWidget | None = None) -> None:
+    def __init__(self, path: Path, parent: QWidget | None = None, *, adult: bool = False) -> None:
         super().__init__(parent)
         self.path = path
         self.setWindowTitle(self.tr("Add Library Folder"))
@@ -46,7 +46,7 @@ class LibraryFolderDialog(QDialog):
         name.setWordWrap(True)
         layout.addRow(self.tr("Folder"), name)
         self.kind = QComboBox()
-        for kind in ContentKind:
+        for kind in offered_kinds(adult):
             self.kind.addItem(kind_label(kind), kind)
         self.kind.setCurrentIndex(self.kind.findData(LibraryFolder(path).kind))
         layout.addRow(self.tr("Content Kind"), self.kind)

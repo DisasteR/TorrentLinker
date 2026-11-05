@@ -131,6 +131,7 @@ def test_profiles_are_keyed_by_c411_category_and_a_kind_only_proposes_one(tmp_pa
         ContentKind.MUSIC: 3,
         ContentKind.GAME: 5,
         ContentKind.MODEL_3D: 10,
+        ContentKind.ADULT: None,  # c411's Adult category has no upload profile
         ContentKind.OTHER: None,
     }
     assert isinstance(profile_for(ContentKind.MODEL_3D), Model3DProfile)

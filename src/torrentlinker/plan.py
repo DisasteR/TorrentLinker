@@ -20,7 +20,7 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 
 from torrentlinker import ratelimit
-from torrentlinker.domain import ItemState, LocalItem
+from torrentlinker.domain import ItemState, LocalItem, is_adult_category
 from torrentlinker.downloads import DownloadFolders, IndexerCategory
 from torrentlinker.library import LibraryEntry
 from torrentlinker.plan_diagnostics import PlanIssue
@@ -471,10 +471,12 @@ def catalogue_candidates(
     plan_exclusions: Iterable[str] = (),
     *,
     issues: list[PlanIssue] | None = None,
+    adult: bool = False,
 ) -> list[PlanCandidate]:
     """Catalogue torrents a Plan may download: not in qBittorrent, alive, in a category
-    that has a Download Folder, not carrying an excluded title, and, if `only` is given,
-    in one of those categories (a category includes its subcategories)."""
+    that has a Download Folder, not carrying an excluded title, not XXX unless `adult`
+    (Settings → Adult content), and, if `only` is given, in one of those categories (a
+    category includes its subcategories)."""
     resolved: dict[int | None, Path | None] = {}
     disks: dict[Path, Hashable] = {}
     excluded = {unicodedata.normalize("NFKD", w) for w in plan_exclusions}
@@ -489,7 +491,9 @@ def catalogue_candidates(
         if r.category is None:
             rejected["unknown_category"] += 1
             continue
-        if only is not None and not _within(r.category, only, categories):
+        if (only is not None and not _within(r.category, only, categories)) or (
+            not adult and is_adult_category(r.category)
+        ):
             rejected["category"] += 1
             continue
         if r.infohash.lower() in in_client:

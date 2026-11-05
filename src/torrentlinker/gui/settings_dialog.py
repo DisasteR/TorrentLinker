@@ -91,12 +91,19 @@ KIND_LABELS = {
     ContentKind.EBOOK: QT_TRANSLATE_NOOP("ContentKind", "Ebooks"),
     ContentKind.GAME: QT_TRANSLATE_NOOP("ContentKind", "Games"),
     ContentKind.MODEL_3D: QT_TRANSLATE_NOOP("ContentKind", "3D models"),
+    ContentKind.ADULT: QT_TRANSLATE_NOOP("ContentKind", "XXX"),
     ContentKind.OTHER: QT_TRANSLATE_NOOP("ContentKind", "Other"),
 }
 
 
 def kind_label(kind: ContentKind) -> str:
     return QCoreApplication.translate("ContentKind", str(KIND_LABELS[kind]))
+
+
+def offered_kinds(adult: bool, current: ContentKind | None = None) -> list[ContentKind]:
+    """Content Kinds to choose from: XXX only once adult content is enabled, or for a
+    folder that already has it."""
+    return [k for k in ContentKind if k is not ContentKind.ADULT or adult or k is current]
 
 
 class SettingsDialog(QDialog):
@@ -300,6 +307,15 @@ class SettingsDialog(QDialog):
             max(self.media_layout.findData(self.settings.media_layout), 0)
         )
         form.addRow(self.tr("Media interface"), self.media_layout)
+        self.adult_content = QCheckBox(self.tr("Show XXX content"))
+        self.adult_content.setChecked(self.settings.adult_content)
+        self.adult_content.setToolTip(
+            self.tr(
+                "Adds c411's XXX category to searches, Plans and Library Folder kinds, "
+                "and an XXX panel to Media. Off, XXX stays hidden everywhere."
+            )
+        )
+        form.addRow(self.tr("Adult content"), self.adult_content)
         self.diagnostics_button = QPushButton(self.tr("Export support report…"))
         self.diagnostics_button.clicked.connect(self.diagnostics_requested)
         form.addRow(self.diagnostics_button)
@@ -754,7 +770,9 @@ class SettingsDialog(QDialog):
 
         box = QGroupBox(self.tr("Library Folders"))
         layout = QVBoxLayout(box)
-        self.folder_editor = FolderEditor(self.settings.library_folders)
+        self.folder_editor = FolderEditor(
+            self.settings.library_folders, adult=self.settings.adult_content
+        )
         self.folders = self.folder_editor.table
         self.typed_folder = self.folder_editor.path
         layout.addWidget(self.folder_editor)
@@ -1462,6 +1480,7 @@ class SettingsDialog(QDialog):
             )
         s.ui_scale = self.ui_scale.currentData()
         s.media_layout = self.media_layout.currentData()
+        s.adult_content = self.adult_content.isChecked()
         s.client = self._chosen_client()
         s.deluge.host = self.deluge_host.text().strip()
         s.transmission.host = self.transmission_host.text().strip()

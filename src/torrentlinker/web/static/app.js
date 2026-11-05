@@ -352,6 +352,8 @@ function step(name) {
 }
 async function refreshSetup() {
   state.setup = await api("setup");
+  // XXX choices and the Media XXX panel only once adult content is enabled.
+  for (const node of document.querySelectorAll("[data-adult]")) node.hidden = !state.setup.adult_content;
   if (!state.clientId) state.clientId = state.setup.client_id;
   const selector = $("target-client");
   selector.replaceChildren(new Option(say("All clients · overview", "Tous les clients · aperçu"), "all"),

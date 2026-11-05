@@ -33,6 +33,7 @@ def kind_of(row):
         (3000, 4000, "music"),
         (4000, 5000, "software"),
         (5000, 6000, "series"),
+        (6000, 7000, "adult"),
     ):
         if lower <= category < upper:
             return kind

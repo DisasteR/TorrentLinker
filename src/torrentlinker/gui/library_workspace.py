@@ -27,15 +27,18 @@ from PySide6.QtWidgets import (
 
 from torrentlinker.domain import ContentKind, LibraryFolder
 from torrentlinker.gui.library_folder_dialog import grouping, grouping_box
-from torrentlinker.gui.settings_dialog import choose_directory, kind_label
+from torrentlinker.gui.settings_dialog import choose_directory, kind_label, offered_kinds
 from torrentlinker.scan import ScanError
 
 
 class FolderEditor(QWidget):
     """Edit registered Library Folders without altering downloads or Path Mappings."""
 
-    def __init__(self, folders: list[LibraryFolder], parent: QWidget | None = None):
+    def __init__(
+        self, folders: list[LibraryFolder], parent: QWidget | None = None, *, adult: bool = False
+    ):
         super().__init__(parent)
+        self.adult = adult
         layout = QVBoxLayout(self)
         note = QLabel(
             self.tr(
@@ -101,7 +104,7 @@ class FolderEditor(QWidget):
         cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self.table.setItem(row, 0, cell)
         kind = QComboBox()
-        for value in ContentKind:
+        for value in offered_kinds(self.adult, folder.kind):
             kind.addItem(kind_label(value), value)
         kind.setCurrentIndex(kind.findData(folder.kind))
         self.table.setCellWidget(row, 1, kind)
@@ -240,7 +243,9 @@ class LibraryWorkspace(QWidget):
         stack.addWidget(window.review, 1)
         body.addWidget(content, 1)
         self.sections.addTab(explorer, self.tr("Local Items"))
-        self.editor = FolderEditor(window.settings.library_folders)
+        self.editor = FolderEditor(
+            window.settings.library_folders, adult=window.settings.adult_content
+        )
         save = QPushButton(self.tr("Save folders"))
         save.setProperty("role", "primary")
         save.clicked.connect(self.save_folders)

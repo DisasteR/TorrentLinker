@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from torrentlinker.catalogue import crawl_categories, plan_categories
-from torrentlinker.catalogue_sync import SNAPSHOT_NAME, sync_catalogue
+from torrentlinker.catalogue_sync import SNAPSHOT_NAME, fill_capped, sync_catalogue
 from torrentlinker.domain import LibraryFolder
 from torrentlinker.indexer import KeyRefused, RateLimited
 from torrentlinker.plan import (
@@ -87,6 +87,14 @@ def catalogue(
         progress=lambda p: progress({"phase": "fetching", **asdict(p)}),
         categories=setup.settings.indexer_categories,
     )
+    if full and not fetch_stopped(stop):
+        # Then what newest-first pages cannot reach in the biggest subcategories.
+        fill_capped(
+            setup.indexer(),
+            setup.store,
+            stop=lambda: fetch_stopped(stop),
+            progress=lambda p: progress({"phase": "fetching", **asdict(p)}),
+        )
     return catalogue_status(setup)
 
 
@@ -141,6 +149,7 @@ def plan(
         set(chosen) if chosen is not None else None,
         settings.plan_exclusions,
         issues=issues,
+        adult=settings.adult_content,
     )
     existing = on_disk(candidates, [entry.item for entry in library.entries]) + [
         row

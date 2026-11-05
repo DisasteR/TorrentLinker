@@ -1859,6 +1859,10 @@ Passer en mode Exécuter dans les limites ? Cette question ne sera plus posée.<
 <context>
     <name>ContentKind</name>
     <message>
+        <source>XXX</source>
+        <translation>XXX</translation>
+    </message>
+    <message>
         <location filename="../gui/settings_dialog.py" line="87"/>
         <source>Movies</source>
         <translation>Films</translation>
@@ -8138,6 +8142,18 @@ Le torrent est ensuite ajouté à votre client torrent avec les fichiers décomp
 </context>
 <context>
     <name>SettingsDialog</name>
+    <message>
+        <source>Adds c411&apos;s XXX category to searches, Plans and Library Folder kinds, and an XXX panel to Media. Off, XXX stays hidden everywhere.</source>
+        <translation>Ajoute la catégorie XXX de c411 aux recherches, aux Plans et aux types de dossier de bibliothèque, ainsi qu’un panneau XXX dans Médias. Désactivé, le XXX reste masqué partout.</translation>
+    </message>
+    <message>
+        <source>Adult content</source>
+        <translation>Contenu adulte</translation>
+    </message>
+    <message>
+        <source>Show XXX content</source>
+        <translation>Afficher le contenu XXX</translation>
+    </message>
     <message>
         <source>XML-RPC address</source>
         <translation>Adresse XML-RPC</translation>

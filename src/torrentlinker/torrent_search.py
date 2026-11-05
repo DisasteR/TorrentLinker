@@ -29,10 +29,16 @@ class SearchTree:
         return selected == 1 or self.slugs.get(selected or 0) in SERIES_SLUGS
 
 
-def parse_tree(payload: dict[str, Any]) -> SearchTree:
+ADULT_ROOT = 8  # c411's native XXX category (Torznab 6000)
+
+
+def parse_tree(payload: dict[str, Any], *, adult: bool = True) -> SearchTree:
+    """c411's category tree; without `adult`, XXX is left out (Settings → Adult content)."""
     categories, slugs, colors = {}, {}, {}
     for root in payload["data"]:
         rid = int(root["id"])
+        if rid == ADULT_ROOT and not adult:
+            continue
         categories[rid] = IndexerCategory(str(root["name"]))
         slugs[rid] = str(root.get("slug", ""))
         if re.fullmatch(r"#[0-9a-fA-F]{6}", str(root.get("color", ""))):

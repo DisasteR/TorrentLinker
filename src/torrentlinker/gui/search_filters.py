@@ -271,6 +271,8 @@ class SearchFilters(QWidget):
         self.category = category
         self.indexer: Indexer | None = None
         self.tree: SearchTree | None = None
+        self.adult = False  # XXX among the categories (Settings → Adult content)
+        self._adult_shown = False
         self.ready = True
         self._generation = 0
         self._root: int | None = None
@@ -342,10 +344,11 @@ class SearchFilters(QWidget):
         category.category_changed.connect(self._category_changed)
 
     def configure(self, indexer: Indexer) -> None:
-        if self.indexer is indexer:
+        if self.indexer is indexer and self._adult_shown == self.adult:
             return
         self._generation += 1
         self.indexer = indexer
+        self._adult_shown = self.adult
         self.tree = None
         self._cache.clear()
         self._root = None
@@ -387,7 +390,7 @@ class SearchFilters(QWidget):
             self._set_ready(True)
 
         run_in_background(
-            lambda: parse_tree(indexer.search_categories()),
+            lambda: parse_tree(indexer.search_categories(), adult=self.adult),
             done,
             lambda error: self._failed(generation, error),
         )

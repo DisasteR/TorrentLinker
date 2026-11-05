@@ -14,12 +14,18 @@ class ContentKind(StrEnum):
     EBOOK = "ebook"
     GAME = "game"
     MODEL_3D = "3d-model"
+    ADULT = "adult"  # XXX: offered only when adult content is enabled in Settings
     OTHER = "other"
 
     @property
     def has_external_ids(self) -> bool:
         """Whether items of this kind can be identified by IMDb/TMDb ids."""
         return self in (ContentKind.MOVIE, ContentKind.SERIES)
+
+
+def is_adult_category(category: int) -> bool:
+    """XXX: c411's adult category and its subcategories (Torznab 6000-6999)."""
+    return 6000 <= category < 7000
 
 
 class TorrentClient(StrEnum):

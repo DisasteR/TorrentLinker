@@ -5,10 +5,17 @@ from __future__ import annotations
 import copy
 import json
 import uuid
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from torrentlinker.domain import ContentKind, LibraryFolder, PathMapping, TorrentClient
+from torrentlinker.domain import (
+    ContentKind,
+    LibraryFolder,
+    PathMapping,
+    TorrentClient,
+    is_adult_category,
+)
 from torrentlinker.downloads import DownloadFolders, IndexerCategory
 from torrentlinker.matching import (
     DEFAULT_IGNORE_PATTERNS,
@@ -140,6 +147,17 @@ class Settings:
     theme: str = "auto"  # auto | light | dark
     ui_scale: float = 1.0  # desktop interface size, on top of the system's scaling
     media_layout: str = "cinematic"  # cinematic | focus | collection
+    # XXX (c411's adult category, Torznab 6000-6999): hidden unless the user opts in.
+    adult_content: bool = False
+
+    def visible_categories(self, ids: Iterable[int]) -> list[int]:
+        """`ids` without XXX's unless the user enabled adult content."""
+        return [c for c in ids if self.adult_content or not is_adult_category(c)]
+
+    def hides(self, categories: Iterable[int]) -> bool:
+        """Whether a torrent of these categories is XXX the user did not enable."""
+        found = list(categories)
+        return not self.adult_content and bool(found) and all(map(is_adult_category, found))
 
     def categories(self, kind: ContentKind) -> tuple[int, ...]:
         return tuple(self.kind_categories.get(kind, []))
@@ -260,6 +278,7 @@ class Settings:
             "theme": self.theme,
             "ui_scale": self.ui_scale,
             "media_layout": self.media_layout,
+            "adult_content": self.adult_content,
             "library_folders": [_folder_to_json(f) for f in self.library_folders],
             "path_mappings": [asdict(m) for m in self.path_mappings],
             "zen": asdict(self.zen),
@@ -306,6 +325,7 @@ class Settings:
                 if data.get("media_layout") in ("cinematic", "focus", "collection")
                 else "cinematic"
             ),
+            adult_content=data.get("adult_content", False) is True,
             kind_categories={
                 ContentKind(k): [int(c) for c in v]
                 for k, v in data.get("kind_categories", {}).items()

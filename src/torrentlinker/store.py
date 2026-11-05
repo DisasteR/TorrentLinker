@@ -248,6 +248,9 @@ class Verification:
     local_files: list[str] = field(default_factory=list)
 
 
+_RANK = "(CASE {0}.source WHEN 'zen-lab' THEN 0 WHEN 'bundled' THEN 1 ELSE 2 END)"
+
+
 class Store:
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -811,9 +814,9 @@ class Store:
                 " category=excluded.category, download_url=excluded.download_url,"
                 " details_url=excluded.details_url, seen_at=excluded.seen_at,"
                 " source=excluded.source"
-                # Snapshots (Zen Lab, the bundled Catalogue) never replace live c411 rows.
-                " WHERE excluded.source NOT IN ('zen-lab', 'bundled')"
-                " OR catalogue.source IN ('zen-lab', 'bundled')",
+                # Live c411 rows outrank the bundled Catalogue, which outranks Zen
+                # Lab's coarser categories: a source never replaces a better one.
+                f" WHERE {_RANK.format('excluded')} >= {_RANK.format('catalogue')}",
                 [
                     (
                         r.infohash,

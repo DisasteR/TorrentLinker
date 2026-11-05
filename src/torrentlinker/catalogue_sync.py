@@ -522,6 +522,104 @@ def sync_catalogue(
         ) from snapshot_error
 
 
+def _capped_page(
+    indexer: Indexer, root: int, sub: int | None, page: int, **extra: str
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    params = {
+        "category": str(root),
+        "viewMode": "flat",
+        "perPage": str(PAGE),
+        "sortBy": "createdAt",
+        "sortOrder": "desc",
+        "palliative": "include",
+        "page": str(page),
+        **extra,
+    }
+    if sub is not None:
+        params["subcat"] = str(sub)
+    data = indexer.catalogue_json(params)
+    items, meta = data.get("data"), data.get("meta", {})
+    if not isinstance(items, list) or not all(
+        _integer(meta.get(k)) for k in ("page", "perPage", "total", "totalPages")
+    ):
+        raise ValueError("Invalid c411 catalogue pagination")
+    return items, meta
+
+
+FIRST_YEAR = 1900
+
+
+def fill_capped(
+    indexer: Indexer,
+    store: Store,
+    *,
+    stop: Callable[[], bool] = lambda: False,
+    progress: Progress = lambda p: None,
+    this_year: int | None = None,
+) -> None:
+    """Read the subcategories too big for c411's listing, which returns at most 100
+    pages per query: oldest-first to the same cap, then year by year (the work's
+    release year), each year small enough to be read in full. Only torrents with no
+    year that are neither among the newest nor the oldest stay out of reach (473 of
+    63,974 films on 2026-11-05). Part of an explicit full crawl; resumable, each part
+    keeping the next page to read."""
+    if not indexer.is_c411:
+        return
+    last = this_year or time.gmtime().tm_year
+    for root in ROOTS:
+        if root in TORZNAB_ONLY_ROOTS or stop():
+            continue
+        _, meta = _capped_page(indexer, root, None, 1)
+        if meta["total"] <= meta["totalPages"] * PAGE:
+            continue
+        capped = [
+            s["id"]
+            for s in meta.get("subcategories", [])
+            if _integer(s.get("id")) and _integer(s.get("count")) and s["count"] > 100 * PAGE
+        ]
+        for sub in capped or [None]:
+            parts: list[dict[str, str]] = [{"sortOrder": "asc"}]
+            parts += [{"year": str(y)} for y in range(FIRST_YEAR, last + 2)]
+            for part in parts:
+                if stop() or not _read_part(indexer, store, root, sub, part, stop, progress):
+                    return
+
+
+def _read_part(
+    indexer: Indexer,
+    store: Store,
+    root: int,
+    sub: int | None,
+    part: dict[str, str],
+    stop: Callable[[], bool],
+    progress: Progress,
+) -> bool:
+    """Every page of one part; False when stopped before its end."""
+    key = f"c411-capped:{root}:{sub}:{urlencode(part)}"
+    state = store.feed_state(key)
+    page = state.next_page
+    category = SUBCATS[root].get(sub, ROOTS[root]) if sub else ROOTS[root]
+    while state.updated_at is None:
+        if stop():
+            return False
+        items, meta = _capped_page(indexer, root, sub, page, **part)
+        rows = [_native_row(item, time.time()) for item in items]
+        known = store.known_hashes([r.infohash for r in rows])
+        store.save_catalogue(rows)
+        added = len({r.infohash for r in rows} - known)
+        progress(CrawlProgress(category, page, added, page * PAGE, "c411-capped"))
+        end = meta["page"] != page or page >= meta["totalPages"] or len(rows) < PAGE
+        state = replace(
+            state,
+            next_page=page + 1,
+            updated_at=time.time() if end else None,
+            count=meta["total"],
+        )
+        store.save_feed_state(state)
+        page += 1
+    return True
+
+
 def refresh_due(store: Store, now: float | None = None) -> bool:
     """Whether the last whole-Catalogue refresh is older than REFRESH_INTERVAL."""
     last = store.feed_state(REFRESH_FEED).updated_at

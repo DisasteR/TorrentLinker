@@ -496,10 +496,11 @@ class SearchTab(QWidget):
             indexer = self.indexer()
             if not indexer.api_key:
                 raise ValueError(self.tr("Set your Indexer API key in Settings first."))
+            self.filters.adult = self.settings.adult_content
             self.filters.configure(indexer)
             self.filters.sort.setVisible(indexer.is_c411)
             if not indexer.is_c411:
-                self.category.set_categories(self.settings.indexer_categories)
+                self.category.set_categories(self._visible_categories())
             return indexer
         except Exception as error:
             self.result_status.setText(error_text(error))
@@ -532,9 +533,13 @@ class SearchTab(QWidget):
         elif not self.filters.retry.isHidden():
             self._search_pending = False  # the filters failed to load; do not search later
 
+    def _visible_categories(self) -> dict:
+        known = self.settings.indexer_categories
+        return {c: known[c] for c in self.settings.visible_categories(known)}
+
     def refresh_categories(self) -> None:
         if self.filters.tree is None:
-            self.category.set_categories(self.settings.indexer_categories)
+            self.category.set_categories(self._visible_categories())
         if self.isVisible():
             self._configure_filters()
 
@@ -634,6 +639,7 @@ class SearchTab(QWidget):
 
     def _show_results(self, rows: list[Candidate], indexer: Indexer) -> None:
         self._searching = False
+        rows = [c for c in rows if not self.settings.hides(c.categories)]
         self._results, self._result_indexer = rows, indexer
         if self._native_page is None:
             self.results_summary.clear()

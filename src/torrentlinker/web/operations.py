@@ -462,10 +462,13 @@ class Operations:
     def search_options(self, category=None):
         from torrentlinker.indexer_search import search_options
 
+        settings = self.setup.settings
+        visible = settings.visible_categories(settings.indexer_categories)
         return search_options(
             self.setup.indexer(),
             category,
-            {str(k): asdict(v) for k, v in self.setup.settings.indexer_categories.items()},
+            {str(k): asdict(settings.indexer_categories[k]) for k in visible},
+            adult=settings.adult_content,
         )
 
     def run(
@@ -805,6 +808,7 @@ class Operations:
                     )
                 )
                 total_pages = request.page + int(len(found) == 100)
+            found = [c for c in found if not self.setup.settings.hides(c.categories)]
             metadata: dict[str, Any] = {
                 "backend": "c411-native" if indexer.is_c411 else "torznab",
                 "page": page.page if indexer.is_c411 else request.page,

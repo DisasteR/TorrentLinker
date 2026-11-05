@@ -19,6 +19,7 @@ from xml.etree import ElementTree
 from guessit import guessit
 
 from torrentlinker import media_tracks
+from torrentlinker.domain import ContentKind
 
 VIDEO = {".mp4", ".m4v", ".mkv", ".webm", ".avi", ".mov", ".mpeg", ".mpg", ".ts", ".wmv"}
 AUDIO = {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".aiff", ".wma", ".wv"}
@@ -854,6 +855,7 @@ class MediaLibrary:
         artist="",
         offset=0,
         limit=100,
+        adult=False,
         **unused,
     ):
         self.setup(client_id)
@@ -865,10 +867,22 @@ class MediaLibrary:
             error = self.db.execute(
                 "SELECT body FROM media_options WHERE key=?", ("errors:" + client_id,)
             ).fetchone()
-        registered = {
-            str(folder.path.absolute()) for folder in self.setup(client_id).settings.library_folders
+        settings = self.setup(client_id).settings
+        registered = {str(folder.path.absolute()) for folder in settings.library_folders}
+        # XXX lives in its own panel, from folders of that kind, only once enabled.
+        adult_folders = {
+            str(folder.path.absolute())
+            for folder in settings.library_folders
+            if folder.kind is ContentKind.ADULT
         }
-        records = [record for record in records if record["folder"] in registered]
+        adult = bool(adult)
+        records = [
+            record
+            for record in records
+            if record["folder"] in registered
+            and (record["folder"] in adult_folders) == adult
+            and (settings.adult_content or not adult)
+        ]
         rows = [self.row(r, check=bool(availability)) for r in records]
         rows = [r for r in rows if (not kind or r["kind"] == kind)]
         filters = {
@@ -1004,28 +1018,42 @@ class MediaLibrary:
                     }
                 )
 
+        def genre_rows(view, least=3, **extra):
+            page = self.listing(client_id, kind=kind, view=view, limit=200, **extra)
+            counts: dict[str, int] = {}
+            while True:
+                for row in page["rows"]:
+                    for genre in genres_of(row.get("genre")):
+                        counts[genre] = counts.get(genre, 0) + 1
+                if page["next_offset"] is None:
+                    break
+                page = self.listing(
+                    client_id,
+                    kind=kind,
+                    view=view,
+                    limit=200,
+                    offset=page["next_offset"],
+                    **extra,
+                )
+            top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+            for genre, count in top[:genres]:
+                if count >= least:
+                    add("genre", genre, view=view, genre=genre, **extra)
+
+        if scope == "adult":
+            # The XXX panel: what is new, then its main genres, in XXX folders only.
+            add("recent", "", view="recent", adult=True)
+            genre_rows("all", adult=True)
+            add("unwatched", "", view="unwatched", adult=True)
+            return {"rows": rows}
         base = scope if scope in {"films", "series"} else "films"
         if scope == "home":
             add("continue", "", view="continue")
             add("recent", "", view="recent")
         else:
             add("recent", "", view=base)
-        films = self.listing(client_id, kind=kind, view=base, limit=200)
-        counts: dict[str, int] = {}
-        while True:
-            for row in films["rows"]:
-                for genre in genres_of(row.get("genre")):
-                    counts[genre] = counts.get(genre, 0) + 1
-            if films["next_offset"] is None:
-                break
-            films = self.listing(
-                client_id, kind=kind, view=base, limit=200, offset=films["next_offset"]
-            )
-        top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
-        least = 2 if base == "series" else 3  # libraries hold far fewer series than films
-        for genre, count in top[:genres]:
-            if count >= least:
-                add("genre", genre, view=base, genre=genre)
+        # Libraries hold far fewer series than films.
+        genre_rows(base, least=2 if base == "series" else 3)
         if scope == "home":
             add("series", "", view="series")
             add("rated", "", view="rated")

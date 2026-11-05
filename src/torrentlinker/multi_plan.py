@@ -71,6 +71,7 @@ def distributed_plan(
             set(settings.plan_categories) if settings.plan_categories is not None else None,
             settings.plan_exclusions,
             issues=issues,
+            adult=settings.adult_content,
         )
         for folder in {c.folder for c in candidates if c.folder is not None}:
             validate_folder(identifier, folder)

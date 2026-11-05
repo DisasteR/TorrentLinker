@@ -48,7 +48,7 @@ function mediaViews() {
   $("media-search").placeholder = say("Search your media", "Rechercher dans vos médias");
   $("media-playlist-name").placeholder = say("Playlist name", "Nom de la playlist");
   const select = $("media-view"); select.replaceChildren();
-  const choices = media.kind === "video" ? [["recent", say("Recent", "Récents")], ["continue", say("Continue watching", "Reprendre")], ["films", say("Films", "Films")], ["series", say("Series", "Séries")], ["rated", say("Highly rated", "Les mieux notés")], ["unwatched", say("Not watched yet", "Pas encore vus")], ["all", say("All videos", "Toutes les vidéos")]] : [["albums", say("Albums", "Albums")], ["artists", say("Artists", "Artistes")], ["tracks", say("Tracks", "Pistes")]];
+  const choices = media.kind === "video" ? [["recent", say("Recent", "Récents")], ["continue", say("Continue watching", "Reprendre")], ["films", say("Films", "Films")], ["series", say("Series", "Séries")], ["rated", say("Highly rated", "Les mieux notés")], ["unwatched", say("Not watched yet", "Pas encore vus")], ["all", say("All videos", "Toutes les vidéos")], ...(state.setup?.adult_content ? [["adult", "XXX"]] : [])] : [["albums", say("Albums", "Albums")], ["artists", say("Artists", "Artistes")], ["tracks", say("Tracks", "Pistes")]];
   for (const [value, label] of choices) mediaOption(select, value, label);
   select.value = media.view;
   $("media-video-tab").setAttribute("aria-selected", String(media.kind === "video"));
@@ -61,13 +61,16 @@ function mediaViews() {
 async function loadMedia(append = false) {
   if (!$("media-view").options.length) mediaViews();
   const version = ++media.request;
-  const query = {kind: media.kind, view: media.view, q: $("media-search").value, offset: append ? media.next || 0 : 0, limit: 100};
+  // The XXX panel is its own view: recent first, from XXX folders only.
+  const adult = media.view === "adult";
+  const query = {kind: media.kind, view: adult ? "recent" : media.view, q: $("media-search").value, offset: append ? media.next || 0 : 0, limit: 100};
+  if (adult) query.adult = true;
   for (const key of ["genre", "year", "language", "availability"]) if ($(`media-${key}`).value) query[key] = $(`media-${key}`).value;
   const home = !append && mediaHomeActive();
   const [result, continuing, rows] = await Promise.all([
     api(`media?${mediaQuery(query)}`),
     media.kind === "video" ? api(`media?${mediaQuery({...query, view: "continue", offset: 0, limit: 8})}`) : Promise.resolve({rows: []}),
-    home ? api(`media/home?${mediaQuery({scope: {films: "films", series: "series"}[media.view] || "home"})}`) : Promise.resolve({rows: []}),
+    home ? api(`media/home?${mediaQuery({scope: {films: "films", series: "series", adult: "adult"}[media.view] || "home"})}`) : Promise.resolve({rows: []}),
   ]);
   if (version !== media.request) return;
   media.continueRows = continuing.rows;
@@ -179,7 +182,7 @@ function mediaRenderContinue() {
 }
 // The video home shows rows (genres, series…); each row's "See all" opens the grid with its filters.
 function mediaHomeActive() {
-  return media.kind === "video" && ["recent", "films", "series"].includes(media.view) && !media.gridMode && media.layout === "cinematic" && !$("media-search").value.trim()
+  return media.kind === "video" && ["recent", "films", "series", "adult"].includes(media.view) && !media.gridMode && media.layout === "cinematic" && !$("media-search").value.trim()
     && ["genre", "year", "language", "availability"].every(key => !$(`media-${key}`).value);
 }
 function mediaRenderHome() {
@@ -233,7 +236,7 @@ async function mediaSeeAll(filters) {
   }
   // The grid stays until a browse tab is chosen again.
   media.gridMode = true;
-  media.view = filters.view || "all"; $("media-view").value = media.view;
+  media.view = filters.adult ? "adult" : filters.view || "all"; $("media-view").value = media.view;
   await loadMedia();
   window.scrollTo({top: 0});
 }
@@ -250,7 +253,7 @@ function mediaRender() {
   for (const item of document.querySelectorAll("[data-media-music-view]")) { item.classList.toggle("active", item.dataset.mediaMusicView === media.view); item.setAttribute("aria-current", item.dataset.mediaMusicView === media.view ? "page" : "false"); }
   mediaMusicBar();
   mediaRenderFeature(); mediaRenderContinue(); mediaRenderHome(); mediaRenderEpisodes(media.selected).catch(() => {});
-  $("media-shelf-title").textContent = media.kind === "music" ? ({albums: say("Albums", "Albums"), artists: say("Artists", "Artistes"), tracks: say("Tracks", "Pistes")})[media.view] : ({recent: say("Recently added", "Récemment ajoutés"), continue: say("Continue watching", "Reprendre la lecture"), films: say("Films", "Films"), series: say("Series", "Séries")})[media.view] || say("Your videos", "Vos vidéos");
+  $("media-shelf-title").textContent = media.kind === "music" ? ({albums: say("Albums", "Albums"), artists: say("Artists", "Artistes"), tracks: say("Tracks", "Pistes")})[media.view] : ({recent: say("Recently added", "Récemment ajoutés"), continue: say("Continue watching", "Reprendre la lecture"), films: say("Films", "Films"), series: say("Series", "Séries"), adult: "XXX"})[media.view] || say("Your videos", "Vos vidéos");
   $("media-shelf-count").textContent = say("From your Library Folders", "Dans vos dossiers de bibliothèque");
   const root = $("media-results"); root.replaceChildren();
   if (!media.rows.length) { root.append(element("p", say("No media found. Add a Library Folder in Library options, then refresh the inventory.", "Aucun média trouvé. Ajoutez un dossier dans les options de bibliothèque, puis actualisez les médias."), "media-empty")); root.append(button(say("Add Library Folder", "Ajouter un dossier de bibliothèque"), () => navigate("setup"))); return; }

@@ -151,7 +151,7 @@ class IndexerFilters(BaseModel):
         return params
 
 
-def search_options(indexer, category=None, fallback_categories=None):
+def search_options(indexer, category=None, fallback_categories=None, *, adult=True):
     if not indexer.is_c411:
         return {
             "backend": "torznab",
@@ -160,7 +160,7 @@ def search_options(indexer, category=None, fallback_categories=None):
             "advanced_filters_supported": False,
             "note": "Use text/category search; native c411 filters are unavailable here.",
         }
-    tree = parse_tree(indexer.search_categories())
+    tree = parse_tree(indexer.search_categories(), adult=adult)
     if category is not None and category not in tree.categories:
         raise ValueError("Unknown native category. Read options without a category first.")
     root = tree.root(category)

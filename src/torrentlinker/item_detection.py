@@ -48,6 +48,7 @@ ARCHIVES = {".rar", ".zip", ".7z"}  # unpacked before a Reseed (ADR-0007)
 CONTENT = {
     ContentKind.MOVIE: VIDEO,
     ContentKind.SERIES: VIDEO,
+    ContentKind.ADULT: VIDEO,
     ContentKind.MUSIC: AUDIO,
     ContentKind.EBOOK: EBOOK,
     ContentKind.MODEL_3D: MODEL_3D,
@@ -55,7 +56,7 @@ CONTENT = {
 }
 SUPPORT = {".nfo", ".txt", ".jpg", ".jpeg", ".png", ".srt", ".sub", ".idx", ".ass", ".sfv"}
 SUPPORT |= {".url", ".md", ".xml", ".diz", ".cue", ".log", ".m3u", ".m3u8", ".db", ".ini"}
-VIDEO_KINDS = {ContentKind.MOVIE, ContentKind.SERIES, ContentKind.OTHER}
+VIDEO_KINDS = {ContentKind.MOVIE, ContentKind.SERIES, ContentKind.ADULT, ContentKind.OTHER}
 DISC_FOLDERS = {"BDMV", "VIDEO_TS", "AUDIO_TS"}
 MULTI_DISC = re.compile(r"(?i)^(cd|dis[ck]|disque)[ ._-]?\d{1,2}$")  # CD1, Disc 2, Disque 1
 # S01E02, S1.EP 01, 1x02

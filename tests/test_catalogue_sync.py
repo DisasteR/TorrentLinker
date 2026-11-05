@@ -57,6 +57,7 @@ def test_images_catalogue_uses_torznab_when_json_omits_the_category(tmp_path, fu
         set(),
         lambda _: "disk",
         {6060},
+        adult=True,  # XXX: planned only once the user enables adult content
     )
     plan = make_plan(
         ZenProfile(ZenClass.SWARM_KEEPER),
@@ -833,3 +834,37 @@ def test_the_whole_catalogue_refresh_leaves_other_indexers_alone(tmp_path: Path)
     refresh_catalogue(ix, store, {7000: IndexerCategory("Books", None)})
 
     assert store.feed_state(REFRESH_FEED).updated_at is None
+
+
+def test_a_capped_subcategory_is_read_oldest_first_then_year_by_year(tmp_path: Path) -> None:
+    from torrentlinker.catalogue_sync import fill_capped
+
+    asked: list[dict[str, str]] = []
+
+    def listing(request: httpx.Request) -> httpx.Response:
+        q = dict(request.url.params)
+        asked.append(q)
+        meta = {"page": int(q["page"]), "perPage": 100, "total": 0, "totalPages": 1}
+        rows = []
+        if q["category"] == "1" and "subcat" not in q:
+            meta |= {"total": 20000, "totalPages": 100}
+            meta["subcategories"] = [{"id": 6, "count": 15000}, {"id": 7, "count": 5000}]
+        elif q.get("subcat") == "6" and q.get("sortOrder") == "asc":
+            rows = [live_item(1)]
+        elif q.get("subcat") == "6" and q.get("year") == "2020":
+            rows = [live_item(2), live_item(1)]
+        meta["total"] = meta["total"] or len(rows)
+        return httpx.Response(200, json={"data": rows, "meta": meta})
+
+    store = Store(tmp_path / "s.db")
+    fill_capped(native_indexer(listing), store, this_year=2026)
+
+    assert store.catalogue_size() == 2
+    subcat6 = [q for q in asked if q.get("subcat") == "6"]
+    assert subcat6[0]["sortOrder"] == "asc"
+    assert [q["year"] for q in subcat6[1:]] == [str(y) for y in range(1900, 2028)]
+    assert not any(q.get("subcat") == "7" for q in asked)  # small enough to page through
+
+    asked.clear()
+    fill_capped(native_indexer(listing), store, this_year=2026)  # every part already read
+    assert all("subcat" not in q for q in asked)

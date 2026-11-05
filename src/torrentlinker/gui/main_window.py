@@ -55,6 +55,7 @@ from torrentlinker.catalogue import (
 )
 from torrentlinker.catalogue_sync import (
     SNAPSHOT_NAME,
+    fill_capped,
     refresh_catalogue,
     refresh_due,
     sync_catalogue,
@@ -388,6 +389,7 @@ class MainWindow(QMainWindow):
             self.add_library_folder,
         )
         self.media_tab.set_media_layout(settings.media_layout)
+        self.media_tab.set_adult(settings.adult_content)
         self.media_tab.refresh_on_first_open = True
         self.media_tab.layout_changed.connect(self._save_media_layout)
         self.media_tab.center_mode_requested.connect(self.set_media_center)
@@ -1278,7 +1280,8 @@ class MainWindow(QMainWindow):
     def offer_plan_categories(self) -> None:
         """Offer every category and subcategory, marking those without a Download Folder."""
         s = self.settings
-        cats, folders = s.indexer_categories, s.download_folders
+        folders = s.download_folders
+        cats = {c: s.indexer_categories[c] for c in s.visible_categories(s.indexer_categories)}
         options = []
         for cid, cat in sorted(cats.items()):
             if cat.parent is None:
@@ -1432,6 +1435,7 @@ class MainWindow(QMainWindow):
                 only,
                 s.plan_exclusions,
                 issues=issues,
+                adult=s.adult_content,
             )
             on_disk_items = list(local_items)
             for folder in unlisted:
@@ -1841,6 +1845,8 @@ class MainWindow(QMainWindow):
                     progress=progress,
                     categories=categories,
                 )
+            # Then what newest-first pages cannot reach in the biggest subcategories.
+            fill_capped(indexer, store, stop=stop, progress=progress)
 
         self._crawl_position[:] = [0, 0]
         self.zen_tab.catalogue.set_state(True, False)
@@ -2105,7 +2111,7 @@ class MainWindow(QMainWindow):
                 self, self.tr("Library"), self.tr("This folder is already in the Library.")
             )
             return
-        dialog = LibraryFolderDialog(path, self)
+        dialog = LibraryFolderDialog(path, self, adult=self.settings.adult_content)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         folders = [*self.settings.library_folders, dialog.folder()]
@@ -2240,6 +2246,7 @@ class MainWindow(QMainWindow):
             replacement.media_tab.center_mode_requested.connect(replacement.set_media_center)
             replacement.media_tab.set_center_mode(False)
             replacement.media_tab.set_media_layout(settings.media_layout)
+            replacement.media_tab.set_adult(settings.adult_content)
             replacement.tabs.insertTab(media_index, self.media_tab, self.tr("Media"))
         else:
             self.media_tab.stop()
@@ -2346,6 +2353,9 @@ class MainWindow(QMainWindow):
             self.apply_proxy()
             set_theme(self.settings.theme)
             self.media_tab.set_media_layout(self.settings.media_layout)
+            self.media_tab.set_adult(self.settings.adult_content)
+            self.search_tab.refresh_categories()
+            self.offer_plan_categories()
             self._fill_folder_filter()
             if not self._has_indexer_key():
                 self._await_setup()

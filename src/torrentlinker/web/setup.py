@@ -261,10 +261,12 @@ class Setup:
                     self.secrets.get(self.settings.secret_name(name + "-password"))
                 ),
                 "has_api_key": bool(self.secrets.get(self.settings.secret_name("qbit-api-key"))),
+                # Without adult content, XXX is left out of every picker (read-only here).
                 "indexer_categories": {
-                    str(key): asdict(category)
-                    for key, category in self.settings.indexer_categories.items()
+                    str(key): asdict(self.settings.indexer_categories[key])
+                    for key in self.settings.visible_categories(self.settings.indexer_categories)
                 },
+                "adult_content": self.settings.adult_content,
                 "indexer_url": self.settings.indexer.url,
                 "indexer_configured": bool(self.secrets.get("indexer-api-key")),
                 "indexer_key_count": self.indexer_key_count(),
@@ -494,6 +496,13 @@ class Setup:
             self._client = None
             self._indexer = None
             return {"ok": True}
+
+    def set_adult_content(self, enabled: bool) -> None:
+        root = self._root or self
+        with root.lock:
+            root.settings.adult_content = enabled
+            root.save()
+        self.settings.adult_content = enabled
 
     def set_sequential_video(self, enabled: bool) -> None:
         root = self._root or self
