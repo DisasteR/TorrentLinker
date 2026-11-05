@@ -12,9 +12,8 @@ import httpx
 from torrentlinker.catalogue import crawl_categories, plan_categories
 from torrentlinker.catalogue_sync import (
     SNAPSHOT_NAME,
-    fill_capped,
-    prune_deleted,
-    start_full_crawl,
+    TORZNAB_ONLY_CATEGORIES,
+    fetch_all,
     sync_catalogue,
 )
 from torrentlinker.domain import LibraryFolder
@@ -83,33 +82,24 @@ def catalogue(
             chosen, setup.settings.download_folders, setup.settings.indexer_categories
         )
     )
-    if full:
-        start_full_crawl(setup.store)
+    indexer = setup.indexer()
+    stopped = lambda: fetch_stopped(stop)  # noqa: E731
+    report = lambda p: progress({"phase": "fetching", **asdict(p)})  # noqa: E731
+    if full and indexer.is_c411:
+        # Category by category, each to parity with the site; XXX only through Torznab.
+        if not fetch_all(indexer, setup.store, stop=stopped, progress=report):
+            return catalogue_status(setup)
+        wanted = [c for c in wanted if c in TORZNAB_ONLY_CATEGORIES]
     sync_catalogue(
-        setup.indexer(),
+        indexer,
         setup.store,
         wanted,
         full=full,
         bootstrap=True,
-        stop=lambda: fetch_stopped(stop),
-        progress=lambda p: progress({"phase": "fetching", **asdict(p)}),
+        stop=stopped,
+        progress=report,
         categories=setup.settings.indexer_categories,
     )
-    if full and not fetch_stopped(stop):
-        # Then what newest-first pages cannot reach in the biggest subcategories.
-        fill_capped(
-            setup.indexer(),
-            setup.store,
-            stop=lambda: fetch_stopped(stop),
-            progress=lambda p: progress({"phase": "fetching", **asdict(p)}),
-        )
-        if not fetch_stopped(stop):  # complete: drop what c411 deleted since
-            prune_deleted(
-                setup.indexer(),
-                setup.store,
-                stop=lambda: fetch_stopped(stop),
-                progress=lambda p: progress({"phase": "checking", **asdict(p)}),
-            )
     return catalogue_status(setup)
 
 

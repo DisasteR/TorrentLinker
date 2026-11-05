@@ -870,33 +870,44 @@ def test_a_capped_subcategory_is_read_oldest_first_then_year_by_year(tmp_path: P
     assert all("subcat" not in q for q in asked)
 
 
-def test_a_complete_full_fetch_removes_what_c411_deleted_and_keeps_xxx(tmp_path: Path) -> None:
-    from torrentlinker.catalogue_sync import FULL_CRAWL, prune_deleted, start_full_crawl
+def test_fetching_one_category_reaches_parity_with_c411(tmp_path: Path) -> None:
+    from torrentlinker.catalogue_sync import ROOT_FEED, fetch_root
     from torrentlinker.store import CatalogueRow
 
     store = Store(tmp_path / "s.db")
-    store.save_feed_state(FeedState("c411-json:category=1", updated_at=1.0, head_hashes=("x",)))
+    store.save_feed_state(FeedState("c411-json:category=2&viewMode=flat", updated_at=1.0))
 
-    def row(h: str, category: int, seen: float) -> CatalogueRow:
-        return CatalogueRow(h * 40, h, 1, 1, category, "u", "d", seen)
+    def row(h: str, category: int, root: int | None = None) -> CatalogueRow:
+        return CatalogueRow(h * 40, h, 1, 1, category, "u", "d", 5.0, root=root)
 
+    # a: listed again. b: deleted on c411. c: unlisted but alive. d: XXX. e: another
+    # category, never checked by this fetch.
     store.save_catalogue(
-        [row("a", 2000, 100.0), row("b", 2000, 5.0), row("c", 2000, 5.0), row("d", 6010, 5.0)]
+        [row("a", 7010), row("b", 7020), row("c", 7030), row("d", 6010), row("e", 2000, 1)]
     )
-    start_full_crawl(store, clock=lambda: 50.0)
-    assert store.feed_state("c411-json:category=1").updated_at is None  # read again in full
-    start_full_crawl(store, clock=lambda: 60.0)  # resuming keeps the first start
     asked: list[str] = []
 
-    def lookup(request: httpx.Request) -> httpx.Response:
-        h = request.url.path.rsplit("/", 1)[1]
-        asked.append(h[0])
-        return httpx.Response(404 if h[0] == "b" else 200, json={})
+    def c411(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/api/torrents/"):
+            h = request.url.path.rsplit("/", 1)[1]
+            asked.append(h[0])
+            return httpx.Response(404 if h[0] == "b" else 200, json={})
+        q = dict(request.url.params)
+        meta = {"page": int(q["page"]), "perPage": 100, "total": 1, "totalPages": 1}
+        if "category" not in q:
+            meta["categories"] = [{"id": 2, "count": 2}]
+            return httpx.Response(200, json={"data": [], "meta": meta})
+        item = live_item(int("a" * 40, 16)) | {"infoHash": "a" * 40}
+        return httpx.Response(200, json={"data": [item], "meta": meta})
 
-    removed = prune_deleted(native_indexer(lookup), store, clock=lambda: 70.0)
+    assert fetch_root(native_indexer(c411), store, 2, clock=lambda: 50.0, this_year=2026)
 
-    assert removed == 1 and sorted(asked) == ["b", "c"]  # never the seen one, never XXX
-    assert sorted(r.title for r in store.catalogue()) == ["a", "c", "d"]
-    store.save_catalogue([row("b", 2000, 80.0)])
-    assert "b" not in {r.title for r in store.catalogue()}  # a refresh cannot bring it back
-    assert store.feed_state(FULL_CRAWL).started_at is None  # the next fetch starts anew
+    assert sorted(asked) == ["b", "c"]  # only this category's unseen torrents, never XXX
+    titles = {r.infohash[0] for r in store.catalogue()}
+    assert titles == {"a", "c", "d", "e"}
+    assert store.catalogue([("a" * 40)])[0].root == 2  # c411's own category, from the listing
+    state = store.feed_state(f"{ROOT_FEED}2")
+    assert state.updated_at == 50.0 and state.started_at is None and state.count == 2
+    assert store.feed_state("c411-json:category=2&viewMode=flat").updated_at is None  # forgot
+    store.save_catalogue([row("b", 7020)])
+    assert "b" not in {r.infohash[0] for r in store.catalogue()}  # deleted for good

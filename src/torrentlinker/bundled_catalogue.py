@@ -48,7 +48,7 @@ def bundled_key() -> bytes | None:
 
 def columns(rows: Iterable[CatalogueRow]) -> dict[str, list[Any]]:
     data: dict[str, list[Any]] = {
-        k: [] for k in ("hash", "title", "size", "seeders", "category", "seen_at")
+        k: [] for k in ("hash", "title", "size", "seeders", "category", "seen_at", "root")
     }
     for r in rows:
         data["hash"].append(r.infohash.lower())
@@ -57,6 +57,7 @@ def columns(rows: Iterable[CatalogueRow]) -> dict[str, list[Any]]:
         data["seeders"].append(r.seeders)
         data["category"].append(r.category)
         data["seen_at"].append(r.seen_at)
+        data["root"].append(r.root)
     return data
 
 
@@ -70,10 +71,12 @@ def rows_from_columns(data: Any) -> list[CatalogueRow]:
     if not isinstance(data, dict) or not all(isinstance(data.get(k), list) for k in names):
         raise ValueError("Invalid bundled Catalogue")
     lists = [data[k] for k in names]
-    if len({len(c) for c in lists}) != 1:
+    # c411's own category arrived later: an older export has none.
+    roots = data.get("root") or [None] * len(lists[0])
+    if len({len(c) for c in [*lists, roots]}) != 1:
         raise ValueError("Incomplete bundled Catalogue")
     rows, seen = [], set()
-    for h, title, size, seeders, category, seen_at in zip(*lists, strict=True):
+    for h, title, size, seeders, category, seen_at, root in zip(*lists, roots, strict=True):
         if (
             not isinstance(h, str)
             or not HASH.fullmatch(h)
@@ -83,6 +86,7 @@ def rows_from_columns(data: Any) -> list[CatalogueRow]:
             or not (_count(size) and _count(seeders))
             or not (category is None or _count(category))
             or not isinstance(seen_at, int | float)
+            or not (root is None or _count(root))
         ):
             raise ValueError("Invalid or duplicate torrent in the bundled Catalogue")
         h = h.lower()
@@ -98,6 +102,7 @@ def rows_from_columns(data: Any) -> list[CatalogueRow]:
                 f"https://c411.org/torrents/{h}",
                 float(seen_at),
                 BUNDLE_NAME,
+                root,
             )
         )
     return rows

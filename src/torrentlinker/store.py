@@ -174,6 +174,7 @@ class CatalogueRow:
     details_url: str
     seen_at: float
     source: str = "indexer"
+    root: int | None = None  # c411's own category, known from its listing
 
 
 @dataclass(frozen=True)
@@ -556,6 +557,10 @@ class Store:
             self._db.execute(
                 "ALTER TABLE catalogue ADD COLUMN source TEXT NOT NULL DEFAULT 'indexer'"
             )
+        if "root" not in catalogue_columns:
+            # c411's own category: Torznab ids alone mix some of them (Jeux vidéo and
+            # Emulation are both 1000), so per-category parity needs the real one.
+            self._db.execute("ALTER TABLE catalogue ADD COLUMN root INTEGER")
         crawl_columns = {r[1] for r in self._db.execute("PRAGMA table_info(catalogue_crawl)")}
         if "limited" not in crawl_columns:
             self._db.execute(
@@ -795,18 +800,36 @@ class Store:
 
     # Catalogue --------------------------------------------------------------
 
-    def catalogue_unseen_since(self, since: float, limit: int = 500) -> list[str]:
-        """Torrents outside XXX that no listing has returned since `since`, oldest first.
-        XXX is left out: c411's API never lists it, so it would always look unseen."""
+    def catalogue_unseen_since(
+        self, since: float, root: int, categories: set[int], limit: int = 500
+    ) -> list[str]:
+        """Torrents of a c411 category that no listing has returned since `since`,
+        oldest first: those known to be of it, and those of unknown category whose
+        Torznab category it uses."""
+        marks = ",".join("?" * len(categories))
         with self._lock:
             return [
                 row[0]
                 for row in self._db.execute(
-                    "SELECT infohash FROM catalogue WHERE seen_at < ?"
-                    " AND NOT (category BETWEEN 6000 AND 6999) ORDER BY seen_at LIMIT ?",
-                    (since, limit),
+                    "SELECT infohash FROM catalogue WHERE seen_at < ? AND (root = ?"
+                    f" OR (root IS NULL AND category IN ({marks}))) ORDER BY seen_at LIMIT ?",
+                    (since, root, *sorted(categories), limit),
                 )
             ]
+
+    def catalogue_root_counts(self) -> tuple[dict[int, int], dict[int, int]]:
+        """Torrents per c411 category where known, and per Torznab category where not."""
+        known: dict[int, int] = {}
+        unknown: dict[int, int] = {}
+        with self._lock:
+            for root, category, count in self._db.execute(
+                "SELECT root, category, COUNT(*) FROM catalogue GROUP BY root, category"
+            ):
+                if root is not None:
+                    known[root] = known.get(root, 0) + count
+                elif category is not None:
+                    unknown[category] = unknown.get(category, 0) + count
+        return known, unknown
 
     def forget_feed_states(self, prefixes: tuple[str, ...]) -> None:
         with self._lock, self._db:
@@ -834,13 +857,13 @@ class Store:
     def save_catalogue(self, rows: list[CatalogueRow]) -> None:
         with self._lock, self._db:
             self._db.executemany(
-                "INSERT INTO catalogue SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?"
+                "INSERT INTO catalogue SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?"
                 " WHERE NOT EXISTS (SELECT 1 FROM unavailable_torrent WHERE infohash = lower(?))"
                 " ON CONFLICT(infohash) DO UPDATE SET"
                 " title=excluded.title, size=excluded.size, seeders=excluded.seeders,"
                 " category=excluded.category, download_url=excluded.download_url,"
                 " details_url=excluded.details_url, seen_at=excluded.seen_at,"
-                " source=excluded.source"
+                " source=excluded.source, root=COALESCE(excluded.root, catalogue.root)"
                 # Live c411 rows outrank the bundled Catalogue, which outranks Zen
                 # Lab's coarser categories: a source never replaces a better one.
                 f" WHERE {_RANK.format('excluded')} >= {_RANK.format('catalogue')}",
@@ -855,6 +878,7 @@ class Store:
                         r.details_url,
                         r.seen_at,
                         r.source,
+                        r.root,
                         r.infohash,
                     )
                     for r in rows

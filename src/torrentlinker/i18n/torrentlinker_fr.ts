@@ -1329,6 +1329,42 @@ Passer en mode Exécuter dans les limites ? Cette question ne sera plus posée.<
 <context>
     <name>CatalogueBox</name>
     <message>
+        <source>By year</source>
+        <translation>Par année</translation>
+    </message>
+    <message>
+        <source>Cache only</source>
+        <translation>Cache seul</translation>
+    </message>
+    <message>
+        <source>Checking</source>
+        <translation>Vérification</translation>
+    </message>
+    <message>
+        <source>Fetch every category to parity with c411: every page again, the big categories year by year, then the torrents c411 deleted are removed. You can pause and resume after closing the app.</source>
+        <translation>Récupère chaque catégorie jusqu’à la parité avec c411 : toutes les pages à nouveau, les grandes catégories année par année, puis les torrents supprimés par c411 sont retirés. Vous pouvez mettre en pause et reprendre après avoir fermé l’application.</translation>
+    </message>
+    <message>
+        <source>Not read yet</source>
+        <translation>Jamais lu</translation>
+    </message>
+    <message>
+        <source>Paused</source>
+        <translation>En pause</translation>
+    </message>
+    <message>
+        <source>Reading</source>
+        <translation>En cours</translation>
+    </message>
+    <message>
+        <source>Up to date</source>
+        <translation>À jour</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <translation>En attente</translation>
+    </message>
+    <message>
         <location filename="../gui/zen_view.py" line="306"/>
         <source>Catalogue</source>
         <translation>Catalogue</translation>
@@ -3618,6 +3654,46 @@ Fait aussi partie du pack {1}. Il n’est en seed seul qu’avec son propre torr
 </context>
 <context>
     <name>MainWindow</name>
+    <message>
+        <source>At parity with c411</source>
+        <translation>À parité avec c411</translation>
+    </message>
+    <message>
+        <source>Category {0}/{1}: {2}</source>
+        <translation>Catégorie {0}/{1} : {2}</translation>
+    </message>
+    <message>
+        <source>Checking torrents c411 no longer lists</source>
+        <translation>Vérification des torrents que c411 ne liste plus</translation>
+    </message>
+    <message>
+        <source>Fetch every category, or one with its ⟳ button. A fetch reads it again in full, then removes what c411 deleted.</source>
+        <translation>Récupérez toutes les catégories, ou une seule avec son bouton ⟳. Une récupération la relit en entier, puis retire ce que c411 a supprimé.</translation>
+    </message>
+    <message>
+        <source>From searches and the first import</source>
+        <translation>Issu des recherches et de l’import initial</translation>
+    </message>
+    <message>
+        <source>Not compared with c411 yet</source>
+        <translation>Pas encore comparé avec c411</translation>
+    </message>
+    <message>
+        <source>Reading every page</source>
+        <translation>Lecture de toutes les pages</translation>
+    </message>
+    <message>
+        <source>Reading year by year</source>
+        <translation>Lecture année par année</translation>
+    </message>
+    <message>
+        <source>{0} missing from the Catalogue</source>
+        <translation>{0} manquants dans le Catalogue</translation>
+    </message>
+    <message>
+        <source>{0} more than c411: fetch it to remove deleted ones</source>
+        <translation>{0} de plus que c411 : récupérez-la pour retirer les supprimés</translation>
+    </message>
     <message>
         <source>Checking torrents no longer listed: {0} checked, {1} deleted on c411</source>
         <translation>Vérification des torrents qui ne sont plus listés : {0} vérifiés, {1} supprimés sur c411</translation>
@@ -11156,6 +11232,21 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
     <message>
         <source>The report could not be saved. Choose a writable folder and try again.</source>
         <translation>Impossible d’enregistrer le rapport. Choisissez un dossier accessible en écriture et réessayez.</translation>
+    </message>
+</context>
+<context>
+    <name>CategoryTile</name>
+    <message>
+        <source>/ {0} on c411</source>
+        <translation>/ {0} sur c411</translation>
+    </message>
+    <message>
+        <source>Fetch only {0}</source>
+        <translation>Récupérer seulement {0}</translation>
+    </message>
+    <message>
+        <source>c411&apos;s listing does not show it</source>
+        <translation>absent de la liste de c411</translation>
     </message>
 </context>
 </TS>

@@ -54,12 +54,19 @@ from torrentlinker.catalogue import (
     startup_categories,
 )
 from torrentlinker.catalogue_sync import (
+    LISTED_ROOTS,
+    ROOT_FEED,
+    ROOT_NAMES,
     SNAPSHOT_NAME,
-    fill_capped,
-    prune_deleted,
+    TORZNAB_ONLY_CATEGORIES,
+    TORZNAB_ONLY_ROOTS,
+    fetch_all,
+    fetch_root,
     refresh_catalogue,
     refresh_due,
-    start_full_crawl,
+    root_categories,
+    save_site_counts,
+    site_counts,
     sync_catalogue,
 )
 from torrentlinker.category_tags import sync_category_tags
@@ -104,7 +111,7 @@ from torrentlinker.gui.theme import set_theme
 from torrentlinker.gui.torrents_view import TorrentsTab
 from torrentlinker.gui.update_notice import UpdateNotice
 from torrentlinker.gui.upload_view import UploadTab
-from torrentlinker.gui.zen_view import ZenBand, ZenTab
+from torrentlinker.gui.zen_view import CategoryCard, ZenBand, ZenTab
 from torrentlinker.indexer import Candidate, Indexer
 from torrentlinker.library import (
     LibraryEntry,
@@ -565,7 +572,14 @@ class MainWindow(QMainWindow):
         self.crawl_ticker.setInterval(500)
         self.crawl_ticker.timeout.connect(self._show_crawl_progress)
         self._planning = False
-        self.zen_tab.catalogue.start_requested.connect(self.crawl_catalogue)
+        self._single_root: int | None = None
+        self._card_phase = "running"
+        self._cards_drawn = 0.0
+        self._site_counted = 0.0
+        self._panel_fetch = False
+        self.zen_tab.pages.currentChanged.connect(self._zen_page_changed)
+        self.zen_tab.catalogue.start_requested.connect(lambda: self.crawl_catalogue())
+        self.zen_tab.catalogue.category_requested.connect(self.crawl_catalogue)
         self.zen_tab.catalogue.pause_requested.connect(self.pause_catalogue)
         self._show_catalogue_age()
         self.verify_timer = QTimer(self)
@@ -1813,8 +1827,9 @@ class MainWindow(QMainWindow):
         self._run_catalogue(work)
         return True
 
-    def crawl_catalogue(self) -> None:
-        """Fetch every category of the Indexer, resuming a paused crawl (user action)."""
+    def crawl_catalogue(self, root: int | None = None) -> None:
+        """Fetch every category of the Indexer, resuming a paused crawl, or only the c411
+        category `root` (user action, from the Catalogue panel)."""
         if self.catalogue_runner is not None:
             self.statusBar().showMessage(self.tr("The Catalogue is already being updated"))
             return
@@ -1833,8 +1848,24 @@ class MainWindow(QMainWindow):
                 for caps in [indexer.caps()]
                 for c, name in caps.categories.items()
             }
+            if indexer.is_c411:
+                # Category by category, each to parity with the site: every page, the
+                # big ones year by year, then the torrents c411 has deleted removed.
+                if root is not None:
+                    position[:] = [1, 1]
+                    fetch_root(indexer, store, root, stop=stop, progress=progress)
+                    return
+                if not fetch_all(
+                    indexer,
+                    store,
+                    stop=stop,
+                    progress=progress,
+                    position=lambda done, total: position.__setitem__(slice(None), [done, total]),
+                ):
+                    return
             wanted = crawl_categories(categories)
-            start_full_crawl(store)
+            if indexer.is_c411:  # XXX: only c411's Torznab search returns it
+                wanted = [c for c in wanted if c in TORZNAB_ONLY_CATEGORIES]
             for i, category in enumerate(wanted, 1):
                 if stop():
                     return
@@ -1848,16 +1879,14 @@ class MainWindow(QMainWindow):
                     progress=progress,
                     categories=categories,
                 )
-            # Then what newest-first pages cannot reach in the biggest subcategories,
-            # and, once complete, drop the torrents c411 has deleted since.
-            fill_capped(indexer, store, stop=stop, progress=progress)
-            if not stop():
-                removed = prune_deleted(indexer, store, stop=stop, progress=progress)
-                log.info("Catalogue: %d torrents deleted on c411 removed", removed)
 
         self._crawl_position[:] = [0, 0]
+        self._single_root = root
+        self._panel_fetch = True
+        self._card_phase = "running"
         self.zen_tab.catalogue.set_state(True, False)
         self._run_catalogue(work)
+        self._show_catalogue_cards()
 
     def pause_catalogue(self) -> None:
         if self.catalogue_runner is not None:
@@ -1892,6 +1921,10 @@ class MainWindow(QMainWindow):
         p = self._last_crawl_progress
         if p is None:
             return
+        if p.source == "c411-prune":
+            self._card_phase = "prune"
+            if time.monotonic() - self._cards_drawn >= 2:
+                self._show_catalogue_cards()
         if p.source in (SNAPSHOT_NAME, "c411-prune"):
             text = (
                 self.tr("Importing Zen Lab metadata: {0} torrents (+{1})").format(p.offset, p.added)
@@ -1931,6 +1964,9 @@ class MainWindow(QMainWindow):
             ).format(text, size)
         self.zen_tab.catalogue.set_status(status + suffix)
         self.statusBar().showMessage(self.tr("Catalogue: {0}").format(status) + suffix)
+        self._card_phase = {"c411-capped": "year", "c411-prune": "prune"}.get(p.source, "running")
+        if time.monotonic() - self._cards_drawn >= 2:
+            self._show_catalogue_cards()
         if self._planning:
             if self._pending_plan is not None:
                 self.zen_tab.plan_view.busy(
@@ -1952,7 +1988,11 @@ class MainWindow(QMainWindow):
     def _catalogue_finished(self, stopped: bool) -> None:
         self.catalogue_runner = None
         self.crawl_ticker.stop()
+        self._single_root = None
         self._show_catalogue_age()
+        if self._panel_fetch:  # a fetch from the Catalogue panel: compare with c411 again
+            self._panel_fetch = False
+            self.refresh_site_counts()
         added, size = sum(self._catalogue_added.values()), self.store.catalogue_size()
         log.info(
             "Catalogue %s: +%d torrents, %d in total",
@@ -1989,7 +2029,116 @@ class MainWindow(QMainWindow):
             else:
                 self._pending_plan = pending
 
+    def _fetching_root(self) -> int | None:
+        """The c411 category being fetched now, if any."""
+        if self.catalogue_runner is None or not self.zen_tab.catalogue.running:
+            return None
+        if self._single_root is not None:
+            return self._single_root
+        done, _total = self._crawl_position
+        return LISTED_ROOTS[done - 1] if 0 < done <= len(LISTED_ROOTS) else None
+
+    def _show_catalogue_cards(self) -> None:
+        """One card per c411 category: the Catalogue's count against the site's."""
+        self._cards_drawn = time.monotonic()
+        known, unknown = self.store.catalogue_root_counts()
+        owner: dict[int, int] = {}
+        for root in ROOT_NAMES:
+            for category in root_categories(root):
+                owner.setdefault(category, root)  # shared ids: the first category
+        ours = dict(known)
+        for category, count in unknown.items():
+            if (holder := owner.get(category)) is not None:
+                ours[holder] = ours.get(holder, 0) + count
+        current = self._fetching_root()
+        roots = [*LISTED_ROOTS, *TORZNAB_ONLY_ROOTS]
+        order = {root: i for i, root in enumerate(LISTED_ROOTS)}
+        cards = []
+        for root in roots:
+            if root in TORZNAB_ONLY_ROOTS and not self.settings.adult_content:
+                continue
+            feed = self.store.feed_state(f"{ROOT_FEED}{root}")
+            count = ours.get(root, 0)
+            site = None if root in TORZNAB_ONLY_ROOTS else (feed.count or None)
+            if site is None and root in TORZNAB_ONLY_ROOTS:
+                state, note = "cache", self.tr("From searches and the first import")
+            elif root == current:
+                state = self._card_phase
+                note = {
+                    "year": self.tr("Reading year by year"),
+                    "prune": self.tr("Checking torrents c411 no longer lists"),
+                }.get(state, self.tr("Reading every page"))
+            else:
+                waiting = (
+                    current is not None
+                    and self._single_root is None
+                    and order.get(root, -1) > order.get(current, -1)
+                )
+                state = (
+                    "waiting"
+                    if waiting
+                    else "paused"
+                    if feed.started_at is not None
+                    else "done"
+                    if feed.updated_at is not None
+                    else "never"
+                )
+                gap = count - site if site else 0
+                note = (
+                    self.tr("Not compared with c411 yet")
+                    if not site
+                    else self.tr("At parity with c411")
+                    if gap == 0
+                    else self.tr("{0} more than c411: fetch it to remove deleted ones").format(gap)
+                    if gap > 0
+                    else self.tr("{0} missing from the Catalogue").format(-gap)
+                )
+            cards.append(
+                CategoryCard(root, ROOT_NAMES.get(root, str(root)), count, site, state, note)
+            )
+        self.zen_tab.catalogue.set_cards(cards)
+        if current is not None:
+            done, total = self._crawl_position
+            self.zen_tab.catalogue.set_phase(
+                self.tr("Category {0}/{1}: {2}").format(
+                    max(done, 1), max(total, 1), ROOT_NAMES.get(current, str(current))
+                ),
+                (max(done, 1) - 1) / max(total, 1),
+            )
+        elif not self.zen_tab.catalogue.running:
+            self.zen_tab.catalogue.set_phase(
+                self.tr(
+                    "Fetch every category, or one with its ⟳ button. A fetch reads it again "
+                    "in full, then removes what c411 deleted."
+                )
+            )
+
+    def _zen_page_changed(self, index: int) -> None:
+        if self.zen_tab.pages.widget(index) is self.zen_tab.catalogue_page:
+            self.refresh_site_counts(max_age=3600)
+
+    def refresh_site_counts(self, max_age: float = 0) -> None:
+        """c411's count per category, for the cards: one request in the background, when
+        the Catalogue page opens (at most hourly) and after each fetch."""
+        if not get_secret(INDEXER_API_KEY) or time.time() - self._site_counted < max_age:
+            return
+        self._site_counted = time.time()
+        indexer, store = self.indexer(), self.store
+        if not indexer.is_c411:
+            return
+
+        def work() -> None:
+            with indexer.background():
+                save_site_counts(store, site_counts(indexer))
+
+        def done(_result: object) -> None:
+            if isValid(self):
+                self._show_catalogue_cards()
+
+        run_in_background(work, done, lambda error: log.info("c411 counts: %s", error))
+
     def _show_catalogue_age(self) -> None:
+        self._show_catalogue_cards()
         self.band.set_catalogue(self.catalogue_age())
         paused = self.store.crawl_paused()
         self.zen_tab.catalogue.set_state(False, paused)

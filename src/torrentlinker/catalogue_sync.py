@@ -216,6 +216,7 @@ def _native_row(item: dict[str, Any], now: float) -> CatalogueRow:
         download_url(h),
         f"https://c411.org/torrents/{h}",
         now,
+        root=root,
     )
 
 
@@ -547,28 +548,44 @@ def _capped_page(
 
 
 FIRST_YEAR = 1900
+ROOT_FEED = "c411-root:"
+LISTED_ROOTS = [r for r in ROOTS if r not in TORZNAB_ONLY_ROOTS]
+# c411's own names, for the Catalogue panel (GET /api/categories, 2026-11-05).
+ROOT_NAMES = {
+    1: "Films & Vidéos",
+    2: "Ebook",
+    3: "Audio",
+    4: "Applications",
+    5: "Jeux Vidéo",
+    6: "Emulation",
+    7: "GPS",
+    8: "XXX",
+    9: "Nulled",
+    10: "Imprimante 3D",
+}
 
 
 def fill_capped(
     indexer: Indexer,
     store: Store,
     *,
+    roots: Iterable[int] | None = None,
     stop: Callable[[], bool] = lambda: False,
     progress: Progress = lambda p: None,
     this_year: int | None = None,
-) -> None:
+) -> bool:
     """Read the subcategories too big for c411's listing, which returns at most 100
     pages per query: oldest-first to the same cap, then year by year (the work's
     release year), each year small enough to be read in full. Only torrents with no
     year that are neither among the newest nor the oldest stay out of reach (473 of
-    63,974 films on 2026-11-05). Part of an explicit full crawl; resumable, each part
-    keeping the next page to read."""
+    63,974 films on 2026-11-05). Resumable, each part keeping the next page to read.
+    False when stopped first."""
     if not indexer.is_c411:
-        return
+        return True
     last = this_year or time.gmtime().tm_year
-    for root in ROOTS:
-        if root in TORZNAB_ONLY_ROOTS or stop():
-            continue
+    for root in LISTED_ROOTS if roots is None else roots:
+        if stop():
+            return False
         _, meta = _capped_page(indexer, root, None, 1)
         if meta["total"] <= meta["totalPages"] * PAGE:
             continue
@@ -582,7 +599,8 @@ def fill_capped(
             parts += [{"year": str(y)} for y in range(FIRST_YEAR, last + 2)]
             for part in parts:
                 if stop() or not _read_part(indexer, store, root, sub, part, stop, progress):
-                    return
+                    return False
+    return True
 
 
 def _read_part(
@@ -620,42 +638,119 @@ def _read_part(
     return True
 
 
-FULL_CRAWL = "c411-full-crawl"
+def root_categories(root: int) -> set[int]:
+    """The Torznab categories a c411 category's torrents are stored under."""
+    return {ROOTS[root], *SUBCATS[root].values()}
 
 
-def start_full_crawl(store: Store, clock: Callable[[], float] = time.time) -> None:
-    """Begin a full fetch from scratch, or resume the one under way. A new one forgets
-    the history checkpoints, so it reads every reachable page again rather than stopping
-    at what an earlier fetch saw: torrents it never sees are then truly unlisted, and
-    are checked one by one once it completes (prune_deleted)."""
-    if store.feed_state(FULL_CRAWL).started_at is None:
-        store.forget_feed_states(("c411-json:", "c411-capped:"))
-        store.save_feed_state(FeedState(FULL_CRAWL, started_at=clock()))
+def site_counts(indexer: Indexer) -> dict[int, int]:
+    """How many torrents c411 lists in each of its categories: one request."""
+    data = indexer.catalogue_json(
+        {"viewMode": "flat", "perPage": str(PAGE), "palliative": "include", "page": "1"}
+    )
+    counts = data.get("meta", {}).get("categories", [])
+    return {
+        int(c["id"]): int(c["count"])
+        for c in counts
+        if _integer(c.get("id")) and _integer(c.get("count"))
+    }
 
 
-def prune_deleted(
+def save_site_counts(store: Store, counts: Mapping[int, int]) -> None:
+    """Keep c411's count of each category with its fetch state, for the Catalogue panel."""
+    for root, count in counts.items():
+        key = f"{ROOT_FEED}{root}"
+        store.save_feed_state(replace(store.feed_state(key), count=count))
+
+
+def fetch_root(
+    indexer: Indexer,
+    store: Store,
+    root: int,
+    *,
+    stop: Callable[[], bool] = lambda: False,
+    progress: Progress = lambda p: None,
+    clock: Callable[[], float] = time.time,
+    this_year: int | None = None,
+) -> bool:
+    """One c411 category, end to end, for parity with the site: every reachable page
+    again from scratch, the capped subcategories year by year, then each of its torrents
+    the fetch did not see is checked on c411 and removed if deleted. A pause resumes
+    where it stopped. True once complete."""
+    key = f"{ROOT_FEED}{root}"
+    state = store.feed_state(key)
+    if state.started_at is None:
+        # Forget the checkpoints, so nothing stops at what an earlier fetch saw.
+        store.forget_feed_states(
+            (f"c411-json:{urlencode({'category': str(root)})}&", f"c411-capped:{root}:")
+        )
+        state = FeedState(key, started_at=clock(), count=state.count)
+        store.save_feed_state(state)
+    started = state.started_at
+    assert started is not None
+    limited = _refresh_filter(indexer, store, root, (), stop=stop, progress=progress)
+    if limited is None or stop():
+        return False
+    for category in root_categories(root):
+        store.save_crawl_state(
+            CrawlState(
+                category,
+                next_offset=0,
+                complete=not limited,
+                updated_at=clock(),
+                limited=bool(limited),
+            )
+        )
+    if not fill_capped(
+        indexer, store, roots=[root], stop=stop, progress=progress, this_year=this_year
+    ):
+        return False
+    if _prune_root(indexer, store, root, started, stop, progress, clock) is None:
+        return False
+    total = site_counts(indexer).get(root, state.count)
+    store.save_feed_state(FeedState(key, updated_at=clock(), count=total))
+    return True
+
+
+def fetch_all(
     indexer: Indexer,
     store: Store,
     *,
     stop: Callable[[], bool] = lambda: False,
     progress: Progress = lambda p: None,
-    clock: Callable[[], float] = time.time,
-) -> int:
-    """After a complete full fetch: ask c411 about each torrent outside XXX it did not
-    see. Deleted ones (404) leave the Catalogue for good; the others count as seen.
-    Returns how many were removed; resumable, as each answer is recorded at once."""
-    started = store.feed_state(FULL_CRAWL).started_at
-    if started is None or not indexer.is_c411:
-        return 0
+    position: Callable[[int, int], None] = lambda done, total: None,
+) -> bool:
+    """Every listed c411 category, one after the other (fetch_root)."""
+    if not indexer.is_c411:
+        return True
+    for i, root in enumerate(LISTED_ROOTS, 1):
+        position(i, len(LISTED_ROOTS))
+        if stop() or not fetch_root(indexer, store, root, stop=stop, progress=progress):
+            return False
+    return True
+
+
+def _prune_root(
+    indexer: Indexer,
+    store: Store,
+    root: int,
+    since: float,
+    stop: Callable[[], bool],
+    progress: Progress,
+    clock: Callable[[], float],
+) -> int | None:
+    """Ask c411 about each torrent of this category that no listing returned since
+    `since`: deleted ones (404) leave the Catalogue for good, the others count as seen.
+    How many were removed; None when stopped first. Each answer is recorded at once."""
     removed = checked = 0
-    while not stop():
-        batch = store.catalogue_unseen_since(started)
+    category = ROOTS[root]
+    while True:
+        batch = store.catalogue_unseen_since(since, root, root_categories(root))
         if not batch:
-            store.save_feed_state(FeedState(FULL_CRAWL, updated_at=clock()))
             return removed
         for infohash in batch:
             if stop():
-                return removed
+                return None
             try:
                 indexer.torrent_json(infohash)
             except httpx.HTTPStatusError as error:
@@ -666,8 +761,7 @@ def prune_deleted(
             else:
                 store.mark_catalogue_seen(infohash, clock())
             checked += 1
-            progress(CrawlProgress(0, checked, -removed, checked, "c411-prune"))
-    return removed
+            progress(CrawlProgress(category, checked, -removed, checked, "c411-prune"))
 
 
 def refresh_due(store: Store, now: float | None = None) -> bool:

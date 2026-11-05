@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication, Qt, QTimer, Signal
 from PySide6.QtGui import QColor
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -296,27 +298,155 @@ class ClassComparison(QGroupBox):
             label.setText(text)
 
 
+@dataclass(frozen=True)
+class CategoryCard:
+    """One c411 category in the Catalogue panel."""
+
+    root: int
+    name: str
+    ours: int
+    site: int | None  # None: c411's listing does not show it (XXX)
+    state: str  # done | never | waiting | running | year | prune | paused | cache
+    note: str = ""
+
+
+CHIPS = {
+    "done": QT_TRANSLATE_NOOP("CatalogueBox", "Up to date"),
+    "never": QT_TRANSLATE_NOOP("CatalogueBox", "Not read yet"),
+    "waiting": QT_TRANSLATE_NOOP("CatalogueBox", "Waiting"),
+    "running": QT_TRANSLATE_NOOP("CatalogueBox", "Reading"),
+    "year": QT_TRANSLATE_NOOP("CatalogueBox", "By year"),
+    "prune": QT_TRANSLATE_NOOP("CatalogueBox", "Checking"),
+    "paused": QT_TRANSLATE_NOOP("CatalogueBox", "Paused"),
+    "cache": QT_TRANSLATE_NOOP("CatalogueBox", "Cache only"),
+}
+ACTIVE = {"running", "year", "prune"}
+
+
+class CategoryTile(QFrame):
+    """A category: how much of it the Catalogue holds against c411, and a button to
+    fetch it alone. Highlighted, with each page's gain, while it is being fetched."""
+
+    fetch_requested = Signal(int)
+
+    def __init__(self, card: CategoryCard) -> None:
+        super().__init__()
+        self.setObjectName("catalogueCard")
+        self.root = card.root
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(6)
+        header = QHBoxLayout()
+        self.name = QLabel(card.name)
+        self.name.setProperty("role", "cardTitle")
+        self.name.setMinimumWidth(0)
+        header.addWidget(self.name, 1)
+        self.fetch_button = icon_button("⟳", self.tr("Fetch only {0}").format(card.name))
+        self.fetch_button.clicked.connect(lambda: self.fetch_requested.emit(self.root))
+        self.fetch_button.setVisible(card.site is not None)
+        header.addWidget(self.fetch_button)
+        layout.addLayout(header)
+        counts = QHBoxLayout()
+        self.number = QLabel()
+        self.number.setProperty("role", "cardNumber")
+        counts.addWidget(self.number)
+        self.of_site = QLabel()
+        self.of_site.setProperty("role", "muted")
+        counts.addWidget(self.of_site)
+        self.gain = QLabel()
+        self.gain.setProperty("role", "gain")
+        counts.addWidget(self.gain)
+        counts.addStretch()
+        layout.addLayout(counts)
+        self.bar = QProgressBar()
+        self.bar.setTextVisible(False)
+        self.bar.setFixedHeight(6)
+        self.bar.setRange(0, 1000)
+        layout.addWidget(self.bar)
+        footer = QHBoxLayout()
+        self.note = QLabel()
+        self.note.setProperty("role", "muted")
+        self.note.setMinimumWidth(0)
+        footer.addWidget(self.note, 1)
+        self.chip = QLabel()
+        footer.addWidget(self.chip)
+        layout.addLayout(footer)
+        self._gain_timer = QTimer(self)
+        self._gain_timer.setSingleShot(True)
+        self._gain_timer.timeout.connect(self.gain.clear)
+        self.show_card(card)
+
+    def show_card(self, card: CategoryCard) -> None:
+        self.number.setText(f"{card.ours:,}".replace(",", "\u202f"))
+        if card.site is None:
+            self.of_site.setText(self.tr("c411's listing does not show it"))
+            self.bar.setValue(1000)
+        else:
+            self.of_site.setText(
+                self.tr("/ {0} on c411").format(f"{card.site:,}".replace(",", "\u202f"))
+            )
+            self.bar.setValue(round(1000 * min(1.0, card.ours / card.site)) if card.site else 0)
+        self.note.setText(card.note)
+        self.note.setToolTip(card.note)
+        self.chip.setText(QCoreApplication.translate("CatalogueBox", str(CHIPS[card.state])))
+        self._restyle(self.chip, "chip", card.state)
+        self._restyle(self, "active", "true" if card.state in ACTIVE else "false")
+
+    def show_gain(self, added: int) -> None:
+        if added > 0:
+            self.gain.setText(f"+{added:,}".replace(",", "\u202f"))
+            self._gain_timer.start(1500)
+
+    @staticmethod
+    def _restyle(widget: QWidget, name: str, value: str) -> None:
+        if widget.property(name) != value:
+            widget.setProperty(name, value)
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+
+
 class CatalogueBox(QGroupBox):
-    """Fetch the whole Catalogue on demand, with progress, pause and resume."""
+    """The Catalogue, one card per c411 category: fetch all of them, or one, to parity
+    with the site, with progress, pause and resume."""
 
     start_requested = Signal()
     pause_requested = Signal()
+    category_requested = Signal(int)
+
+    COLUMNS = 3
 
     def __init__(self) -> None:
         super().__init__(self.tr("Catalogue"))
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
+        header = QHBoxLayout()
         self.status = QLabel()
         self.status.setWordWrap(True)
-        layout.addWidget(self.status, 1)
+        header.addWidget(self.status, 1)
         self.fetch_button = QPushButton()
         self.fetch_button.setToolTip(
             self.tr(
-                "Fetch the available torrents in every category. You can pause and resume "
-                "after closing the app. The Indexer may limit how far the Catalogue can be read."
+                "Fetch every category to parity with c411: every page again, the big "
+                "categories year by year, then the torrents c411 deleted are removed. "
+                "You can pause and resume after closing the app."
             )
         )
         self.fetch_button.clicked.connect(self._clicked)
-        layout.addWidget(self.fetch_button)
+        header.addWidget(self.fetch_button)
+        layout.addLayout(header)
+        self.progress = QProgressBar()
+        self.progress.setTextVisible(False)
+        self.progress.setFixedHeight(6)
+        self.progress.setRange(0, 1000)
+        self.progress.hide()
+        layout.addWidget(self.progress)
+        self.phase = QLabel()
+        self.phase.setProperty("role", "muted")
+        self.phase.setWordWrap(True)
+        layout.addWidget(self.phase)
+        self.grid = QGridLayout()
+        self.grid.setSpacing(10)
+        layout.addLayout(self.grid)
+        self.tiles: dict[int, CategoryTile] = {}
         self.running = False
         self.set_state(False, False)
 
@@ -331,9 +461,33 @@ class CatalogueBox(QGroupBox):
             self.fetch_button.setText(self.tr("Resume fetching all categories"))
         else:
             self.fetch_button.setText(self.tr("Fetch all categories"))
+        self.progress.setVisible(running)
+        for tile in self.tiles.values():
+            tile.fetch_button.setEnabled(not running)
 
     def set_status(self, text: str) -> None:
         self.status.setText(text)
+
+    def set_phase(self, text: str, fraction: float | None = None) -> None:
+        self.phase.setText(text)
+        if fraction is not None:
+            self.progress.setValue(round(1000 * max(0.0, min(1.0, fraction))))
+
+    def set_cards(self, cards: list[CategoryCard]) -> None:
+        for i, card in enumerate(cards):
+            tile = self.tiles.get(card.root)
+            if tile is None:
+                tile = CategoryTile(card)
+                tile.fetch_requested.connect(self.category_requested)
+                tile.fetch_button.setEnabled(not self.running)
+                self.tiles[card.root] = tile
+                self.grid.addWidget(tile, i // self.COLUMNS, i % self.COLUMNS)
+            else:
+                tile.show_card(card)
+
+    def show_gain(self, root: int, added: int) -> None:
+        if (tile := self.tiles.get(root)) is not None:
+            tile.show_gain(added)
 
 
 class PlanView(QGroupBox):
@@ -956,7 +1110,7 @@ class ZenTab(QWidget):
         seeding_layout.setContentsMargins(0, 0, 0, 0)
         seeding_layout.addWidget(self.seeding_view, 1)
         seeding_layout.addWidget(self.comparison)
-        catalogue_page = QWidget()
+        catalogue_page = self.catalogue_page = QWidget()
         catalogue_layout = QVBoxLayout(catalogue_page)
         catalogue_layout.setContentsMargins(0, 0, 0, 0)
         catalogue_layout.addWidget(self.catalogue)

@@ -168,6 +168,19 @@ def _update_theme(app: QApplication, scheme: Qt.ColorScheme) -> None:
             font-weight: 600; }}
         QListWidget#navigation::item:hover {{ background: {hover}; }}
         QFrame#zenBand {{ background: transparent; border: none; }}
+        QFrame#catalogueCard {{ background: {panel}; border: 1px solid {border};
+            border-radius: 10px; }}
+        QFrame#catalogueCard[active="true"] {{ border: 1px solid {brand}; }}
+        QFrame#catalogueCard QLabel {{ background: transparent; }}
+        QLabel[role="cardTitle"] {{ font-size: 14px; font-weight: 600; }}
+        QLabel[role="cardNumber"] {{ font-size: 20px; font-weight: 600; }}
+        QLabel[role="gain"] {{ color: {ok}; font-weight: 600; }}
+        QLabel[chip] {{ border-radius: 6px; padding: 1px 7px; border: 1px solid {border};
+            color: {muted}; }}
+        QLabel[chip="done"] {{ color: {ok}; border-color: {ok}; }}
+        QLabel[chip="running"] {{ color: {brand}; border-color: {brand}; }}
+        QLabel[chip="year"], QLabel[chip="prune"], QLabel[chip="paused"] {{
+            color: {warning}; border-color: {warning}; }}
         QFrame#zenBand QLabel {{ background: transparent; }}
         QFrame#updateNotice {{ background: {panel}; border: 1px solid {warning};
             border-radius: 8px; }}
