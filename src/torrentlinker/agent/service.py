@@ -55,6 +55,29 @@ PERMISSIONS = {
 }
 
 
+def kept_rows(rows: list[dict[str, Any]], keep: list[str]) -> list[dict[str, Any]]:
+    """The rows a user picked, named by exact release title or hash. Every name must be one
+    of these rows, so a mistyped or invented release fails instead of being guessed."""
+    if not keep:
+        return rows
+    wanted = {name.strip().casefold() for name in keep}
+    known = {str(r["hash"]).casefold() for r in rows} | {
+        str(r.get("title", "")).casefold() for r in rows
+    }
+    missing = sorted(name for name in keep if name.strip().casefold() not in known)
+    if missing:
+        raise ValueError(
+            "Not in this selection: "
+            + ", ".join(missing[:5])
+            + ". Use exact release titles or hashes from its rows."
+        )
+    return [
+        r
+        for r in rows
+        if str(r["hash"]).casefold() in wanted or str(r.get("title", "")).casefold() in wanted
+    ]
+
+
 class AgentRequest(JobRequest):
     count_scope: Literal["global", "per_client"] = "global"
     hashes: list[str] = Field(default_factory=list, max_length=10_000)
@@ -66,6 +89,7 @@ class AgentRequest(JobRequest):
     exclude_seeded: bool = False
     exclude_selection_id: str = Field(default="", max_length=64)
     exclude_only_on_client_id: str = Field(default="", max_length=64)
+    keep: list[str] = Field(default_factory=list, max_length=200)
     model_config = ConfigDict(extra="forbid")
 
     def requires_owner_approval(self) -> bool:
@@ -574,7 +598,7 @@ class AgentService:
             excluded.update((r.get("client_id", other_client), r["hash"]) for r in other["rows"])
         rows = [
             r
-            for r in saved["rows"]
+            for r in kept_rows(saved["rows"], body.keep)
             if (r.get("client_id", client_ids[0]), r["hash"]) not in excluded
         ]
         known_zen = [r["zen"] for r in rows if r.get("zen") is not None]
@@ -766,7 +790,11 @@ class AgentService:
                                     "Selections must belong to the same Torrent Client."
                                 )
                             excluded.update(r["hash"] for r in other["rows"])
-                        rows = [r for r in saved["rows"] if r["hash"] not in excluded]
+                        rows = [
+                            r
+                            for r in kept_rows(saved["rows"], body.keep)
+                            if r["hash"] not in excluded
+                        ]
                         result = snapshot(rows, saved["source"], saved["criteria"])
                         result.update(
                             excluded_count=len(saved["rows"]) - len(rows),
