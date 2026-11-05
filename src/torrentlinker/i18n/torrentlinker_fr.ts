@@ -5004,8 +5004,8 @@ La mettre à la corbeille ?</translation>
     </message>
     <message>
         <location filename="../gui/media.py" line="2634"/>
-        <source>Only downloaded pieces are exposed to the player. Refresh preview after more pieces arrive. Some formats need the missing end before they can play.</source>
-        <translation>Le lecteur n’accède qu’aux blocs téléchargés. Actualisez l’aperçu après le téléchargement de nouveaux blocs. Certains formats nécessitent la fin du fichier pour être lus.</translation>
+        <source>Playing while it downloads: playback waits for the next pieces when it catches up. Some formats need the missing end before they can play.</source>
+        <translation>Lecture pendant le téléchargement : quand elle rattrape le téléchargement, la lecture attend les morceaux suivants. Certains formats nécessitent la fin du fichier pour être lus.</translation>
     </message>
     <message>
         <location filename="../gui/media.py" line="2898"/>

@@ -86,48 +86,96 @@ from torrentlinker.gui.tasks import run_in_background
 # The Media Center chat panel and the media beside it never shrink below these.
 CHAT_MIN_WIDTH = 320
 MEDIA_MIN_WIDTH = 560
+PREVIEW_WAIT_SECONDS = 300.0  # how long playback waits for the next downloaded pieces
+PREVIEW_WAIT_AHEAD = 64 * 1024 * 1024  # how far past the downloaded part a read waits
 AUTO_REFRESH_MS = 60_000  # Media rescans the Library Folders this often while open
 
 
-class VerifiedPrefixDevice(QIODevice):
-    """A read-only, seekable view of a fixed verified prefix, never of missing pieces."""
+class DownloadingFileDevice(QIODevice):
+    """A read-only, seekable view of a file qBittorrent is downloading, like qBittorrent's own
+    preview: the player sees the whole file, but only verified pieces are ever read.
 
-    def __init__(self, path, verified_bytes: int, parent=None) -> None:
+    A read just past the downloaded part waits for the next pieces; a read far ahead (an
+    index at the end of the file) finds nothing until its pieces arrive. Qt reads off the GUI
+    thread, so waiting never freezes the window; abort() ends a wait before the player stops.
+    """
+
+    def __init__(self, path, size: int, piece_size: int, pieces, parent=None) -> None:
         super().__init__(parent)
         self.file = QFile(str(path))
-        self.limit = int(verified_bytes)
+        self.total, self.piece_size = int(size), int(piece_size)
+        self.pieces = list(pieces)
+        self.changed = threading.Condition()
+        self.aborted = False
         if not self.file.open(QIODevice.OpenModeFlag.ReadOnly):
             raise ValueError("The preview file cannot be opened read-only.")
-        if not 0 < self.limit <= self.file.size():
+        if self.total <= 0 or self.piece_size <= 0 or not self.available(0):
             self.file.close()
-            raise ValueError("The verified preview range is no longer available.")
+            raise ValueError("The start of this file is not downloaded yet.")
         self.open(QIODevice.OpenModeFlag.ReadOnly | QIODevice.OpenModeFlag.Unbuffered)
+
+    def update(self, pieces) -> None:
+        """qBittorrent verified more pieces: wake a read waiting for them."""
+        with self.changed:
+            self.pieces = list(pieces)
+            self.changed.notify_all()
+
+    def abort(self) -> None:
+        with self.changed:
+            self.aborted = True
+            self.changed.notify_all()
+
+    def available(self, position: int) -> int:
+        """Verified bytes from `position` on, up to the next missing piece."""
+        piece = position // self.piece_size
+        last = piece
+        while last < len(self.pieces) and self.pieces[last]:
+            last += 1
+        return max(0, min(self.total, last * self.piece_size) - position)
+
+    def downloaded(self) -> int:
+        """The verified bytes from the start of the file."""
+        return self.available(0)
 
     def isSequential(self) -> bool:
         return False
 
     def size(self) -> int:
-        return self.limit
+        return self.total
 
     def seek(self, position: int) -> bool:
-        if position < 0 or position > self.limit:
+        if position < 0 or position > self.total:
             return False
-        return self.file.seek(position) and super().seek(position)
+        return super().seek(position)
 
     def bytesAvailable(self) -> int:
-        return max(0, self.limit - self.pos())
+        return self.available(self.pos())
 
     def atEnd(self) -> bool:
-        return self.pos() >= self.limit
+        return self.pos() >= self.total
 
     def readData(self, maximum: int) -> bytes:
-        remaining = self.limit - self.file.pos()
-        return bytes(self.file.read(min(max(0, maximum), max(0, remaining))).data())
+        position = self.pos()
+        deadline = time.monotonic() + PREVIEW_WAIT_SECONDS
+        with self.changed:
+            while not (count := self.available(position)):
+                if (
+                    self.aborted
+                    or position >= self.total
+                    or position > self.downloaded() + PREVIEW_WAIT_AHEAD
+                    or time.monotonic() >= deadline
+                ):
+                    return b""
+                self.changed.wait(0.5)
+        if not self.file.seek(position):
+            return b""
+        return bytes(self.file.read(min(max(0, maximum), count)).data())
 
     def writeData(self, _data: bytes | bytearray | memoryview, _length: int) -> int:
         return -1
 
     def close(self) -> None:
+        self.abort()
         super().close()
         self.file.close()
 
@@ -371,7 +419,7 @@ class MediaTab(QWidget):
         self.next_offset: int | None = None
         self.preview_id = ""
         self.preview_item = ""
-        self.preview_device: VerifiedPrefixDevice | None = None
+        self.preview_device: DownloadingFileDevice | None = None
         self.preview_generation = 0
         self.preview_checked = 0.0
         self.preview_check_pending = False
@@ -2648,14 +2696,14 @@ class MediaTab(QWidget):
         def work():
             preview = library.create_preview(client, identifier)
             try:
-                path, size = library.preview_source(client, preview["preview_id"])
-                return preview, path, size
+                path, _prefix = library.preview_source(client, preview["preview_id"])
+                return preview, path, library.preview_map(client, preview["preview_id"])
             except Exception:
                 library.close_preview(client, preview["preview_id"])
                 raise
 
         def apply_preview(result):
-            preview, path, size = result
+            preview, path, (size, piece_size, pieces) = result
             if (
                 not isValid(self)
                 or generation != self.preview_generation
@@ -2668,7 +2716,7 @@ class MediaTab(QWidget):
             self._close_preview()
             self.preview_id = preview["preview_id"]
             self.preview_item = identifier
-            self.preview_device = VerifiedPrefixDevice(path, size, self)
+            self.preview_device = DownloadingFileDevice(path, size, piece_size, pieces, self)
             self.preview_checked = time.monotonic()
             self.last_source = identifier
             self.current_row = library.detail(client, identifier)
@@ -2685,9 +2733,9 @@ class MediaTab(QWidget):
             )
             self._set_notice(
                 self.tr(
-                    "Only downloaded pieces are exposed to the player. "
-                    "Refresh preview after more pieces arrive. "
-                    "Some formats need the missing end before they can play."
+                    "Playing while it downloads: playback waits for the next pieces "
+                    "when it catches up. Some formats need the missing end before they "
+                    "can play."
                 )
             )
             self.video.show()
@@ -2722,6 +2770,7 @@ class MediaTab(QWidget):
 
     def _close_preview(self) -> None:
         if self.preview_device is not None:
+            self.preview_device.abort()  # end a read waiting for pieces before stopping
             self.player.setSource(QUrl())
             self.preview_device.close()
             self.preview_device.deleteLater()
@@ -2733,15 +2782,23 @@ class MediaTab(QWidget):
         self.refresh_preview.hide()
 
     def _check_preview(self) -> None:
-        if self.preview_check_pending or time.monotonic() - self.preview_checked < 5:
+        if self.preview_check_pending or time.monotonic() - self.preview_checked < 2:
             return
         preview_id, library, client = self.preview_id, self.library, self.session_client
+        device = self.preview_device
         self.preview_check_pending = True
         self.preview_checked = time.monotonic()
 
-        def done(_result):
+        def done(result):
             if isValid(self):
                 self.preview_check_pending = False
+                if device is not None and device is self.preview_device:
+                    device.update(result[2])
+                    self.now_playing.setText(
+                        self.tr("Preview of downloaded portion · {0}% verified").format(
+                            round(100 * sum(result[2]) / max(1, len(result[2])))
+                        )
+                    )
 
         def failed(error):
             if isValid(self):
@@ -2752,7 +2809,7 @@ class MediaTab(QWidget):
                     self.last_source = ""
                     self._set_notice(str(error))
 
-        run_in_background(lambda: library.preview_source(client, preview_id), done, failed)
+        run_in_background(lambda: library.preview_map(client, preview_id), done, failed)
 
     def _chosen_ids(self) -> list[str]:
         for combo in (self.episodes, self.releases):
