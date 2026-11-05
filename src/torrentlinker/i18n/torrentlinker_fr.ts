@@ -4407,6 +4407,31 @@ Chaque .torrent est téléchargé directement depuis c411 avec votre clé et ajo
         <translation>Recherche groupée terminée : {0} recherchés</translation>
     </message>
     <message>
+        <location filename="../gui/main_window.py" line="2800"/>
+        <source>Processing {0}/{1}: {2}</source>
+        <translation>Traitement {0}/{1} : {2}</translation>
+    </message>
+    <message>
+        <location filename="../gui/main_window.py" line="2800"/>
+        <source>Searching {0}/{1}: {2}</source>
+        <translation>Recherche {0}/{1} : {2}</translation>
+    </message>
+    <message>
+        <location filename="../gui/main_window.py" line="2800"/>
+        <source> · {0} failed</source>
+        <translation> · {0} en échec</translation>
+    </message>
+    <message>
+        <location filename="../gui/main_window.py" line="2800"/>
+        <source>Search failed {0}/{1}: {2}: {3}</source>
+        <translation>Échec de la recherche {0}/{1} : {2} : {3}</translation>
+    </message>
+    <message>
+        <location filename="../gui/main_window.py" line="2800"/>
+        <source>Searching…</source>
+        <translation>Recherche…</translation>
+    </message>
+    <message>
         <location filename="../gui/main_window.py" line="2549"/>
         <source>Scanning…</source>
         <translation>Analyse…</translation>

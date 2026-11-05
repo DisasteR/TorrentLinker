@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -267,6 +268,20 @@ class MainWindow(QMainWindow):
         self._batch_errors: list[str] = []
         self._batch_reseeded = 0
         self.batch_text = ""
+        self._batch_failed = 0
+        self._batch_position = (0, 0)
+        # A batch's bar, then its text, on the footer's left. A status message would hide
+        # them, so the text is shown here instead while the batch runs.
+        self.batch_status = QWidget()
+        batch_status_box = QHBoxLayout(self.batch_status)
+        batch_status_box.setContentsMargins(0, 0, 0, 0)
+        self.batch_progress = QProgressBar()
+        self.batch_progress.setFixedWidth(160)
+        self.batch_progress.setTextVisible(False)
+        self.batch_label = QLabel()
+        batch_status_box.addWidget(self.batch_progress)
+        batch_status_box.addWidget(self.batch_label, 1)
+        self.batch_status.hide()
         self.countdown = QTimer(self)
         self.countdown.setInterval(250)
         self.countdown.timeout.connect(self._show_batch_progress)
@@ -515,6 +530,7 @@ class MainWindow(QMainWindow):
         self.setup_notice.hide()
         header_layout.addWidget(self.setup_notice)
         header_layout.addWidget(self.band.message)
+        self.statusBar().addWidget(self.batch_status, 1)
         self.statusBar().addPermanentWidget(self.band)
         # A wide workspace must not impose its minimum size on the desktop window.
         # Keep navigation and the status band visible; scroll only the workspace.
@@ -2743,6 +2759,11 @@ class MainWindow(QMainWindow):
         self._batch_errors = []
         self._batch_reseeded = 0
         self._batch_existing = 0
+        self._batch_failed = 0
+        self._batch_position = (0, len(runner.entries))
+        self.batch_progress.setRange(0, max(1, len(runner.entries)))
+        self.batch_progress.setValue(0)
+        self.batch.signals.started.connect(self._batch_started)
         self.batch.signals.searched.connect(self._batch_result)
         self.batch.signals.already_present.connect(self._batch_already_present)
         self.batch.signals.error.connect(self._batch_error)
@@ -2768,6 +2789,7 @@ class MainWindow(QMainWindow):
         self.review.setEnabled(not running)
         self.cancel_action.setText(self.tr("Cancel batch") if running else self.tr("Cancel search"))
         self.cancel_action.setEnabled(running)
+        self.batch_status.setVisible(running)
         if running:
             self.countdown.start()
         else:
@@ -2776,11 +2798,30 @@ class MainWindow(QMainWindow):
     def _show_batch_progress(self) -> None:
         wait = self._indexer.next_request_in() if self._indexer else 0
         suffix = self.tr(" · next request in {0} s").format(f"{wait:.1f}") if wait > 0.05 else ""
-        self.statusBar().showMessage(self.batch_text + suffix)
+        self.batch_label.setText(self.batch_text + suffix)
+        self.statusBar().clearMessage()
+
+    def _batch_started(self, index: int, total: int, entry: LibraryEntry) -> None:
+        """Say which item is being worked on as soon as it starts: one search can take a
+        while when c411's request budget is busy."""
+        self._batch_position = (index, total)
+        self.batch_progress.setRange(0, max(1, total))
+        self.batch_progress.setValue(index - 1)
+        failed = self.tr(" · {0} failed").format(self._batch_failed) if self._batch_failed else ""
+        if self._batch_mode != "search":
+            self.batch_text = self.tr("Processing {0}/{1}: {2}").format(
+                index, total, entry.item.path.name
+            )
+            return
+        self.batch_text = (
+            self.tr("Searching {0}/{1}: {2}").format(index, total, entry.item.path.name) + failed
+        )
+        self.library_model.set_status(entry.item.path, self.tr("Searching…"))
 
     def _batch_result(
         self, index: int, total: int, entry: LibraryEntry, checked: list[CheckedCandidate]
     ) -> None:
+        self.batch_progress.setValue(index)
         if self._batch_mode != "search":
             self.batch_text = self.tr("Processed {0}/{1}: {2}").format(
                 index, total, entry.item.path.name
@@ -2818,11 +2859,17 @@ class MainWindow(QMainWindow):
         return self.tr("No Candidates")
 
     def _batch_error(self, entry: LibraryEntry, error: Exception) -> None:
+        self._batch_failed += 1
+        index, total = self._batch_position
+        self.batch_progress.setValue(index)
         if self._batch_mode != "search":
             self._batch_errors.append(f"{entry.item.path.name}: {error_text(error)}")
             return
         self.library_model.set_status(
             entry.item.path, self.tr("Search failed: {0}").format(error_text(error))
+        )
+        self.batch_text = self.tr("Search failed {0}/{1}: {2}: {3}").format(
+            index, total, entry.item.path.name, error_text(error)
         )
 
     def _batch_waiting(self, entry: LibraryEntry, seconds: float) -> None:
@@ -2867,7 +2914,10 @@ class MainWindow(QMainWindow):
                 box.setDetailedText("\n".join(self._batch_errors))
                 box.exec()
             return
-        self.statusBar().showMessage(self.tr("Batch search finished: {0} searched").format(done))
+        text = self.tr("Batch search finished: {0} searched").format(done)
+        if self._batch_failed:
+            text += self.tr(" · {0} failed").format(self._batch_failed)
+        self.statusBar().showMessage(text)
 
     def scan(self, refresh: bool = False) -> None:
         if not self.settings.library_folders:
