@@ -597,6 +597,7 @@ def test_native_explicit_preview_decodes_h264_without_reading_missing_pieces(qtb
     assert waiting.seek(verified_bytes)
     threading.Timer(0.3, waiting.abort).start()
     assert waiting.readData(4096) == b""
+    assert waiting.atEnd()  # Qt's reader stops only at end of file; an empty read loops
     waiting.close()
     downloading.close()
 

@@ -17,6 +17,7 @@ from PySide6.QtCore import (
     QFile,
     QIODevice,
     QLocale,
+    QObject,
     QRect,
     QRectF,
     QSettings,
@@ -24,6 +25,7 @@ from PySide6.QtCore import (
     QSize,
     QSizeF,
     Qt,
+    QThread,
     QTimer,
     QUrl,
     Signal,
@@ -44,7 +46,13 @@ from PySide6.QtGui import (
     QPixmap,
     QTextDocumentFragment,
 )
-from PySide6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoSink
+from PySide6.QtMultimedia import (
+    QMediaMetaData,
+    QMediaPlayer,
+    QVideoFrame,
+    QVideoFrameFormat,
+    QVideoSink,
+)
 from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -107,6 +115,7 @@ class DownloadingFileDevice(QIODevice):
         self.pieces = list(pieces)
         self.changed = threading.Condition()
         self.aborted = False
+        self.stalled = False  # no new pieces within PREVIEW_WAIT_SECONDS: the preview ends
         if not self.file.open(QIODevice.OpenModeFlag.ReadOnly):
             raise ValueError("The preview file cannot be opened read-only.")
         if self.total <= 0 or self.piece_size <= 0 or not self.available(0):
@@ -151,20 +160,30 @@ class DownloadingFileDevice(QIODevice):
     def bytesAvailable(self) -> int:
         return self.available(self.pos())
 
+    def gives_up(self, position: int) -> bool:
+        """Whether a read here ends instead of waiting for pieces."""
+        return (
+            self.aborted
+            or self.stalled
+            or position >= self.total
+            or not self.available(position)
+            and position > self.downloaded() + PREVIEW_WAIT_AHEAD
+        )
+
     def atEnd(self) -> bool:
-        return self.pos() >= self.total
+        # Qt's FFmpeg reader ends only when atEnd() says so: an empty read alone makes
+        # it read again, forever.
+        return self.gives_up(self.pos())
 
     def readData(self, maximum: int) -> bytes:
         position = self.pos()
         deadline = time.monotonic() + PREVIEW_WAIT_SECONDS
         with self.changed:
             while not (count := self.available(position)):
-                if (
-                    self.aborted
-                    or position >= self.total
-                    or position > self.downloaded() + PREVIEW_WAIT_AHEAD
-                    or time.monotonic() >= deadline
-                ):
+                if self.gives_up(position):
+                    return b""
+                if time.monotonic() >= deadline:
+                    self.stalled = True
                     return b""
                 self.changed.wait(0.5)
         if not self.file.seek(position):
@@ -332,6 +351,157 @@ class MediaHero(QWidget):
         painter.end()
 
 
+# Frame layouts DisplayFrames can halve: bytes per sample, and whether chroma is interleaved.
+HALVABLE = {
+    QVideoFrameFormat.PixelFormat.Format_P010: (2, True),
+    QVideoFrameFormat.PixelFormat.Format_P016: (2, True),
+    QVideoFrameFormat.PixelFormat.Format_NV12: (1, True),
+    QVideoFrameFormat.PixelFormat.Format_NV21: (1, True),
+    QVideoFrameFormat.PixelFormat.Format_YUV420P: (1, False),
+    QVideoFrameFormat.PixelFormat.Format_YUV420P10: (2, False),
+    QVideoFrameFormat.PixelFormat.Format_YV12: (1, False),
+}
+
+
+class DisplayFrames(QObject):
+    """Prepares decoded frames for the picture, on the frame thread.
+
+    The picture converts every frame on the GUI thread; a 4K frame took about 50 ms there,
+    longer than a 24 fps frame lasts, so playback stuttered. While a frame is at least twice
+    the picture's size it is halved first, a quarter of the work.
+
+    Qt also draws HDR10 with two faults. It reads the mastering peak brightness 10,000 times
+    too high, so highlights clip; and converting BT.2020's most saturated reds overflows into
+    black blotches. HDR10 frames get the real peak and the BT.601 matrix, whose conversion
+    stays in range at the cost of a slight hue shift.
+
+    Frames reach convert() queued: Qt's video thread only posts them, so it never waits for
+    the interpreter lock, which the GUI thread may hold while stopping it.
+    """
+
+    ready = Signal(QVideoFrame)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.size = QSize()  # the picture, in device pixels; set from the GUI thread
+
+    def convert(self, frame: QVideoFrame) -> None:
+        self.ready.emit(self.prepared(frame, self.size))
+
+    @staticmethod
+    def prepared(frame: QVideoFrame, size: QSize = QSize()) -> QVideoFrame:
+        source = frame.surfaceFormat()
+        hdr = source.colorTransfer() == QVideoFrameFormat.ColorTransfer.ColorTransfer_ST2084
+        layout = HALVABLE.get(source.pixelFormat())
+        step = 1
+        while (
+            layout
+            and size.width() > 0
+            and frame.width() // (step * 2) >= size.width()
+            and frame.height() // (step * 2) >= size.height()
+        ):
+            step *= 2
+        if step == 1 and not hdr:
+            return frame
+        target = QVideoFrameFormat(source)
+        if step > 1:
+            target.setFrameSize(QSize(frame.width() // step & ~1, frame.height() // step & ~1))
+            target.setViewport(QRect(0, 0, target.frameWidth(), target.frameHeight()))
+        if hdr:
+            if target.maxLuminance() > 10_000:  # 1,000 nits read as 10,000,000
+                target.setMaxLuminance(target.maxLuminance() / 10_000)
+            target.setColorSpace(QVideoFrameFormat.ColorSpace.ColorSpace_BT601)
+        copy = QVideoFrame(target)
+        if not frame.map(QVideoFrame.MapMode.ReadOnly):
+            return frame
+        try:
+            if not copy.map(QVideoFrame.MapMode.WriteOnly):
+                return frame
+            if layout:
+                DisplayFrames._sample(frame, copy, step, *layout)
+            else:
+                DisplayFrames._copy(frame, copy)
+            copy.unmap()
+        finally:
+            frame.unmap()
+        copy.setStartTime(frame.startTime())
+        copy.setEndTime(frame.endTime())
+        return copy
+
+    @staticmethod
+    def _plane(video: QVideoFrame, plane: int, rows: int, dtype):
+        import numpy
+
+        line = video.bytesPerLine(plane) // numpy.dtype(dtype).itemsize
+        bits = numpy.frombuffer(video.bits(plane), dtype)
+        rows = min(rows, bits.size // line)
+        return bits[: rows * line].reshape(rows, line)
+
+    @staticmethod
+    def _sample(frame, copy, step: int, size: int, interleaved: bool) -> None:
+        """Every step-th sample of each plane; numpy releases the interpreter lock."""
+        import numpy
+
+        dtype = numpy.uint16 if size == 2 else numpy.uint8
+        width, height = copy.width(), copy.height()
+        planes = [(0, height, width, 1)]
+        planes += (
+            [(1, height // 2, width // 2, 2)]
+            if interleaved
+            else [(1, height // 2, width // 2, 1), (2, height // 2, width // 2, 1)]
+        )
+        for plane, rows, columns, channels in planes:
+            source = DisplayFrames._plane(frame, plane, rows * step, dtype)[::step]
+            target = DisplayFrames._plane(copy, plane, rows, dtype)
+            rows = min(rows, source.shape[0], target.shape[0])
+            # Rows of (sample, channel): an interleaved chroma pair moves as one sample.
+            picked = source[:rows, : columns * step * channels]
+            picked = picked.reshape(rows, columns * step, channels)[:, ::step]
+            placed = target[:rows, : columns * channels].reshape(rows, columns, channels)
+            numpy.copyto(placed, picked)
+
+    @staticmethod
+    def _copy(frame, copy) -> None:
+        import numpy
+
+        for plane in range(frame.planeCount()):
+            source = numpy.frombuffer(frame.bits(plane), numpy.uint8)
+            target = numpy.frombuffer(copy.bits(plane), numpy.uint8)
+            source_line, target_line = frame.bytesPerLine(plane), copy.bytesPerLine(plane)
+            if source_line == target_line:
+                count = min(source.size, target.size)
+                numpy.copyto(target[:count], source[:count])
+                continue
+            rows = min(source.size // source_line, target.size // target_line)
+            width = min(source_line, target_line)
+            numpy.copyto(
+                target[: rows * target_line].reshape(rows, target_line)[:, :width],
+                source[: rows * source_line].reshape(rows, source_line)[:, :width],
+            )
+
+
+_FRAME_THREAD: QThread | None = None
+
+
+def frame_thread() -> QThread:
+    """The one thread that prepares frames, for every player; it stops when Python exits."""
+    global _FRAME_THREAD
+    if _FRAME_THREAD is None:
+        import atexit
+
+        _FRAME_THREAD = QThread()
+        _FRAME_THREAD.setObjectName("TorrentLinker frames")
+        _FRAME_THREAD.start()
+        atexit.register(_stop_frame_thread)
+    return _FRAME_THREAD
+
+
+def _stop_frame_thread() -> None:
+    if _FRAME_THREAD is not None and isValid(_FRAME_THREAD):
+        _FRAME_THREAD.quit()
+        _FRAME_THREAD.wait(5000)
+
+
 class VideoSurface(QGraphicsView):
     """Qt video rendering and ordinary widget controls share one composited surface."""
 
@@ -341,6 +511,7 @@ class VideoSurface(QGraphicsView):
         self.setScene(scene)
         self.item = QGraphicsVideoItem()
         scene.addItem(self.item)
+        self.frames: DisplayFrames | None = None
         self.setFrameShape(QGraphicsView.Shape.NoFrame)
         self.setBackgroundBrush(QColor("black"))
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -360,6 +531,14 @@ class VideoSurface(QGraphicsView):
         self.item.setSize(QSizeF(rect.size()))
         self.overlay.setGeometry(rect)
         self.overlay.raise_()
+        self.measure()
+
+    def measure(self) -> None:
+        """Tell the frame preparer how many device pixels the picture covers."""
+        if self.frames is not None:
+            ratio = self.devicePixelRatioF()
+            size = self.viewport().size()
+            self.frames.size = QSize(round(size.width() * ratio), round(size.height() * ratio))
 
 
 class MediaTab(QWidget):
@@ -1805,9 +1984,15 @@ class MediaTab(QWidget):
                 self.audio = create_audio_output(self)
                 self.player.setAudioOutput(self.audio)
                 self.decoder_sink = QVideoSink(self.player)
+                self.display_frames = DisplayFrames()
+                self.display_frames.moveToThread(frame_thread())
+                self.destroyed.connect(self.display_frames.deleteLater)
+                self.video.frames = self.display_frames
+                self.video.measure()
                 self.decoder_sink.videoFrameChanged.connect(
-                    self.video.item.videoSink().setVideoFrame
+                    self.display_frames.convert, Qt.ConnectionType.QueuedConnection
                 )
+                self.display_frames.ready.connect(self.video.item.videoSink().setVideoFrame)
                 self.decoder_sink.subtitleTextChanged.connect(self._embedded_subtitle_text)
                 self.player.setVideoSink(self.decoder_sink)
                 self.player.playbackStateChanged.connect(self._playback_controls_changed)
