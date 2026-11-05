@@ -308,6 +308,7 @@ class CategoryCard:
     site: int | None  # None: c411's listing does not show it (XXX)
     state: str  # done | never | waiting | running | year | prune | paused | cache
     note: str = ""
+    fetchable: bool = True  # False for XXX, which c411's listing never returns
 
 
 CHIPS = {
@@ -343,7 +344,6 @@ class CategoryTile(QFrame):
         header.addWidget(self.name, 1)
         self.fetch_button = icon_button("⟳", self.tr("Fetch only {0}").format(card.name))
         self.fetch_button.clicked.connect(lambda: self.fetch_requested.emit(self.root))
-        self.fetch_button.setVisible(card.site is not None)
         header.addWidget(self.fetch_button)
         layout.addLayout(header)
         counts = QHBoxLayout()
@@ -377,10 +377,14 @@ class CategoryTile(QFrame):
         self.show_card(card)
 
     def show_card(self, card: CategoryCard) -> None:
+        self.fetch_button.setVisible(card.fetchable)
         self.number.setText(f"{card.ours:,}".replace(",", "\u202f"))
-        if card.site is None:
+        if not card.fetchable:
             self.of_site.setText(self.tr("c411's listing does not show it"))
             self.bar.setValue(1000)
+        elif card.site is None:
+            self.of_site.setText("")
+            self.bar.setValue(0)
         else:
             self.of_site.setText(
                 self.tr("/ {0} on c411").format(f"{card.site:,}".replace(",", "\u202f"))

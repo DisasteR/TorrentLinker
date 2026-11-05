@@ -770,6 +770,8 @@ class MainWindow(QMainWindow):
         ):
             self.set_media_center(False)
         self.workspace_scroll.horizontalScrollBar().setValue(0)
+        if self.tabs.widget(index) is self.zen_tab:  # opening on the Catalogue page
+            self._zen_page_changed(self.zen_tab.pages.currentIndex())
         self.workspace_scroll.verticalScrollBar().setValue(0)
         self.page_title.setText(self.tabs.tabText(index))
         descriptions = [
@@ -2094,7 +2096,15 @@ class MainWindow(QMainWindow):
                     else self.tr("{0} missing from the Catalogue").format(-gap)
                 )
             cards.append(
-                CategoryCard(root, ROOT_NAMES.get(root, str(root)), count, site, state, note)
+                CategoryCard(
+                    root,
+                    ROOT_NAMES.get(root, str(root)),
+                    count,
+                    site,
+                    state,
+                    note,
+                    fetchable=root not in TORZNAB_ONLY_ROOTS,
+                )
             )
         self.zen_tab.catalogue.set_cards(cards)
         if current is not None:
