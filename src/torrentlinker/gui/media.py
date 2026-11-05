@@ -547,6 +547,9 @@ class MediaTab(QWidget):
     PICTURE_CACHE_LIMIT = 24 * 1024 * 1024
 
     scan_progress = Signal(object)
+    # A video plays: background work that would hold the interpreter lock should wait,
+    # or the frame thread misses frames.
+    video_playing_changed = Signal(bool)
     layout_changed = Signal(str)
     center_mode_requested = Signal(bool)
     connections_requested = Signal()
@@ -617,7 +620,8 @@ class MediaTab(QWidget):
     def _build_presentation(self, add_folder) -> None:
         self.media_layout = "cinematic"
         self.adult = False  # the XXX tab, once adult content is enabled in Settings
-        self.anime_filters: dict[str, Any] = {}  # an Anime row's See all: series, OAV, films
+        self.anime_filters: dict[str, Any] = {}
+        self.video_playing = False  # an Anime row's See all: series, OAV, films
         self.featured_id = ""
         self.picture_cache: OrderedDict[str, QImage] = OrderedDict()
         self._picture_cache_bytes = 0
@@ -1492,6 +1496,10 @@ class MediaTab(QWidget):
             )
         )
         self.pause.setToolTip(self.tr("Pause") if playing else self.tr("Play"))
+        video = playing and self.current_row.get("kind") != "music"
+        if video != self.video_playing:
+            self.video_playing = video
+            self.video_playing_changed.emit(video)
         self._show_video_controls()
         if self.kind.currentData() == "video" and self.current_row.get("kind") == "music":
             self._update_panes()  # the music bar follows play and pause while in Video
@@ -3624,7 +3632,7 @@ class MediaTab(QWidget):
 
     def _auto_scan(self) -> None:
         """Rescan quietly; the screen reloads only when the library changed."""
-        if not self.isVisible() or self.library is None:
+        if not self.isVisible() or self.library is None or self.video_playing:
             return
         if self.library.setup(self.session_client).settings.library_folders:
             self.start_scan(quiet=True)

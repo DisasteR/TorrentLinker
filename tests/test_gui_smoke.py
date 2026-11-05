@@ -1533,3 +1533,20 @@ def test_seeding_views_wait_while_hidden_and_catch_up_when_shown(qtbot):
     tab.show()
     qtbot.waitUntil(lambda: "a" in tab.seeding_view.table.torrents, timeout=3000)
     qtbot.waitUntil(lambda: "<b>" in tab.comparison.labels[ZenClass.TANKER].text(), timeout=3000)
+
+
+def test_seeding_and_catalogue_refreshes_wait_while_a_video_plays(qtbot, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    window = MainWindow(Settings(), tmp_path / "settings.json", Store(tmp_path / "s.db"))
+    qtbot.addWidget(window)
+    refreshed = []
+    window.zen_tab.seeding_view.refresh = lambda quiet=False: refreshed.append(quiet)  # type: ignore[method-assign]
+    window.media_tab.video_playing = True
+    window._refresh_seeding_quietly()
+    window._refresh_seeding_quietly()
+    assert refreshed == []  # reading every seeded torrent would drop frames
+    assert not window.refresh_whole_catalogue()
+    window.media_tab.video_playing = False
+    window.media_tab.video_playing_changed.emit(False)
+    assert refreshed == [True]  # once, when the video stops
+    window.media_tab.video_playing_changed.emit(False)
+    assert refreshed == [True]

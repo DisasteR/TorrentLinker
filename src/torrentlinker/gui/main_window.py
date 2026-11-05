@@ -417,6 +417,7 @@ class MainWindow(QMainWindow):
         self.media_tab.refresh_on_first_open = True
         self.media_tab.layout_changed.connect(self._save_media_layout)
         self.media_tab.center_mode_requested.connect(self.set_media_center)
+        self.media_tab.video_playing_changed.connect(self._video_playing_changed)
         self.media_tab.connections_requested.connect(self.open_assistant_connections)
         self.tabs.addTab(self.media_tab, self.tr("Media"))
         self.search_tab.manage_requested.connect(self.open_torrents)
@@ -603,7 +604,8 @@ class MainWindow(QMainWindow):
         self.verify_timer.timeout.connect(self.check_verifications)
         self.seeding_timer = QTimer(self)
         self.seeding_timer.setInterval(30_000)
-        self.seeding_timer.timeout.connect(lambda: self.zen_tab.seeding_view.refresh(quiet=True))
+        self.seeding_timer.timeout.connect(self._refresh_seeding_quietly)
+        self._seeding_held = False
         # Checks often, fetches only once the whole Catalogue is REFRESH_INTERVAL old.
         self.catalogue_refresh_timer = QTimer(self)
         self.catalogue_refresh_timer.setInterval(10 * 60_000)
@@ -1826,11 +1828,26 @@ class MainWindow(QMainWindow):
         self._run_catalogue(work)
         return True
 
+    def _refresh_seeding_quietly(self) -> None:
+        """The 30-second Seeding refresh. It reads every seeded torrent in Python, holding
+        the interpreter lock long enough to drop video frames, so it waits for a video to
+        stop, then runs once."""
+        if self.media_tab.video_playing:
+            self._seeding_held = True
+            return
+        self.zen_tab.seeding_view.refresh(quiet=True)
+
+    def _video_playing_changed(self, playing: bool) -> None:
+        if not playing and self._seeding_held:
+            self._seeding_held = False
+            self._refresh_seeding_quietly()
+
     def refresh_whole_catalogue(self) -> bool:
         """Every few hours, the newest torrents of every category (timer). Waits for any
         other Catalogue work; False if nothing was started."""
         if (
             self.catalogue_runner is not None
+            or self.media_tab.video_playing  # the next check, after the film, catches up
             or not get_secret(INDEXER_API_KEY)
             or not refresh_due(self.store)
         ):
@@ -2426,9 +2443,11 @@ class MainWindow(QMainWindow):
                 self.tabs.removeTab(self.tabs.indexOf(self.media_tab))
             self.media_tab.layout_changed.disconnect(self._save_media_layout)
             self.media_tab.center_mode_requested.disconnect(self.set_media_center)
+            self.media_tab.video_playing_changed.disconnect(self._video_playing_changed)
             replacement.media_tab = self.media_tab
             replacement.media_tab.layout_changed.connect(replacement._save_media_layout)
             replacement.media_tab.center_mode_requested.connect(replacement.set_media_center)
+            replacement.media_tab.video_playing_changed.connect(replacement._video_playing_changed)
             replacement.media_tab.set_center_mode(False)
             replacement.media_tab.set_media_layout(settings.media_layout)
             replacement.media_tab.set_adult(settings.adult_content)

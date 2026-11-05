@@ -213,6 +213,9 @@ def main() -> int:
     from torrentlinker.gui.stall_watchdog import install as watch_for_stalls
 
     watch_for_stalls(window)
+    from torrentlinker.gui.garbage import keep_collections_short
+
+    keep_collections_short(window)
     try:
         if "--smoke-test" in sys.argv:  # used by CI on packaged builds
             try:
