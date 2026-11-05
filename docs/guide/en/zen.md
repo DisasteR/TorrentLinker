@@ -85,11 +85,11 @@ An empty Plan states the observed blocker and what to change: total torrent cap,
 
 ### Catalog updates and provisional estimates
 
-The first Plan imports Zen Lab's public metadata snapshot anonymously. Your c411 API key and all `.torrent` requests go directly to c411.
+The app ships with a copy of the c411 Catalogue, made with Zen Lab, and imports it at its first Catalogue refresh, without any network request. A build without it, such as one run from source, imports Zen Lab's public metadata snapshot anonymously at the first Plan instead. Your c411 API key and all `.torrent` requests go directly to c411.
 
 c411 allows your account 1,200 searches and Catalogue requests an hour, whatever the key, and limits each key's `.torrent` downloads to 30 a minute. TorrentLinker keeps the two apart: searches go up to two a second while the hour's budget lasts, then slow down, even while a Plan is being sent; each key's downloads keep to 30 a minute and about 280 in 20 minutes. Your own searches, file checks and Reseeds always go before a Plan being sent or a Catalogue update. If c411 asks every key to wait more than half a minute, they stop at once and tell you when to try again, instead of hanging. You can add up to 4 more keys of the same c411 account in **Settings → Connections → More API keys**: each adds its own download allowance, and requests go to whichever is free soonest (see [ADR-0008](../../adr/0008-several-c411-keys-each-within-its-own-limits.md)). See [the measurements](../../research/rate-limits.md).
 
-Planning and startup refresh c411 newest-first, stopping at the previous successful update's checkpoint, or an already known page on the first update. Historical scans and their saved page positions are reserved for the explicit Catalogue fetch action. Interrupted updates retain their checkpoint and check for new arrivals when resumed.
+Planning and startup refresh c411 newest-first, stopping at the previous successful update's checkpoint, or an already known page on the first update. Historical scans and their saved page positions are reserved for the explicit Catalogue fetch action. Interrupted updates retain their checkpoint and check for new arrivals when resumed. While the app or the web server runs, every category is refreshed this way every four hours, so the whole Catalogue stays current. These refreshes wait for any other Catalogue work, and your own searches go first.
 
 A paging-limit warning means the Indexer stopped exposing older pages. Cached torrents remain available for Plans; repeating the fetch does not remove the server limit. A paused fetch is different: it has unfinished work that can be resumed.
 

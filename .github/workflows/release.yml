@@ -18,6 +18,24 @@ jobs:
       - name: Qt runtime libraries
         run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libxcb-cursor0 libpulse0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xkb1 libxkbcommon-x11-0 desktop-file-utils
       - run: pip install '.[package]'
+      - name: Bundle the Catalogue
+        # From the private repository's "catalogue" release; without the token the build
+        # ships no Catalogue and the app falls back to Zen Lab (ADR-0019).
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CATALOGUE_TOKEN }}
+          CATALOGUE_REPO: ${{ vars.CATALOGUE_REPO || 'Vietnoirien/torrentlinker-catalogue' }}
+          MAX_AGE: ${{ startsWith(github.ref, 'refs/tags/') && '--max-age-hours 48' || '' }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::No CATALOGUE_TOKEN secret: this build ships without a Catalogue"
+            exit 0
+          fi
+          gh release download catalogue --repo "$CATALOGUE_REPO" --pattern catalogue.json.xz --dir "$RUNNER_TEMP"
+          # A tagged release refuses an export older than two days (ADR-0019).
+          python scripts/bundle_catalogue.py "$RUNNER_TEMP/catalogue.json.xz" $MAX_AGE
+          rm "$RUNNER_TEMP/catalogue.json.xz"
+          pip install --no-deps .
       - run: pyinstaller --noconfirm --distpath ../dist --workpath ../build torrentlinker.spec
         working-directory: packaging
       - name: Bundled audio dependency
@@ -52,6 +70,24 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install '.[package]'
+      - name: Bundle the Catalogue
+        # From the private repository's "catalogue" release; without the token the build
+        # ships no Catalogue and the app falls back to Zen Lab (ADR-0019).
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CATALOGUE_TOKEN }}
+          CATALOGUE_REPO: ${{ vars.CATALOGUE_REPO || 'Vietnoirien/torrentlinker-catalogue' }}
+          MAX_AGE: ${{ startsWith(github.ref, 'refs/tags/') && '--max-age-hours 48' || '' }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::No CATALOGUE_TOKEN secret: this build ships without a Catalogue"
+            exit 0
+          fi
+          gh release download catalogue --repo "$CATALOGUE_REPO" --pattern catalogue.json.xz --dir "$RUNNER_TEMP"
+          # A tagged release refuses an export older than two days (ADR-0019).
+          python scripts/bundle_catalogue.py "$RUNNER_TEMP/catalogue.json.xz" $MAX_AGE
+          rm "$RUNNER_TEMP/catalogue.json.xz"
+          pip install --no-deps .
       - run: pyinstaller --noconfirm --distpath ../dist --workpath ../build torrentlinker.spec
         working-directory: packaging
       - name: Smoke test
@@ -83,6 +119,24 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install '.[package]'
+      - name: Bundle the Catalogue
+        # From the private repository's "catalogue" release; without the token the build
+        # ships no Catalogue and the app falls back to Zen Lab (ADR-0019).
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CATALOGUE_TOKEN }}
+          CATALOGUE_REPO: ${{ vars.CATALOGUE_REPO || 'Vietnoirien/torrentlinker-catalogue' }}
+          MAX_AGE: ${{ startsWith(github.ref, 'refs/tags/') && '--max-age-hours 48' || '' }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::No CATALOGUE_TOKEN secret: this build ships without a Catalogue"
+            exit 0
+          fi
+          gh release download catalogue --repo "$CATALOGUE_REPO" --pattern catalogue.json.xz --dir "$RUNNER_TEMP"
+          # A tagged release refuses an export older than two days (ADR-0019).
+          python scripts/bundle_catalogue.py "$RUNNER_TEMP/catalogue.json.xz" $MAX_AGE
+          rm "$RUNNER_TEMP/catalogue.json.xz"
+          pip install --no-deps .
       - run: pyinstaller --noconfirm --distpath ../dist --workpath ../build torrentlinker.spec
         working-directory: packaging
       - name: Smoke test
@@ -112,6 +166,27 @@ jobs:
       DOCKER_BUILD_RECORD_UPLOAD: false
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install .
+      - name: Bundle the Catalogue
+        # From the private repository's "catalogue" release; without the token the build
+        # ships no Catalogue and the app falls back to Zen Lab (ADR-0019).
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CATALOGUE_TOKEN }}
+          CATALOGUE_REPO: ${{ vars.CATALOGUE_REPO || 'Vietnoirien/torrentlinker-catalogue' }}
+          MAX_AGE: ${{ startsWith(github.ref, 'refs/tags/') && '--max-age-hours 48' || '' }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::No CATALOGUE_TOKEN secret: this build ships without a Catalogue"
+            exit 0
+          fi
+          gh release download catalogue --repo "$CATALOGUE_REPO" --pattern catalogue.json.xz --dir "$RUNNER_TEMP"
+          # A tagged release refuses an export older than two days (ADR-0019).
+          python scripts/bundle_catalogue.py "$RUNNER_TEMP/catalogue.json.xz" $MAX_AGE
+          rm "$RUNNER_TEMP/catalogue.json.xz"
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Build for the smoke test

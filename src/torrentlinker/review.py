@@ -83,6 +83,68 @@ def catalogue_candidates(store: Store, indexer: Indexer, item: LocalItem) -> lis
     ]
 
 
+# Files this small match by size by coincidence too often to be worth a comparison.
+LAYOUT_MIN_FILE_SIZE = 256 * 1024
+
+
+def index_cached_layouts(store: Store) -> None:
+    """Read every cached .torrent not yet in the layout index (no network)."""
+    for key in store.unindexed_torrent_keys():
+        data = store.cached_torrent(key)
+        try:
+            meta = read_torrent(data) if data is not None else None
+        except Exception:  # noqa: BLE001 - an unreadable cache file is skipped for good
+            meta = None
+        store.index_layout(key, meta.infohash if meta else "", meta.files if meta else {})
+
+
+def layout_candidates(
+    store: Store,
+    indexer: Indexer,
+    item: LocalItem,
+    rules: MatchRules,
+    rejections: Mapping[str, str] = {},
+    known: frozenset[str] = frozenset(),
+) -> list[CheckedCandidate]:
+    """Matches among the .torrent files already cached, found by the item's file sizes
+    whatever the torrent's total: a season pack of which a few episodes are missing
+    locally, or a torrent of one episode of a local season folder. Costs no request;
+    only Matches are kept, and only torrents the Catalogue knows, so each has its page."""
+    index_cached_layouts(store)
+    sizes = {
+        s
+        for p, s in item.files.items()
+        if s >= LAYOUT_MIN_FILE_SIZE and not rules.ignore.matches(p)
+    }
+    result: list[CheckedCandidate] = []
+    seen = set(known)
+    for key, infohash in store.layouts_holding(sizes) if sizes else []:
+        row = store.catalogue_row(infohash) if infohash else None
+        if row is None or infohash in seen:
+            continue
+        data = store.cached_torrent(key)
+        if data is None:
+            continue
+        candidate = Candidate(
+            row.title,
+            row.size,
+            indexer.unredact(row.download_url),
+            row.seeders,
+            row.infohash,
+            row.details_url,
+            categories=(row.category,) if row.category is not None else (),
+            metadata={"discovery": "layout"},
+        )
+        if candidate_key(candidate) in rejections:
+            continue
+        checked = _compared(item, candidate, read_torrent(data), rules)
+        if checked.match is not None:
+            indexer.keep_torrent(candidate, data)
+            result.append(checked)
+            seen.add(infohash)
+    return result
+
+
 def find_candidates(
     store: Store,
     indexer: Indexer,
@@ -93,14 +155,20 @@ def find_candidates(
     *,
     use_catalogue: bool = True,
 ) -> tuple[list[Candidate], list[CheckedCandidate]]:
-    """Candidates and their checks: the Catalogue first, then `search` unless the
-    Catalogue already gave a Full Match. A typed query (`use_catalogue=False`) always
-    searches. Returns every Candidate, to remember, and every check, Catalogue first."""
+    """Candidates and their checks: the Catalogue first, then cached torrents holding
+    the item's files, then `search` unless these already gave a Full Match. A typed
+    query (`use_catalogue=False`) always searches. Returns every Candidate, to
+    remember, and every check, in that order."""
     found: list[Candidate] = catalogue_candidates(store, indexer, item) if use_catalogue else []
     checked = check_candidates(indexer, item, found, rules, rejections)
+    known = {(c.infohash or "").lower() for c in found if c.infohash}
+    if use_catalogue:
+        layouts = layout_candidates(store, indexer, item, rules, rejections, frozenset(known))
+        found += [v.candidate for v in layouts]
+        checked += layouts
+        known |= {(v.candidate.infohash or "").lower() for v in layouts}
     if any(v.match is not None and v.match.is_full for v in checked):
         return found, checked
-    known = {(c.infohash or "").lower() for c in found if c.infohash}
     searched = [c for c in search() if not c.infohash or c.infohash.lower() not in known]
     return found + searched, checked + check_candidates(indexer, item, searched, rules, rejections)
 

@@ -103,6 +103,14 @@ def never_reach_the_users_own_clients(monkeypatch):  # type: ignore[no-untyped-d
 
 
 @pytest.fixture(autouse=True)
+def no_bundled_catalogue(monkeypatch, tmp_path_factory):  # type: ignore[no-untyped-def]
+    """A Catalogue bundled into a local checkout would be imported by every sync."""
+    from torrentlinker import bundled_catalogue
+
+    monkeypatch.setattr(bundled_catalogue, "BUNDLE", tmp_path_factory.getbasetemp() / "none")
+
+
+@pytest.fixture(autouse=True)
 def dialogs_answer_at_once(monkeypatch):  # type: ignore[no-untyped-def]
     """A message box a test did not expect returns at once, as if dismissed, rather than
     waiting offscreen for a click that never comes. Tests that answer one patch it."""

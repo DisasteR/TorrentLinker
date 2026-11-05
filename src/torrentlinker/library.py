@@ -208,3 +208,12 @@ def auto_searchable(entries: Iterable[LibraryEntry]) -> list[LibraryEntry]:
     entries = list(entries)
     packs = {e.item.path for e in entries}
     return [e for e in entries if e.state is ItemState.ORPHAN and e.item.within not in packs]
+
+
+def pack_episodes(entries: Iterable[LibraryEntry]) -> list[LibraryEntry]:
+    """The Orphan episodes `auto_searchable` leaves to their pack's search. A batch still
+    checks them against the Catalogue and cached torrents, which costs no search: a
+    torrent of that single episode can be reseeded beside the pack's."""
+    entries = list(entries)
+    packs = {e.item.path for e in entries}
+    return [e for e in entries if e.state is ItemState.ORPHAN and e.item.within in packs]

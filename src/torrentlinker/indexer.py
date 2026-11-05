@@ -383,6 +383,11 @@ class Indexer:
         """The Candidate's .torrent if it was fetched before; never uses the network."""
         return self._cache.cached_torrent(self._torrent_key(candidate)) if self._cache else None
 
+    def keep_torrent(self, candidate: Candidate, data: bytes) -> None:
+        """Cache a .torrent obtained another way, so `cached_torrent` finds it."""
+        if self._cache and self.cached_torrent(candidate) is None:
+            self._cache.cache_torrent(self._torrent_key(candidate), data)
+
     def _torrent_key(self, candidate: Candidate) -> str:
         return hashlib.sha1(self._redact(candidate.download_url).encode()).hexdigest()
 

@@ -20,6 +20,7 @@ dependencies = [
   "pymediainfo>=6.1",  # MediaInfo of videos, for the Films & Vidéos upload (ADR-0012)
   "mutagen>=1.47",  # audio tags for the Audio and Ebook uploads
   "tzdata>=2024.1",  # IANA timezones for Assistant schedules, including Windows
+  "cryptography>=43",  # opens the Catalogue bundled with the app (ADR-0019)
 ]
 
 [project.optional-dependencies]
@@ -40,7 +41,7 @@ torrentlinker-web = "torrentlinker.web.server:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-torrentlinker = ["i18n/*.qm", "assets/*.png", "gui/*.qml", "web/static/*", "companion_extension/*"]
+torrentlinker = ["i18n/*.qm", "assets/*.png", "assets/*.tlcat", "gui/*.qml", "web/static/*", "companion_extension/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -33,6 +33,22 @@ UI strings are English in the code; French lives in `src/torrentlinker/i18n/`. A
 .venv/bin/pyside6-lrelease src/torrentlinker/i18n/torrentlinker_fr.ts -qm src/torrentlinker/i18n/torrentlinker_fr.qm
 ```
 
+## Publishing a release
+
+Releases ship the Catalogue encrypted inside the app (ADR-0019), so every release starts with a fresh export:
+
+1. Refresh the Catalogue in your desktop app (**Zen → Catalogue**). Then export it and replace the private release's file. The app may stay open; the local copy is deleted after the upload:
+
+   ```bash
+   .venv/bin/python scripts/export_catalogue.py
+   ```
+
+2. If the release changes what users see or do, update the guides in `docs/guide/en` and `docs/guide/fr`, and the screenshots they show. Check the README and `CONTEXT.md` too.
+3. Set the version in `pyproject.toml` and `TL_IMAGE_TAG` in `docs/guide/{en,fr}/web-docker.md`, and write `docs/releases/v<version>.md`.
+4. Once CI is green, commit "Release <version>", tag `v<version>` and push the tag.
+
+The release workflow downloads the export with the `CATALOGUE_TOKEN` secret, a fine-grained token with read-only access to the contents of `Vietnoirien/torrentlinker-catalogue`. A tagged build refuses an export older than two days: export again, then re-run the failed jobs. Without the secret, the release ships no Catalogue.
+
 ## Testing against real services
 
 The multi-client suite starts two qBittorrent instances, Deluge and Transmission on an internal Docker network. It checks profile credentials, Path Mappings, Reseeds, Upload seeding, queue and Plan destinations, real file transfers through a local tracker, and Web API action isolation. It uses generated data and removes its containers and network afterwards.

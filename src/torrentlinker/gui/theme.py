@@ -167,7 +167,7 @@ def _update_theme(app: QApplication, scheme: Qt.ColorScheme) -> None:
         QListWidget#navigation::item:selected {{ background: {selection}; color: {text};
             font-weight: 600; }}
         QListWidget#navigation::item:hover {{ background: {hover}; }}
-        QFrame#zenBand {{ background: {panel}; border: 1px solid {border}; border-radius: 9px; }}
+        QFrame#zenBand {{ background: transparent; border: none; }}
         QFrame#zenBand QLabel {{ background: transparent; }}
         QFrame#updateNotice {{ background: {panel}; border: 1px solid {warning};
             border-radius: 8px; }}

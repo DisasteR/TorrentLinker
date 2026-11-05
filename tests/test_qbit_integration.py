@@ -131,7 +131,7 @@ def test_occupied_original_names_are_refused_without_moving_files(
     assert store.verification_hashes() == []
 
 
-def test_partial_match_is_verified_on_local_pieces_and_left_stopped(
+def test_partial_match_is_verified_on_local_pieces_and_seeds_with_every_file_skipped(
     tmp_path: Path, qbit: QbitApi
 ) -> None:
     pack = tmp_path / "scene" / "Zweig.Pack"
@@ -151,10 +151,19 @@ def test_partial_match_is_verified_on_local_pieces_and_left_stopped(
     h = start_reseed(qbit, store, item, meta, m, meta.infohash)
     [outcome] = settle(qbit, store)
 
-    assert outcome.verified and not outcome.started
-    t = qbit.torrent(h)
-    assert t is not None and PARTIAL in t.tags
-    assert t.state.startswith(("stopped", "paused"))  # 5.x and 4.x names
+    assert outcome.verified and outcome.started
+    # Nothing wanted: the piece a.epub shares with the absent b.epub is never fetched.
+    assert not any(f.wanted for f in qbit.file_listing(h))
+    states = []
+    for _ in range(50):  # starting is asynchronous
+        t = qbit.torrent(h)
+        assert t is not None
+        states.append(t.state)
+        if not t.state.startswith(("stopped", "paused")):  # 5.x and 4.x names
+            break
+        time.sleep(0.1)
+    assert PARTIAL in t.tags
+    assert not t.state.startswith(("stopped", "paused")), states
     assert not (lib / "Zweig" / "b.epub").exists()
     listing = sorted(str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*"))
     assert (lib / "Zweig" / "a.epub").exists(), (listing, t)

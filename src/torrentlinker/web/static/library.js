@@ -144,6 +144,7 @@ function showLibraryCandidate(candidate) {
   libraryUI.chosen.set(libraryUI.item.path,candidate.key);
   $("candidate-summary").append(element("h3",candidate.title),element("p",`${libraryMatch(candidate.match)} · ${bytes(candidate.size)} · ${candidate.seeders} seeders`),element("p",libraryUI.item.path),element("p",say("A Match compares file names and sizes. Your Torrent Client verifies the hashes before seeding.","La correspondance compare les noms et tailles. Le client torrent vérifie les hashes avant le seed."),"muted"));
   table("candidate-files",candidate.files,[{label:say("Torrent file","Fichier du torrent"),render:f=>f.torrent},{label:say("Local file","Fichier local"),render:f=>f.local || "—"},{label:say("Result","Résultat"),render:f=>f.status}],null);
+  if(candidate.evidence?.discovery === "layout") $("candidate-summary").append(element("p",say("Found among the torrents already downloaded, by the sizes of your files, without spending a search.","Trouvé parmi les torrents déjà téléchargés, par la taille de vos fichiers, sans consommer de recherche.")));
   if(candidate.evidence?.discovery === "compatible") $("candidate-summary").append(element("p",say("Discovery scope: ","Périmètre de recherche : ") + candidate.evidence.scope + (candidate.evidence.limited === "true" ? say(" · Search limit reached; results are incomplete."," · Limite atteinte ; résultats incomplets.") : "")));
   const actions=$("candidate-actions");
   const checkButton=button(say("Check Candidate","Vérifier le candidat"),()=>candidateAction("check-candidate"));
@@ -299,7 +300,7 @@ async function previewArchive(candidate) {
       element("p",say("Archive: ","Archive : ")+preview.archive,"archive-path"),
       element("p",say("Destination: ","Destination : ")+preview.destination,"archive-path"),
       element("p",say(`${preview.files} files · ${bytes(preview.size)} to unpack · ${bytes(preview.free)} available`,`${preview.files} fichiers · ${bytes(preview.size)} à extraire · ${bytes(preview.free)} disponibles`)),
-      element("p",preview.match==="partial"?say(`Partial Match: ${preview.missing} missing files. Missing files will not be downloaded; the torrent stays stopped after verification.`,`Correspondance partielle : ${preview.missing} fichiers manquants. Ils ne seront pas téléchargés ; le torrent restera arrêté après vérification.`):say("The Torrent Client will verify the extracted files before seeding.","Le client torrent vérifiera les fichiers extraits avant le seed.")));
+      element("p",preview.match==="partial"?say(`Partial Match: ${preview.missing} missing files. Missing files will not be downloaded; after verification the torrent seeds the pieces you have, with every file skipped.`,`Correspondance partielle : ${preview.missing} fichiers manquants. Ils ne seront pas téléchargés ; après vérification, le torrent partage les pièces que vous avez, tous ses fichiers étant ignorés.`):say("The Torrent Client will verify the extracted files before seeding.","Le client torrent vérifiera les fichiers extraits avant le seed.")));
     const cancel=button(say("Cancel","Annuler"),()=>dialog.close(),"quiet");
     const approve=button(say("Unpack and reseed","Extraire et seeder"),async()=>{
       if(body.client_id!==state.clientId) {dialog.close();return;}

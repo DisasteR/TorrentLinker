@@ -88,7 +88,7 @@ def test_full_match_under_another_name_is_renamed_verified_and_started(
     assert digest(item.path) == before
 
 
-def test_partial_match_is_verified_on_local_pieces_and_left_stopped(
+def test_partial_match_is_verified_on_local_pieces_and_seeds_with_every_file_skipped(
     shared: Path, deluge: DelugeApi
 ) -> None:
     pack = shared / "scene" / "Zweig.Pack"
@@ -110,12 +110,14 @@ def test_partial_match_is_verified_on_local_pieces_and_left_stopped(
     assert VERIFYING in deluge.torrents(tag=VERIFYING)[0].tags
     [outcome] = settle(deluge, store)  # type: ignore[arg-type]
 
-    assert outcome.verified and not outcome.started
+    assert outcome.verified and outcome.started
+    # Nothing wanted: the piece a.epub shares with the absent b.epub is never fetched.
+    assert not any(f.wanted for f in deluge.file_listing(h))
     t = deluge.torrent(h)
     assert t is not None and PARTIAL in t.tags and VERIFYING not in t.tags
     assert deluge.torrents(tag=VERIFYING) == []
-    assert t.state.startswith("stopped")
-    assert guard(deluge, h) == -1  # the user may start it at full speed
+    assert not t.state.startswith("stopped")
+    assert guard(deluge, h) == -1
     assert not (lib / "Zweig" / "b.epub").exists()
     assert digest(lib / "Zweig" / "a.epub") == before
 

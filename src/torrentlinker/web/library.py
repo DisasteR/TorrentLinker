@@ -264,7 +264,16 @@ class Library:
         entry = self.entry(path)
         return inspect_item(self.scan_entry(entry, stop), stop, **kwargs)
 
-    def check(self, path: str, stop: threading.Event, progress: Callable[[Any], None]) -> list:
+    def check(
+        self,
+        path: str,
+        stop: threading.Event,
+        progress: Callable[[Any], None],
+        *,
+        indexer_search: bool = True,
+    ) -> list:
+        """Check one Local Item; without `indexer_search`, only against the Catalogue and
+        cached torrents, which costs no search."""
         from torrentlinker.review import search_candidates
 
         entry = self.entry(path)
@@ -272,7 +281,7 @@ class Library:
         indexer, store = self.setup.indexer(), self.setup.store
 
         def search() -> list[Candidate]:
-            if stop.is_set():
+            if stop.is_set() or not indexer_search:
                 return []
             return search_candidates(
                 indexer,
@@ -354,17 +363,23 @@ class Library:
 
     def search_items(self, paths: list[str], stop: threading.Event, progress) -> dict:
 
-        from torrentlinker.library import auto_searchable
+        from torrentlinker.library import auto_searchable, pack_episodes
 
         chosen = [self.entry(path) for path in paths] if paths else list(self.entries)
-        selected = auto_searchable(chosen)
+        episodes = pack_episodes(chosen)  # checked without searching, after their packs
+        selected = auto_searchable(chosen) + episodes
         results, errors = [], []
         for entry in selected:
             if stop.is_set():
                 break
             for attempt in range(MAX_WAITS + 1):
                 try:
-                    rows = self.check(str(entry.item.path), stop, progress)
+                    rows = self.check(
+                        str(entry.item.path),
+                        stop,
+                        progress,
+                        indexer_search=entry not in episodes,
+                    )
                     results.append({"path": str(entry.item.path), "rows": rows})
                 except RateLimited as error:
                     # c411 asks to wait: resume this item then, unless cancelled meanwhile.

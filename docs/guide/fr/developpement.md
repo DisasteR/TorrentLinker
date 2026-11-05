@@ -33,6 +33,22 @@ Les textes de l’interface sont en anglais dans le code ; leur traduction fran�
 .venv/bin/pyside6-lrelease src/torrentlinker/i18n/torrentlinker_fr.ts -qm src/torrentlinker/i18n/torrentlinker_fr.qm
 ```
 
+## Publier une version
+
+Les versions publiées contiennent le Catalogue, chiffré dans l’application (ADR-0019). Chaque publication commence donc par un export à jour :
+
+1. Actualisez le Catalogue dans l’application de bureau (**Zen → Catalogue**). Exportez-le ensuite et remplacez le fichier de la version privée. L’application peut rester ouverte ; la copie locale est supprimée après l’envoi :
+
+   ```bash
+   .venv/bin/python scripts/export_catalogue.py
+   ```
+
+2. Si la version change ce que les utilisateurs voient ou font, mettez à jour les guides de `docs/guide/en` et `docs/guide/fr`, ainsi que leurs captures d’écran. Vérifiez aussi le README et `CONTEXT.md`.
+3. Indiquez la version dans `pyproject.toml` et dans `TL_IMAGE_TAG` de `docs/guide/{en,fr}/web-docker.md`, puis rédigez `docs/releases/v<version>.md`.
+4. Quand la CI est verte, validez « Release <version> », créez le tag `v<version>` et poussez-le.
+
+Le workflow de publication télécharge l’export avec le secret `CATALOGUE_TOKEN`, un jeton à portée fine en lecture seule sur le contenu de `Vietnoirien/torrentlinker-catalogue`. Une version taguée refuse un export de plus de deux jours : exportez de nouveau, puis relancez les tâches en échec. Sans le secret, la version ne contient aucun Catalogue.
+
 ## Tests avec des services réels
 
 La suite multiclient démarre deux instances qBittorrent, Deluge et Transmission sur un réseau Docker interne. Elle vérifie les identifiants des profils, les correspondances de chemins, le reseed, la mise en seed des uploads, les destinations des files et des Plans, le transfert réel de fichiers via un tracker local et l'isolation des actions de l'API web. Elle utilise des données générées et supprime ses conteneurs et son réseau à la fin.

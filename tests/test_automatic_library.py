@@ -12,7 +12,7 @@ from torrentlinker.config import Settings
 from torrentlinker.domain import ContentKind, ItemState, LibraryFolder, LocalItem, Torrent
 from torrentlinker.gui.library_folder_dialog import LibraryFolderDialog
 from torrentlinker.gui.library_model import LibraryModel
-from torrentlinker.library import LibraryEntry, auto_searchable, build_library
+from torrentlinker.library import LibraryEntry, auto_searchable, build_library, pack_episodes
 from torrentlinker.scan import scan
 from torrentlinker.store import CatalogueRow, Store
 from torrentlinker.web.app import create_app
@@ -102,6 +102,19 @@ def test_a_batch_searches_a_pack_once_not_each_episode(tmp_path: Path) -> None:
     assert auto_searchable([pack, *episodes, seeded_pack, orphan_episode]) == [pack]
     # Selected without their pack, episodes are searched, even those of a seeded pack.
     assert auto_searchable([*episodes, orphan_episode]) == [*episodes, orphan_episode]
+
+
+def test_a_batch_still_checks_a_packs_episodes_without_searching(tmp_path: Path) -> None:
+    pack = entry(tmp_path / "Saison 01")
+    episodes = [entry(tmp_path / f"Saison 01/E0{i}.mkv", tmp_path / "Saison 01") for i in (1, 2)]
+    seeded_pack = entry(tmp_path / "Saison 02", state=ItemState.SEEDED)
+    orphan_episode = entry(tmp_path / "Saison 02/E01.mkv", tmp_path / "Saison 02")
+    seeded_episode = entry(tmp_path / "Saison 02/E02.mkv", tmp_path / "Saison 02", ItemState.SEEDED)
+
+    found = pack_episodes([pack, *episodes, seeded_pack, orphan_episode, seeded_episode])
+
+    assert found == [*episodes, orphan_episode]
+    assert pack_episodes([*episodes, orphan_episode]) == []  # searched themselves instead
 
 
 def test_the_library_shows_episodes_as_children_of_their_pack(qtbot, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]

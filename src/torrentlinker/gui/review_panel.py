@@ -495,6 +495,15 @@ class ReviewPanel(QWidget):
                     "Found in the local Catalogue by its exact size, without spending a search."
                 )
             )
+        if v is not None and v.candidate.metadata.get("discovery") == "layout":
+            self.summary.setText(
+                self.summary.text()
+                + "\n\n"
+                + self.tr(
+                    "Found among the torrents already downloaded, by the sizes of your files, "
+                    "without spending a search."
+                )
+            )
         if v is not None and v.candidate.metadata.get("discovery") == "compatible":
             self.summary.setText(
                 self.summary.text()
@@ -841,8 +850,8 @@ class ReviewPanel(QWidget):
             self.tr("Partial Match"),
             self.tr(
                 "You have {0} of this torrent. The {1} absent files will not be downloaded. "
-                "After Verification the torrent is left stopped: starting it in your torrent "
-                "client would fetch the few pieces it shares with your files. Reseed?"
+                "After Verification it seeds the pieces you have, with every file skipped so "
+                "that nothing is ever downloaded into your files. Reseed?"
             ).format(f"{coverage:.0%}", missing),
         )
         return answer == QMessageBox.StandardButton.Yes

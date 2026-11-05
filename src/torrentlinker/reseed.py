@@ -1,11 +1,13 @@
 """Reseed: add a Match to qBittorrent against the existing data, then verify it.
 
 The torrent is added stopped, checked, and only
-started once Verification shows every piece is already there. A Match with absent
-files is left stopped after Verification, because starting it would fetch the pieces
-it shares with local files. A failed Verification removes the torrent (never its data)
-and records a Rejection. µTorrent may rename files on disk after explicit approval,
-with a recovery journal; other clients leave names untouched. See ADR-0002/0013.
+started once Verification shows every piece it needs is already there. A Match with
+absent files seeds only once every one of its files, present ones included, is
+confirmed skipped: nothing is then wanted, so no piece it shares with an absent file
+is ever fetched into the library. Otherwise it is left stopped (ADR-0018). A failed
+Verification removes the torrent (never its data) and records a Rejection. µTorrent
+may rename files on disk after explicit approval, with a recovery journal; other
+clients leave names untouched. See ADR-0002/0013.
 """
 
 from __future__ import annotations
@@ -339,16 +341,42 @@ def _verdict(qbit: Qbit, hash: str, progress: float, record: Verification) -> tu
 
 def _accept(qbit: Qbit, store: Store, hash: str, record: Verification, progress: float) -> Outcome:
     complete = record.required_pieces is None
-    if complete:
-        qbit.start(hash)
-    else:
+    if not complete:
         qbit.add_tags(hash, [PARTIAL])
+    started = complete or _skip_every_file(qbit, hash)
+    if started:
+        qbit.start(hash)
     qbit.remove_tags(hash, [VERIFYING])
     renamed = owns_journal(store.torrent_dir.parent, hash, getattr(qbit, "reseed_client_id", ""))
     if renamed:
         keep_disk_renames(store.torrent_dir.parent, hash)
     store.end_verification(hash)
-    return Outcome(record.item_path, hash, True, progress, started=complete, disk_renamed=renamed)
+    return Outcome(record.item_path, hash, True, progress, started=started, disk_renamed=renamed)
+
+
+SKIP_TIMEOUT = 5.0
+
+
+def _skip_every_file(qbit: Qbit, hash: str) -> bool:
+    """Skip every file of a partial torrent and confirm the client took it in, so that
+    starting it uploads its verified pieces and wants none. A piece shared by a present
+    file and an absent one would otherwise be fetched into the present file. Clients
+    apply priorities asynchronously; unconfirmed, the torrent stays stopped."""
+    try:
+        indexes = [f.index for f in qbit.file_listing(hash)]
+        if not indexes:
+            return False
+        qbit.set_file_priority(hash, indexes, 0)
+        for _ in range(int(SKIP_TIMEOUT / POLL_INTERVAL)):
+            listing = qbit.file_listing(hash)
+            if sorted(f.index for f in listing) != sorted(indexes):
+                return False  # the file list changed under us
+            if not any(f.wanted for f in listing):
+                return True
+            time.sleep(POLL_INTERVAL)
+    except Exception:  # noqa: BLE001 - a stopped torrent is the safe outcome
+        log.exception("Could not skip every file of %s; it stays stopped", hash)
+    return False
 
 
 def pending_verifications(qbit: Qbit, store: Store) -> list[Path]:

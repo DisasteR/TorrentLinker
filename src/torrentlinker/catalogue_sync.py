@@ -20,7 +20,13 @@ from urllib.parse import urlencode
 import httpx
 
 from torrentlinker import net
-from torrentlinker.catalogue import PAGE, CrawlProgress, Progress, update_categories
+from torrentlinker.catalogue import (
+    PAGE,
+    CrawlProgress,
+    Progress,
+    crawl_categories,
+    update_categories,
+)
 from torrentlinker.downloads import IndexerCategory
 from torrentlinker.indexer import API_KEY_PLACEHOLDER, Indexer
 from torrentlinker.store import CatalogueRow, CrawlState, FeedState, Store
@@ -28,6 +34,9 @@ from torrentlinker.store import CatalogueRow, CrawlState, FeedState, Store
 SNAPSHOT_URL = "https://zen.mma.dev/api/catalog"
 SNAPSHOT_NAME = "zen-lab"
 SNAPSHOT_MAX_AGE = 24 * 3600
+# The whole Catalogue's newest torrents are fetched this often, while the app runs.
+REFRESH_INTERVAL = 4 * 3600
+REFRESH_FEED = "whole-catalogue"
 MAX_SNAPSHOT_BYTES = 64 * 1024 * 1024
 HASH = re.compile(r"[0-9a-fA-F]{40}\Z")
 log = logging.getLogger(__name__)
@@ -402,8 +411,20 @@ def sync_catalogue(
         )
         return
     snapshot_error = None
+    from torrentlinker.bundled_catalogue import import_bundled
+
     try:
-        if (full or bootstrap) and store.feed_state(SNAPSHOT_NAME).updated_at is None:
+        # The Catalogue shipped with the app; Zen Lab only for a build without one.
+        bundled = import_bundled(store, stop=stop, progress=progress)
+    except (OSError, ValueError) as error:
+        bundled = False
+        log.warning("The bundled Catalogue could not be imported: %s", error)
+    try:
+        if (
+            not bundled
+            and (full or bootstrap)
+            and store.feed_state(SNAPSHOT_NAME).updated_at is None
+        ):
             bootstrap_snapshot(store, stop=stop, progress=progress, http=snapshot_http)
     except (httpx.HTTPError, ValueError) as error:
         snapshot_error = error
@@ -499,3 +520,45 @@ def sync_catalogue(
         raise ValueError(
             "Zen Lab metadata unavailable; the available c411 pages were refreshed"
         ) from snapshot_error
+
+
+def refresh_due(store: Store, now: float | None = None) -> bool:
+    """Whether the last whole-Catalogue refresh is older than REFRESH_INTERVAL."""
+    last = store.feed_state(REFRESH_FEED).updated_at
+    return last is None or (time.time() if now is None else now) - last >= REFRESH_INTERVAL
+
+
+def refresh_catalogue(
+    indexer: Indexer,
+    store: Store,
+    categories: Mapping[int, IndexerCategory],
+    *,
+    stop: Callable[[], bool] = lambda: False,
+    progress: Progress = lambda p: None,
+    clock: Callable[[], float] = time.time,
+) -> None:
+    """Every category's newest torrents, down to what the Catalogue already holds: with
+    the bundled Catalogue as the baseline, this keeps the whole of it current for a few
+    requests per category. Older pages are only read by an explicit crawl. Only c411's
+    listing stops at what is known; other Indexers are left to their own updates."""
+    if not indexer.is_c411:
+        return
+    if not categories:
+        with indexer.background():
+            caps = indexer.caps()
+        categories = {
+            c: IndexerCategory(name, caps.parents.get(c)) for c, name in caps.categories.items()
+        }
+    with indexer.background():  # the user's own searches go first
+        sync_catalogue(
+            indexer,
+            store,
+            crawl_categories(categories),
+            full=False,
+            bootstrap=True,
+            stop=stop,
+            progress=progress,
+            categories=categories,
+        )
+    if not stop():
+        store.save_feed_state(FeedState(REFRESH_FEED, updated_at=clock()))

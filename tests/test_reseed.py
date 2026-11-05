@@ -200,7 +200,7 @@ def test_partial_match_files_missing_locally_are_never_downloaded(tmp_path: Path
     assert qbit.calls.index("priority [1] = 0") < qbit.calls.index("recheck")
 
 
-def test_partial_match_is_verified_on_the_pieces_inside_local_files_and_left_stopped(
+def test_partial_match_is_verified_on_the_pieces_inside_local_files_and_seeds_wanting_nothing(
     tmp_path: Path,
 ) -> None:
     item, data = partial_pack(tmp_path)
@@ -212,8 +212,30 @@ def test_partial_match_is_verified_on_the_pieces_inside_local_files_and_left_sto
     qbit.finish_check(h, 0.5, pieces=[2, 0, 0])
     [outcome] = check_verifications(qbit, store, now=lambda: 1e12)
 
+    assert outcome.verified and outcome.started
+    # Every file skipped, the present one too, before starting: piece 1 is never fetched.
+    assert qbit.priorities[h] == {0: 0, 1: 0}
+    assert qbit.started == [h]
+    assert PARTIAL in qbit.by_hash[h].tags and VERIFYING not in qbit.by_hash[h].tags
+
+
+def test_partial_match_stays_stopped_when_the_client_does_not_confirm_skipping_its_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import torrentlinker.reseed as reseed
+
+    monkeypatch.setattr(reseed, "SKIP_TIMEOUT", 0.4)
+    item, data = partial_pack(tmp_path)
+    meta = read_torrent(data)
+    qbit, store = FakeQbit(), Store(tmp_path / "s.db")
+    h = start_reseed(qbit, store, item, meta, match(item, meta.files), meta.infohash)  # type: ignore[arg-type]
+    qbit.priorities_stick = False
+
+    qbit.finish_check(h, 0.5, pieces=[2, 0, 0])
+    [outcome] = check_verifications(qbit, store, now=lambda: 1e12)
+
     assert outcome.verified and not outcome.started
-    assert qbit.started == []  # starting would rewrite boundary pieces into the library
+    assert qbit.started == []  # starting would fetch boundary pieces into the library
     assert PARTIAL in qbit.by_hash[h].tags and VERIFYING not in qbit.by_hash[h].tags
 
 

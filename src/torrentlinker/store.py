@@ -139,6 +139,18 @@ CREATE TABLE IF NOT EXISTS plan_item (
     outcome TEXT,
     reason TEXT
 );
+-- Every file of every cached .torrent, by size: a local file finds the torrents that
+-- hold it, episodes inside packs included, without a search (layouts_holding).
+CREATE TABLE IF NOT EXISTS layout_file (
+    cache_key TEXT NOT NULL,
+    infohash TEXT NOT NULL,
+    path TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    PRIMARY KEY (cache_key, path)
+);
+CREATE INDEX IF NOT EXISTS layout_file_by_size ON layout_file(size);
+-- Cached .torrent files already read into layout_file, even those with no usable file.
+CREATE TABLE IF NOT EXISTS layout_indexed (cache_key TEXT PRIMARY KEY);
 -- Profile history: one row per local day per account binding (see profile_history).
 CREATE TABLE IF NOT EXISTS profile_history (
     account TEXT NOT NULL,
@@ -619,6 +631,44 @@ class Store:
         self.torrent_dir.mkdir(parents=True, exist_ok=True)
         (self.torrent_dir / f"{key}.torrent").write_bytes(data)
 
+    # Layouts of cached .torrent files ----------------------------------------
+
+    def unindexed_torrent_keys(self) -> list[str]:
+        """Cached .torrent files whose layout is not yet in `layout_file`."""
+        if not self.torrent_dir.is_dir():
+            return []
+        cached = {f.stem for f in self.torrent_dir.glob("*.torrent")}
+        with self._lock:
+            done = {r[0] for r in self._db.execute("SELECT cache_key FROM layout_indexed")}
+        return sorted(cached - done)
+
+    def index_layout(self, key: str, infohash: str, files: dict[str, int]) -> None:
+        """Record a cached .torrent's files; empty `files` marks one that cannot be read."""
+        with self._lock, self._db:
+            self._db.execute("DELETE FROM layout_file WHERE cache_key = ?", (key,))
+            self._db.executemany(
+                "INSERT OR REPLACE INTO layout_file VALUES (?, ?, ?, ?)",
+                [(key, infohash.lower(), path, size) for path, size in files.items()],
+            )
+            self._db.execute("INSERT OR REPLACE INTO layout_indexed VALUES (?)", (key,))
+
+    def layouts_holding(self, sizes: set[int], limit: int = 20) -> list[tuple[str, str]]:
+        """Cached torrents (cache key, infohash) holding files of these exact sizes, the
+        most bytes in common first."""
+        common: dict[tuple[str, str], int] = {}
+        ordered = sorted(sizes)
+        with self._lock:
+            for i in range(0, len(ordered), 500):
+                chunk = ordered[i : i + 500]
+                marks = ",".join("?" * len(chunk))
+                for key, infohash, size in self._db.execute(
+                    f"SELECT cache_key, infohash, size FROM layout_file WHERE size IN ({marks})",
+                    chunk,
+                ):
+                    common[(key, infohash)] = common.get((key, infohash), 0) + size
+        ranked = sorted(common, key=lambda k: (-common[k], k))
+        return ranked[:limit]
+
     # Verifications in flight ------------------------------------------------
 
     def start_verification(
@@ -761,7 +811,9 @@ class Store:
                 " category=excluded.category, download_url=excluded.download_url,"
                 " details_url=excluded.details_url, seen_at=excluded.seen_at,"
                 " source=excluded.source"
-                " WHERE excluded.source != 'zen-lab' OR catalogue.source = 'zen-lab'",
+                # Snapshots (Zen Lab, the bundled Catalogue) never replace live c411 rows.
+                " WHERE excluded.source NOT IN ('zen-lab', 'bundled')"
+                " OR catalogue.source IN ('zen-lab', 'bundled')",
                 [
                     (
                         r.infohash,
@@ -848,6 +900,13 @@ class Store:
                 (size, limit),
             ).fetchall()
         return [CatalogueRow(*r) for r in rows]
+
+    def catalogue_row(self, infohash: str) -> CatalogueRow | None:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT * FROM catalogue WHERE infohash = ?", (infohash.lower(),)
+            ).fetchone()
+        return CatalogueRow(*row) if row else None
 
     def catalogue_sizes(self) -> frozenset[int]:
         """Every Catalogue torrent's exact size, to recognise a release folder by size."""

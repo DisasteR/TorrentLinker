@@ -25,6 +25,7 @@ class FakeQbit:
     downloads: list[str] = field(default_factory=list)
     sequential: list[str] = field(default_factory=list)
     default_path: str = "/downloads"
+    priorities_stick: bool = True  # False: the client never takes in a priority change
 
     def default_save_path(self) -> str:
         return self.default_path
@@ -45,8 +46,10 @@ class FakeQbit:
         return dict(self.by_hash[hash].files)
 
     def file_listing(self, hash: str) -> list[TorrentFile]:
+        chosen = self.priorities.get(hash, {})
         return [
-            TorrentFile(i, name, size) for i, (name, size) in enumerate(self.files(hash).items())
+            TorrentFile(i, name, size, chosen.get(i, 1) > 0)
+            for i, (name, size) in enumerate(self.files(hash).items())
         ]
 
     def add(self, data: bytes, save_path: str, tags: list[str]) -> str:
@@ -80,6 +83,8 @@ class FakeQbit:
 
     def set_file_priority(self, hash: str, indexes: list[int], priority: int) -> None:
         self.calls.append(f"priority {indexes} = {priority}")
+        if not self.priorities_stick:
+            return
         self.priorities.setdefault(hash, {}).update({i: priority for i in indexes})
 
     def recheck(self, hash: str) -> None:

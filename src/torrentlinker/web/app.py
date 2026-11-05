@@ -6,6 +6,7 @@ import threading
 import time
 from collections import Counter
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from functools import partial
 from html import escape
 from ipaddress import IPv4Network, IPv6Network
@@ -200,12 +201,35 @@ def create_app(
                 except ProfileError:
                     pass  # recorded in the history as the day's failure
 
+    def catalogue_loop() -> None:
+        """Every few hours, the newest torrents of every category, as on the desktop."""
+        from torrentlinker.catalogue_sync import refresh_catalogue, refresh_due
+
+        while not shutdown.wait(600):
+            if not service.configured or not service.secrets.get("indexer-api-key"):
+                continue
+            with jobs.lock:
+                if jobs.active() or not refresh_due(service.store):
+                    continue
+                jobs.submit(
+                    "catalogue",
+                    lambda stop, progress: refresh_catalogue(
+                        service.indexer(),
+                        service.store,
+                        service.settings.indexer_categories,
+                        stop=stop.is_set,
+                        progress=lambda p: progress({"phase": "fetching", **asdict(p)}),
+                    ),
+                )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         monitor = threading.Thread(target=verify_loop, daemon=True, name="verification-monitor")
         if monitor_verifications:
             monitor.start()
         threading.Thread(target=history_loop, daemon=True, name="profile-history").start()
+        if monitor_verifications:
+            threading.Thread(target=catalogue_loop, daemon=True, name="catalogue-refresh").start()
         assistant.start_scheduler()
         agent_service.feed_control.start()
         try:

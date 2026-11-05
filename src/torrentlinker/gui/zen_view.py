@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
-from torrentlinker.gui.controls import set_role
+from torrentlinker.gui.controls import icon_button, set_role
 from torrentlinker.gui.errors import error_text
 from torrentlinker.gui.library_model import human_size
 from torrentlinker.gui.profile_view import ProfileView
@@ -976,7 +976,8 @@ WARNING = QColor("#c62828")
 
 
 class ZenBand(QFrame):
-    """Across the top of every tab: Zen Balance, what seeding earns, Plan and Catalogue."""
+    """In the window's footer, on the right: Zen Balance, what seeding earns, Plan and
+    Catalogue. `message`, for profile problems, goes above the workspace instead."""
 
     refresh_requested = Signal()
     catalogue_changed = Signal(str)
@@ -984,31 +985,26 @@ class ZenBand(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("zenBand")
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(16, 12, 16, 12)
-        row = QHBoxLayout()
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 4, 0)
+        row.setSpacing(6)
         self.balance = QLabel()
         self.seeding = QLabel()
         self.plan = QLabel()
         self.catalogue = QLabel()
-        for label in (self.balance, self.seeding, self.plan, self.catalogue):
-            label.setWordWrap(True)
-            row.addWidget(label, 1)
-            row.addSpacing(16)
-        row.addStretch()
-        self.refresh_button = QPushButton(self.tr("Refresh profile"))
-        set_role(self.refresh_button, "quiet")
+        for i, label in enumerate((self.balance, self.seeding, self.plan, self.catalogue)):
+            if i:
+                row.addWidget(QLabel("·"))
+            row.addWidget(label)
+        self.refresh_button = icon_button("⟳", self.tr("Refresh profile"))
         self.refresh_button.setToolTip(self.tr("Read your Zen Balance and Class from c411"))
         self.refresh_button.clicked.connect(self.refresh_requested)
         row.addWidget(self.refresh_button)
-        outer.addLayout(row)
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.message.setOpenExternalLinks(True)
         self.message.setProperty("role", "error")
         self.message.hide()
-        outer.addWidget(self.message)
         self.set_balance(None)
         self.set_seeding(None)
         self.set_plan(None)
@@ -1091,4 +1087,4 @@ class ZenBand(QFrame):
 
     def _message(self, text: str) -> None:
         self.message.setText(text)
-        self.message.setVisible(bool(text))
+        self.message.setVisible(bool(text) and not self.isHidden())  # hidden with the band

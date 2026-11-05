@@ -141,7 +141,7 @@ def test_a_match_needing_other_folders_is_refused_and_removed(
     assert (lib / "a.epub").exists()
 
 
-def test_partial_match_is_verified_on_local_pieces_and_left_stopped(
+def test_partial_match_is_verified_on_local_pieces_and_seeds_with_every_file_skipped(
     shared: Path, transmission: TransmissionApi
 ) -> None:
     pack = shared / "scene" / "Zweig.Pack"
@@ -162,10 +162,12 @@ def test_partial_match_is_verified_on_local_pieces_and_left_stopped(
     assert VERIFYING in transmission.torrents(tag=VERIFYING)[0].tags
     [outcome] = settle(transmission, store)  # type: ignore[arg-type]
 
-    assert outcome.verified and not outcome.started
+    assert outcome.verified and outcome.started
+    # Nothing wanted: the piece a.epub shares with the absent b.epub is never fetched.
+    assert not any(f.wanted for f in transmission.file_listing(h))
     t = transmission.torrent(h)
     assert t is not None and PARTIAL in t.tags and VERIFYING not in t.tags
-    assert t.state.startswith("stopped")
+    assert not t.state.startswith("stopped")
     assert not (lib / "Zweig" / "b.epub").exists()
     assert no_part_files(lib) == []
     assert digest(lib / "Zweig" / "a.epub") == before

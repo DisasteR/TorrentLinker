@@ -782,3 +782,54 @@ def test_parent_fetch_preserves_pending_categories_with_other_native_sources(
     # 4050 also includes applications and GPS outside the fetched games categories.
     assert store.crawl_state(4050) == pending
     assert store.crawl_paused()
+
+
+def test_the_whole_catalogue_refresh_reads_each_category_to_what_is_known(
+    tmp_path: Path,
+) -> None:
+    from torrentlinker.catalogue_sync import REFRESH_FEED, refresh_catalogue, refresh_due
+
+    store = Store(tmp_path / "s.db")
+    store.save_feed_state(FeedState(SNAPSHOT_NAME, updated_at=1.0))  # no Zen Lab here
+    asked: list[str] = []
+
+    def listing(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.params["category"])
+        return httpx.Response(
+            200,
+            json={
+                "data": [live_item(int(request.url.params["category"]))],
+                "meta": {"page": 1, "perPage": 100, "total": 1, "totalPages": 1},
+            },
+        )
+
+    categories = {
+        2000: IndexerCategory("Films", None),
+        2010: IndexerCategory("Films/HD", 2000),
+        7000: IndexerCategory("Livres", None),
+    }
+    assert refresh_due(store, now=1000.0)
+
+    refresh_catalogue(native_indexer(listing), store, categories, clock=lambda: 1000.0)
+
+    assert sorted(asked) == ["1", "2"]  # each top category once, its children with it
+    assert store.catalogue_size() == 2
+    assert store.feed_state(REFRESH_FEED).updated_at == 1000.0
+    assert not refresh_due(store, now=1000.0 + 3 * 3600)
+    assert refresh_due(store, now=1000.0 + 4 * 3600)
+
+
+def test_the_whole_catalogue_refresh_leaves_other_indexers_alone(tmp_path: Path) -> None:
+    from torrentlinker.catalogue_sync import REFRESH_FEED, refresh_catalogue
+
+    def never(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("only c411's listing stops at what is known")
+
+    ix = Indexer(
+        "https://tracker.example/api", "K", http=httpx.Client(transport=httpx.MockTransport(never))
+    )
+    store = Store(tmp_path / "s.db")
+
+    refresh_catalogue(ix, store, {7000: IndexerCategory("Books", None)})
+
+    assert store.feed_state(REFRESH_FEED).updated_at is None

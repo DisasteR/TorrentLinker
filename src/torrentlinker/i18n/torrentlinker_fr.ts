@@ -4365,8 +4365,8 @@ Chaque .torrent est téléchargé directement depuis c411 avec votre clé et ajo
     </message>
     <message>
         <location filename="../gui/main_window.py" line="2680"/>
-        <source>Verified, left stopped: some files are absent</source>
-        <translation>Vérifié, laissé à l’arrêt : certains fichiers sont absents</translation>
+        <source>Verified, left stopped: the Torrent Client did not confirm skipping the absent files</source>
+        <translation>Vérifié, laissé à l’arrêt : le client torrent n’a pas confirmé ignorer les fichiers absents</translation>
     </message>
     <message>
         <location filename="../gui/main_window.py" line="2682"/>
@@ -6609,6 +6609,10 @@ La mettre à la corbeille ?</translation>
         <translation>Trouvé dans le Catalogue local par sa taille exacte, sans consommer de recherche.</translation>
     </message>
     <message>
+        <source>Found among the torrents already downloaded, by the sizes of your files, without spending a search.</source>
+        <translation>Trouvé parmi les torrents déjà téléchargés, par la taille de vos fichiers, sans consommer de recherche.</translation>
+    </message>
+    <message>
         <source>Torrent already present</source>
         <translation>Torrent déjà présent</translation>
     </message>
@@ -6847,8 +6851,8 @@ Le torrent est ensuite ajouté à votre client torrent avec les fichiers décomp
     </message>
     <message>
         <location filename="../gui/review_panel.py" line="802"/>
-        <source>You have {0} of this torrent. The {1} absent files will not be downloaded. After Verification the torrent is left stopped: starting it in your torrent client would fetch the few pieces it shares with your files. Reseed?</source>
-        <translation>Vous avez {0} de ce torrent. Les {1} fichiers absents ne seront pas téléchargés. Après la vérification, le torrent reste à l’arrêt : le démarrer dans votre client torrent récupérerait les quelques pièces qu’il partage avec vos fichiers. Repartager ?</translation>
+        <source>You have {0} of this torrent. The {1} absent files will not be downloaded. After Verification it seeds the pieces you have, with every file skipped so that nothing is ever downloaded into your files. Reseed?</source>
+        <translation>Vous avez {0} de ce torrent. Les {1} fichiers absents ne seront pas téléchargés. Après la vérification, il partage les pièces que vous avez, tous ses fichiers étant ignorés pour que rien ne soit jamais téléchargé dans vos fichiers. Repartager ?</translation>
     </message>
     <message>
         <location filename="../gui/review_panel.py" line="813"/>

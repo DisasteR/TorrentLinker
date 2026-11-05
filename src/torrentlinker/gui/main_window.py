@@ -53,7 +53,12 @@ from torrentlinker.catalogue import (
     plan_categories,
     startup_categories,
 )
-from torrentlinker.catalogue_sync import SNAPSHOT_NAME, sync_catalogue
+from torrentlinker.catalogue_sync import (
+    SNAPSHOT_NAME,
+    refresh_catalogue,
+    refresh_due,
+    sync_catalogue,
+)
 from torrentlinker.category_tags import sync_category_tags
 from torrentlinker.clients import connect
 from torrentlinker.config import Settings
@@ -103,6 +108,7 @@ from torrentlinker.library import (
     auto_searchable,
     build_library,
     indexer_contents,
+    pack_episodes,
 )
 from torrentlinker.matching import MatchRules
 from torrentlinker.paths import MappedQbit, PathMapper
@@ -497,7 +503,8 @@ class MainWindow(QMainWindow):
         self.setup_notice.linkActivated.connect(lambda _link: self.open_settings())
         self.setup_notice.hide()
         header_layout.addWidget(self.setup_notice)
-        header_layout.addWidget(self.band)
+        header_layout.addWidget(self.band.message)
+        self.statusBar().addPermanentWidget(self.band)
         # A wide workspace must not impose its minimum size on the desktop window.
         # Keep navigation and the status band visible; scroll only the workspace.
         self.workspace_scroll = QScrollArea()
@@ -563,6 +570,10 @@ class MainWindow(QMainWindow):
         self.seeding_timer = QTimer(self)
         self.seeding_timer.setInterval(30_000)
         self.seeding_timer.timeout.connect(lambda: self.zen_tab.seeding_view.refresh(quiet=True))
+        # Checks often, fetches only once the whole Catalogue is REFRESH_INTERVAL old.
+        self.catalogue_refresh_timer = QTimer(self)
+        self.catalogue_refresh_timer.setInterval(10 * 60_000)
+        self.catalogue_refresh_timer.timeout.connect(self.refresh_whole_catalogue)
         self._startup_complete = False
         self.show_saved_plan(interrupted=bool((saved := store.saved_plan()) and saved.sending))
 
@@ -708,6 +719,7 @@ class MainWindow(QMainWindow):
         self.band.setEnabled(True)
         self.statusBar().showMessage(self.tr("Ready"))
         self.seeding_timer.start()
+        self.catalogue_refresh_timer.start()
         QTimer.singleShot(0, self.check_verifications)
         QTimer.singleShot(0, self.zen_tab.seeding_view.refresh)
         QTimer.singleShot(0, self.refresh_profile)
@@ -755,7 +767,9 @@ class MainWindow(QMainWindow):
         ]
         if 0 <= index < len(descriptions):
             self.page_description.setText(descriptions[index])
-        self.band.setVisible(index < self.navigation.count() and index not in {5, 6, 7})
+        zen = index < self.navigation.count() and index not in {5, 6, 7}
+        self.band.setVisible(zen)
+        self.band.message.setVisible(zen and bool(self.band.message.text()))
         self.page_title.setVisible(index < self.navigation.count())
         self.page_description.setVisible(
             index < self.navigation.count() and self.tabs.currentWidget() is not self.media_tab
@@ -1774,6 +1788,25 @@ class MainWindow(QMainWindow):
         self._run_catalogue(work)
         return True
 
+    def refresh_whole_catalogue(self) -> bool:
+        """Every few hours, the newest torrents of every category (timer). Waits for any
+        other Catalogue work; False if nothing was started."""
+        if (
+            self.catalogue_runner is not None
+            or not get_secret(INDEXER_API_KEY)
+            or not refresh_due(self.store)
+        ):
+            return False
+        indexer, store = self.indexer(), self.store
+        categories = dict(self.settings.indexer_categories)
+
+        def work(stop: Callable[[], bool], progress: Progress) -> None:
+            log.info("Refreshing the whole Catalogue")
+            refresh_catalogue(indexer, store, categories, stop=stop, progress=progress)
+
+        self._run_catalogue(work)
+        return True
+
     def crawl_catalogue(self) -> None:
         """Fetch every category of the Indexer, resuming a paused crawl (user action)."""
         if self.catalogue_runner is not None:
@@ -2387,7 +2420,9 @@ class MainWindow(QMainWindow):
         if self.batch is not None:
             return
         pool = self.selected_entries() if selected_only else self.library_model.entries
-        entries = auto_searchable(pool)
+        episodes = pack_episodes(pool)  # checked without searching, after their packs
+        free = {e.item.path for e in episodes}
+        entries = auto_searchable(pool) + episodes
         if not entries:
             self.statusBar().showMessage(self.tr("No Orphans to search"))
             return
@@ -2399,12 +2434,13 @@ class MainWindow(QMainWindow):
         )
 
         def search(entry: LibraryEntry) -> list[CheckedCandidate]:
-            query = store.item_query(entry.item.path)
+            searching = entry.item.path not in free
+            query = store.item_query(entry.item.path) if searching else None
             found, checked = find_candidates(
                 store,
                 indexer,
                 entry.item,
-                lambda: searcher(entry, query),
+                lambda: searcher(entry, query) if searching else [],
                 rules,
                 store.rejections(entry.item.path),
                 use_catalogue=query is None,
@@ -2413,7 +2449,7 @@ class MainWindow(QMainWindow):
             return checked
 
         self._batch_mode = "search"
-        self._begin_library_batch(BatchRunner(entries, search))
+        self._begin_library_batch(BatchRunner(entries, search, orphans_only=False))
         self.batch_text = self.tr("Searching {0} Orphans…").format(len(entries))
 
     def start_library_batch(self, mode: str) -> None:
@@ -2802,7 +2838,10 @@ class MainWindow(QMainWindow):
             if outcome.verified and outcome.started:
                 text = self.tr("Reseeded")
             elif outcome.verified:
-                text = self.tr("Verified, left stopped: some files are absent")
+                text = self.tr(
+                    "Verified, left stopped: the Torrent Client did not confirm skipping "
+                    "the absent files"
+                )
             elif outcome.problem:
                 text = self.tr("Reseed undone: {0}").format(outcome.problem)
             else:
