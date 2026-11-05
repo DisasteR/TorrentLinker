@@ -795,6 +795,33 @@ class Store:
 
     # Catalogue --------------------------------------------------------------
 
+    def catalogue_unseen_since(self, since: float, limit: int = 500) -> list[str]:
+        """Torrents outside XXX that no listing has returned since `since`, oldest first.
+        XXX is left out: c411's API never lists it, so it would always look unseen."""
+        with self._lock:
+            return [
+                row[0]
+                for row in self._db.execute(
+                    "SELECT infohash FROM catalogue WHERE seen_at < ?"
+                    " AND NOT (category BETWEEN 6000 AND 6999) ORDER BY seen_at LIMIT ?",
+                    (since, limit),
+                )
+            ]
+
+    def forget_feed_states(self, prefixes: tuple[str, ...]) -> None:
+        with self._lock, self._db:
+            for prefix in prefixes:
+                self._db.execute(
+                    "DELETE FROM catalogue_feed WHERE substr(name, 1, ?) = ?",
+                    (len(prefix), prefix),
+                )
+
+    def mark_catalogue_seen(self, infohash: str, when: float) -> None:
+        with self._lock, self._db:
+            self._db.execute(
+                "UPDATE catalogue SET seen_at = ? WHERE infohash = ?", (when, infohash.lower())
+            )
+
     def drop_unavailable_torrent(self, infohash: str) -> None:
         """Remove an explicitly unavailable torrent and keep refreshes from restoring it."""
         with self._lock, self._db:

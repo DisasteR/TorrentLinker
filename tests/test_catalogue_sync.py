@@ -868,3 +868,35 @@ def test_a_capped_subcategory_is_read_oldest_first_then_year_by_year(tmp_path: P
     asked.clear()
     fill_capped(native_indexer(listing), store, this_year=2026)  # every part already read
     assert all("subcat" not in q for q in asked)
+
+
+def test_a_complete_full_fetch_removes_what_c411_deleted_and_keeps_xxx(tmp_path: Path) -> None:
+    from torrentlinker.catalogue_sync import FULL_CRAWL, prune_deleted, start_full_crawl
+    from torrentlinker.store import CatalogueRow
+
+    store = Store(tmp_path / "s.db")
+    store.save_feed_state(FeedState("c411-json:category=1", updated_at=1.0, head_hashes=("x",)))
+
+    def row(h: str, category: int, seen: float) -> CatalogueRow:
+        return CatalogueRow(h * 40, h, 1, 1, category, "u", "d", seen)
+
+    store.save_catalogue(
+        [row("a", 2000, 100.0), row("b", 2000, 5.0), row("c", 2000, 5.0), row("d", 6010, 5.0)]
+    )
+    start_full_crawl(store, clock=lambda: 50.0)
+    assert store.feed_state("c411-json:category=1").updated_at is None  # read again in full
+    start_full_crawl(store, clock=lambda: 60.0)  # resuming keeps the first start
+    asked: list[str] = []
+
+    def lookup(request: httpx.Request) -> httpx.Response:
+        h = request.url.path.rsplit("/", 1)[1]
+        asked.append(h[0])
+        return httpx.Response(404 if h[0] == "b" else 200, json={})
+
+    removed = prune_deleted(native_indexer(lookup), store, clock=lambda: 70.0)
+
+    assert removed == 1 and sorted(asked) == ["b", "c"]  # never the seen one, never XXX
+    assert sorted(r.title for r in store.catalogue()) == ["a", "c", "d"]
+    store.save_catalogue([row("b", 2000, 80.0)])
+    assert "b" not in {r.title for r in store.catalogue()}  # a refresh cannot bring it back
+    assert store.feed_state(FULL_CRAWL).started_at is None  # the next fetch starts anew

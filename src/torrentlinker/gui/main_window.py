@@ -56,8 +56,10 @@ from torrentlinker.catalogue import (
 from torrentlinker.catalogue_sync import (
     SNAPSHOT_NAME,
     fill_capped,
+    prune_deleted,
     refresh_catalogue,
     refresh_due,
+    start_full_crawl,
     sync_catalogue,
 )
 from torrentlinker.category_tags import sync_category_tags
@@ -1832,6 +1834,7 @@ class MainWindow(QMainWindow):
                 for c, name in caps.categories.items()
             }
             wanted = crawl_categories(categories)
+            start_full_crawl(store)
             for i, category in enumerate(wanted, 1):
                 if stop():
                     return
@@ -1845,8 +1848,12 @@ class MainWindow(QMainWindow):
                     progress=progress,
                     categories=categories,
                 )
-            # Then what newest-first pages cannot reach in the biggest subcategories.
+            # Then what newest-first pages cannot reach in the biggest subcategories,
+            # and, once complete, drop the torrents c411 has deleted since.
             fill_capped(indexer, store, stop=stop, progress=progress)
+            if not stop():
+                removed = prune_deleted(indexer, store, stop=stop, progress=progress)
+                log.info("Catalogue: %d torrents deleted on c411 removed", removed)
 
         self._crawl_position[:] = [0, 0]
         self.zen_tab.catalogue.set_state(True, False)
@@ -1885,11 +1892,15 @@ class MainWindow(QMainWindow):
         p = self._last_crawl_progress
         if p is None:
             return
-        if p.source == SNAPSHOT_NAME:
-            text = self.tr("Importing Zen Lab metadata: {0} torrents (+{1})").format(
-                p.offset, p.added
+        if p.source in (SNAPSHOT_NAME, "c411-prune"):
+            text = (
+                self.tr("Importing Zen Lab metadata: {0} torrents (+{1})").format(p.offset, p.added)
+                if p.source == SNAPSHOT_NAME
+                else self.tr(
+                    "Checking torrents no longer listed: {0} checked, {1} deleted on c411"
+                ).format(p.pages, -p.added)
             )
-            self.band.set_catalogue(text)
+            # Progress goes on the footer's left; its right keeps the Zen figures.
             self.zen_tab.catalogue.set_status(text)
             self.statusBar().showMessage(text)
             if self._planning:
@@ -1902,7 +1913,6 @@ class MainWindow(QMainWindow):
             if parent is not None:
                 label = f"{parent.name} / {label}"
         text = self.tr("updating {0}, page {1} (+{2})").format(label, p.pages, p.added)
-        self.band.set_catalogue(text)
         wait = self._indexer.next_request_in() if self._indexer else 0
         suffix = self.tr(" · next request in {0} s").format(f"{wait:.0f}") if wait > 0.5 else ""
         size = self.store.catalogue_size()

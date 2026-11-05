@@ -3619,6 +3619,10 @@ Fait aussi partie du pack {1}. Il n’est en seed seul qu’avec son propre torr
 <context>
     <name>MainWindow</name>
     <message>
+        <source>Checking torrents no longer listed: {0} checked, {1} deleted on c411</source>
+        <translation>Vérification des torrents qui ne sont plus listés : {0} vérifiés, {1} supprimés sur c411</translation>
+    </message>
+    <message>
         <source>Waiting for c411 until {0}</source>
         <translation>En attente de c411 jusqu’à {0}</translation>
     </message>

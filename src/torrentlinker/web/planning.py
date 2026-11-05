@@ -10,7 +10,13 @@ from typing import Any
 import httpx
 
 from torrentlinker.catalogue import crawl_categories, plan_categories
-from torrentlinker.catalogue_sync import SNAPSHOT_NAME, fill_capped, sync_catalogue
+from torrentlinker.catalogue_sync import (
+    SNAPSHOT_NAME,
+    fill_capped,
+    prune_deleted,
+    start_full_crawl,
+    sync_catalogue,
+)
 from torrentlinker.domain import LibraryFolder
 from torrentlinker.indexer import KeyRefused, RateLimited
 from torrentlinker.plan import (
@@ -77,6 +83,8 @@ def catalogue(
             chosen, setup.settings.download_folders, setup.settings.indexer_categories
         )
     )
+    if full:
+        start_full_crawl(setup.store)
     sync_catalogue(
         setup.indexer(),
         setup.store,
@@ -95,6 +103,13 @@ def catalogue(
             stop=lambda: fetch_stopped(stop),
             progress=lambda p: progress({"phase": "fetching", **asdict(p)}),
         )
+        if not fetch_stopped(stop):  # complete: drop what c411 deleted since
+            prune_deleted(
+                setup.indexer(),
+                setup.store,
+                stop=lambda: fetch_stopped(stop),
+                progress=lambda p: progress({"phase": "checking", **asdict(p)}),
+            )
     return catalogue_status(setup)
 
 

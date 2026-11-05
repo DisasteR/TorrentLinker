@@ -620,6 +620,56 @@ def _read_part(
     return True
 
 
+FULL_CRAWL = "c411-full-crawl"
+
+
+def start_full_crawl(store: Store, clock: Callable[[], float] = time.time) -> None:
+    """Begin a full fetch from scratch, or resume the one under way. A new one forgets
+    the history checkpoints, so it reads every reachable page again rather than stopping
+    at what an earlier fetch saw: torrents it never sees are then truly unlisted, and
+    are checked one by one once it completes (prune_deleted)."""
+    if store.feed_state(FULL_CRAWL).started_at is None:
+        store.forget_feed_states(("c411-json:", "c411-capped:"))
+        store.save_feed_state(FeedState(FULL_CRAWL, started_at=clock()))
+
+
+def prune_deleted(
+    indexer: Indexer,
+    store: Store,
+    *,
+    stop: Callable[[], bool] = lambda: False,
+    progress: Progress = lambda p: None,
+    clock: Callable[[], float] = time.time,
+) -> int:
+    """After a complete full fetch: ask c411 about each torrent outside XXX it did not
+    see. Deleted ones (404) leave the Catalogue for good; the others count as seen.
+    Returns how many were removed; resumable, as each answer is recorded at once."""
+    started = store.feed_state(FULL_CRAWL).started_at
+    if started is None or not indexer.is_c411:
+        return 0
+    removed = checked = 0
+    while not stop():
+        batch = store.catalogue_unseen_since(started)
+        if not batch:
+            store.save_feed_state(FeedState(FULL_CRAWL, updated_at=clock()))
+            return removed
+        for infohash in batch:
+            if stop():
+                return removed
+            try:
+                indexer.torrent_json(infohash)
+            except httpx.HTTPStatusError as error:
+                if error.response.status_code != 404:
+                    raise
+                store.drop_unavailable_torrent(infohash)
+                removed += 1
+            else:
+                store.mark_catalogue_seen(infohash, clock())
+            checked += 1
+            progress(CrawlProgress(0, checked, -removed, checked, "c411-prune"))
+    return removed
+
+
 def refresh_due(store: Store, now: float | None = None) -> bool:
     """Whether the last whole-Catalogue refresh is older than REFRESH_INTERVAL."""
     last = store.feed_state(REFRESH_FEED).updated_at
