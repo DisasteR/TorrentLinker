@@ -34,17 +34,25 @@ def test_guide_worked_example_tanker_fifteen_films_of_4_gb_earns_about_4_a_day()
 @pytest.mark.parametrize(
     ("size", "expected"),
     [
-        (1_000_000, 0.06),
-        (1 * GB, 0.29),
-        (1024**3, 0.31),  # shown as 1,00 Go
+        (100_000_000, 0.025),
+        (500_000_000, 0.125),
+        (1 * GB, 0.25),
+        (2 * GB, 0.5),
         (4 * GB, 1.0),
         (4 * 1024**3, 1.01),  # shown as 4,00 Go
-        (25 * GB, 1.24),
-        (60 * GB, 1.38),
+        (25 * GB, 1.26),
+        (60 * GB, 1.40),
+        (200 * GB, 1.64),
     ],
 )
-def test_size_weight_matches_the_guide(size: float, expected: float) -> None:
+def test_size_weight_matches_the_size_rule(size: float, expected: float) -> None:
     assert weight(int(size)) == pytest.approx(expected, abs=0.006)
+
+
+def test_tiny_torrents_weigh_their_size_down_to_a_floor() -> None:
+    assert weight(1_000_000) == pytest.approx(0.00025)
+    assert weight(400_000) == pytest.approx(0.0001)
+    assert weight(10_000) == 0.0001
 
 
 def test_weight_keeps_rising_slowly_beyond_25_gb() -> None:

@@ -22,6 +22,11 @@ Sources, as of 2026-10:
   100, +20 % from 150, then +1 % per 50 more up to +25 %); the progression tree, up to
   +5 %, from challenges completed (reported by the profile as treeBonusBp); the shop's
   Pondération badges, added on top even when the grid is at its maximum.
+- OFFICIAL SIZE RULE — c411's announcement "Chaque torrent compte selon sa taille",
+  from the payout for the night of 2026-11-16: the size weight is size ÷ 4 GB up to
+  4 GB, never under 0.0001; above, 1.01 at 4.00 GiB, 1.26 at 25 GB, 1.40 at 60 GB and
+  1.64 at 200 GB. Days paid before keep the old curve, which this module no longer
+  models.
 
 - OFFICIAL FORMULA — c411's "Le calcul en cours", supplied on 2026-10-22:
   payout = round(T × P × S × I ÷ 7 × (1 + B)), with T the torrents counted, P the share
@@ -43,7 +48,8 @@ GB = 1_000_000_000  # c411 sizes are decimal: 1 Zen buys 1 Go of download credit
 DIVISOR = 7  # OFFICIAL
 MIN_SEED_HOURS = 0.5  # OFFICIAL: under 30 minutes a day a torrent counts nothing
 MAX_TREE_BONUS = 0.05  # OFFICIAL BONUS PAGE
-WEIGHT_EXPONENT = 0.119  # fitted to OFFICIAL FORMULA's 1.01, 1.24 and 1.38
+WEIGHT_EXPONENT = 0.1256  # fitted to OFFICIAL SIZE RULE's 1.01, 1.26, 1.40 and 1.64
+MIN_WEIGHT = 0.0001  # OFFICIAL SIZE RULE: reached under 400 KB
 UPLOAD_ZEN_PER_DAY = 0.43  # OFFICIAL, upper figure: rough Reuploader estimate per upload
 KEEPER_CATEGORY_BASES = {6000: 0.5}  # OFFICIAL EXCERPT: other listed categories have base 1
 
@@ -107,15 +113,15 @@ class ZenDay:
 
 
 def weight(size: int) -> float:
-    """Size weight: 1 for a 4 GB film (OFFICIAL FORMULA).
+    """Size weight: 1 for a 4 GB film (OFFICIAL SIZE RULE).
 
-    Up to 4 GB: (0.25 GB + size) / 4.25 GB. Above, it rises slowly; c411 gives 1.01 at
-    4.29 GB (4.00 GiB), 1.24 at 25 GB and 1.38 at 60 GB, which a power curve fits within
-    their rounding, where a straight line from 4 to 25 GB gives 1.00 at 4.29 GB.
+    Up to 4 GB: size / 4 GB, never under 0.0001. Above, it rises slowly; c411 gives
+    1.01 at 4.29 GB (4.00 GiB), 1.26 at 25 GB, 1.40 at 60 GB and 1.64 at 200 GB, which a
+    power curve fits within their rounding.
     """
     gb = size / GB
     if gb <= 4:
-        return (0.25 + gb) / 4.25
+        return max(gb / 4, MIN_WEIGHT)
     return float((gb / 4) ** WEIGHT_EXPONENT)
 
 
