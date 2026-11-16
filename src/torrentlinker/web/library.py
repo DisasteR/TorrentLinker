@@ -86,7 +86,18 @@ class Library:
         client_unavailable = False
         try:
             torrents = indexer_contents(
-                self.client(), self.setup.store, self.setup.settings.indexer.url
+                self.client(),
+                self.setup.store,
+                self.setup.settings.indexer.url,
+                stop=stop,
+                progress=lambda done, total, rate: progress(
+                    {
+                        "stage": "client-files",
+                        "done": done,
+                        "total": total,
+                        "requests_per_second": round(rate, 2),
+                    }
+                ),
             )
         except Exception:
             torrents = []

@@ -71,7 +71,6 @@ from torrentlinker.catalogue_sync import (
     sync_catalogue,
 )
 from torrentlinker.category_tags import sync_category_tags
-from torrentlinker.clients import connect
 from torrentlinker.config import Settings
 from torrentlinker.credentials import get_secret
 from torrentlinker.domain import ContentKind, ItemState, LibraryFolder, TorrentClient
@@ -93,21 +92,15 @@ from torrentlinker.gui.search_view import SearchTab
 from torrentlinker.gui.send_runner import SendRunner
 from torrentlinker.gui.settings_dialog import (
     ANNOUNCE_URL,
-    DELUGE_PASSWORD,
     INDEXER_API_KEY,
     PROXY_PASSWORD,
-    QBIT_API_KEY,
-    QBIT_PASSWORD,
-    RTORRENT_PASSWORD,
     TMDB_API_KEY,
-    TRANSMISSION_PASSWORD,
-    UTORRENT_PASSWORD,
     SettingsDialog,
     choose_directory,
     extra_indexer_keys,
 )
 from torrentlinker.gui.tables import EmptyState, TreeTable, style_tree
-from torrentlinker.gui.tasks import run_in_background
+from torrentlinker.gui.tasks import run_in_background, run_with_progress
 from torrentlinker.gui.theme import set_theme
 from torrentlinker.gui.torrents_view import TorrentsTab
 from torrentlinker.gui.update_notice import UpdateNotice
@@ -122,7 +115,7 @@ from torrentlinker.library import (
     pack_episodes,
 )
 from torrentlinker.matching import MatchRules
-from torrentlinker.paths import MappedQbit, PathMapper
+from torrentlinker.paths import MappedQbit
 from torrentlinker.plan import (
     Plan,
     PlanCandidate,
@@ -140,7 +133,7 @@ from torrentlinker.plan import (
 )
 from torrentlinker.plan_diagnostics import PlanIssue
 from torrentlinker.profile import UserProfile
-from torrentlinker.qbit import AlreadyInClient, ClientApi
+from torrentlinker.qbit import AlreadyInClient
 from torrentlinker.queries import build_queries, find_ids
 from torrentlinker.reseed import (
     Outcome,
@@ -188,6 +181,7 @@ class MainWindow(QMainWindow):
         self.companion_receiver: CompanionReceiver | None = None
         self._profile_refreshing = False
         self._torrent_clients_busy = False
+        self._scan_stop = threading.Event()
         self._avatar_token: str | None = None
         self._torrent_clients_at = -TORRENT_CLIENTS_EVERY
         self._receiver_retry_at = 0.0
@@ -201,8 +195,6 @@ class MainWindow(QMainWindow):
 
         self._connections = Connections(get_secret)
         self._indexer: Indexer | None = None
-        # Kept connections, with what they were made for, the proxy in use included.
-        self._qbit: tuple[tuple[str, ...], ClientApi, tuple[str | None, str | None]] | None = None
         self.apply_proxy()
         self._indexer_proxy = net.current()  # what the Indexer, once made, goes through
         self.running_version = installed_version()
@@ -914,32 +906,7 @@ class MainWindow(QMainWindow):
 
     def qbit(self) -> MappedQbit:
         """The Torrent Client the user chose, through Path Mappings."""
-        s = self.settings
-        if s.client is TorrentClient.DELUGE:
-            key: tuple[str, ...] = (
-                s.client,
-                s.deluge.host,
-                "",
-                get_secret(s.secret_name(DELUGE_PASSWORD)),
-            )
-        elif s.client is TorrentClient.TRANSMISSION:
-            t = s.transmission
-            key = (s.client, t.host, t.username, get_secret(s.secret_name(TRANSMISSION_PASSWORD)))
-        elif s.client is TorrentClient.RTORRENT:
-            r = s.rtorrent
-            key = (s.client, r.host, r.username, get_secret(s.secret_name(RTORRENT_PASSWORD)))
-        elif s.client in {TorrentClient.UTORRENT, TorrentClient.BITTORRENT}:
-            u = s.utorrent
-            key = (s.client, u.host, u.username, get_secret(s.secret_name(UTORRENT_PASSWORD)))
-        else:
-            q = s.qbit
-            key = (s.client, q.host, q.username, get_secret(s.secret_name(QBIT_PASSWORD)))
-            key += (get_secret(s.secret_name(QBIT_API_KEY)),)
-        if self._qbit is None or self._qbit[2] != net.current() or self._qbit[0] != key:
-            self._qbit = (key, connect(s.client, *key[1:]), net.current())
-        return MappedQbit(
-            self._qbit[1], PathMapper(s.path_mappings), sequential_video=s.sequential_video
-        )
+        return self._connections.client(self.settings)
 
     def indexer(self) -> Indexer:
         """One Indexer instance, so every search shares the same rate limiter.
@@ -1414,11 +1381,9 @@ class MainWindow(QMainWindow):
         """Build on the GUI thread the work that makes a Plan (no Indexer request)."""
         s = self.settings
         if self._plan_destinations != {s.active_client_id: 0}:
-            from torrentlinker.client_profiles import Connections
             from torrentlinker.multi_plan import distributed_plan
 
-            connections = Connections(get_secret)
-            clients = {i: connections.client(s, i) for i in self._plan_destinations}
+            clients = {i: self._connections.client(s, i) for i in self._plan_destinations}
             budgets = dict(self._plan_destinations)
             return lambda: distributed_plan(s, self.store, clients, budgets)
         qbit, store, profile, url = self.qbit(), self.store, s.zen, s.indexer.url
@@ -2216,6 +2181,7 @@ class MainWindow(QMainWindow):
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._scan_stop.set()
         self.profile_timer.stop()
         if self.companion_receiver is not None:
             self.companion_receiver.stop()
@@ -2951,10 +2917,21 @@ class MainWindow(QMainWindow):
         qbit, ignore, store = self.qbit(), self.settings.matching.ignore, self.store
         url = self.settings.indexer.url
 
-        def work():
+        self._scan_stop = stop = threading.Event()
+
+        def work(report):
             client_error = None
             try:
-                torrents = indexer_contents(qbit, store, url, refresh=refresh)
+                torrents = indexer_contents(
+                    qbit,
+                    store,
+                    url,
+                    refresh=refresh,
+                    stop=stop,
+                    progress=lambda done, total, rate: report((done, total, rate)),
+                )
+            except InterruptedError:
+                return previous
             except Exception as error:
                 client_error = error
                 torrents = None
@@ -2962,9 +2939,20 @@ class MainWindow(QMainWindow):
             result.client_error = client_error
             return result
 
-        run_in_background(work, self._scan_done, self._scan_failed)
+        def progress(value):
+            if not stop.is_set() and isValid(self):
+                done, total, rate = value
+                self.statusBar().showMessage(
+                    self.tr("Reading client files: {0}/{1} · up to {2} requests/s").format(
+                        done, total, f"{rate:.2f}"
+                    )
+                )
+
+        run_with_progress(work, progress, self._scan_done, self._scan_failed)
 
     def _scan_done(self, entries: list) -> None:  # type: ignore[type-arg]
+        if self._scan_stop.is_set() or not isValid(self):
+            return
         self.library_workspace.set_scan_errors(getattr(entries, "errors", []))
         self.library_model.set_entries(entries)
         self.upload_tab.set_entries(entries)
@@ -3037,6 +3025,8 @@ class MainWindow(QMainWindow):
         log.warning("could not restore previous searches: %s", error)
 
     def _scan_failed(self, error: Exception) -> None:
+        if self._scan_stop.is_set() or not isValid(self):
+            return
         self.scan_action.setEnabled(True)
         self.rescan_action.setEnabled(True)
         self.add_folder_action.setEnabled(True)

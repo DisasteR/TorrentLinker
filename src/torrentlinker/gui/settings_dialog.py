@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -28,7 +27,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
-    QSpinBox,
     QStackedWidget,
     QStyle,
     QTableWidget,
@@ -45,6 +43,8 @@ from torrentlinker.config import UI_SCALES, Settings
 from torrentlinker.credentials import TMDB_API_KEY, get_secret, set_secret
 from torrentlinker.domain import ContentKind, LibraryFolder, PathMapping, Torrent, TorrentClient
 from torrentlinker.downloads import DownloadFolders, IndexerCategory
+from torrentlinker.gui.controls import ScrollDoubleSpinBox as QDoubleSpinBox
+from torrentlinker.gui.controls import ScrollSpinBox as QSpinBox
 from torrentlinker.gui.controls import set_role
 from torrentlinker.gui.errors import offer_whole_names
 from torrentlinker.gui.folder_import import FolderImportDialog
@@ -118,7 +118,8 @@ class SettingsDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("Settings"))
-        self.resize(1020, 720)
+        available = self.screen().availableGeometry()
+        self.resize(min(1020, available.width() - 40), min(720, available.height() - 60))
         self.settings = settings
         self._secret_values = secret_values
         self._loaded_secrets: dict[str, str] = {}

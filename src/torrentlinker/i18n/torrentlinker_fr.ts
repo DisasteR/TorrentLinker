@@ -4594,6 +4594,10 @@ La mettre à la corbeille ?</translation>
         <source>Browser connection unavailable. Close the other TorrentLinker instance; retrying automatically.</source>
         <translation>Connexion navigateur indisponible. Fermez l’autre instance de TorrentLinker ; nouvelle tentative automatique.</translation>
     </message>
+<message>
+        <source>Reading client files: {0}/{1} · up to {2} requests/s</source>
+        <translation>Lecture des fichiers du client : {0}/{1} · jusqu’à {2} requêtes/s</translation>
+    </message>
 </context>
 <context>
     <name>MediaHero</name>
