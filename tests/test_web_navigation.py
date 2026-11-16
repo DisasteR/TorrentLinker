@@ -144,8 +144,21 @@ eval(process.argv[1] + process.argv[2] + process.argv[3] + process.argv[4] + `
     assert.equal(state.view,'torrents');assert.equal(location.hash,'#/torrents');
   }
   state.setup.configured=false;
-  location.hash='#/library/activity';await settle();await enter();await settle();
+  location.hash='';await settle();await enter();await settle();
   assert.equal(state.view,'setup');assert.equal(location.hash,'#/setup/connections');
+  // Setup is the default, not a navigation gate. Users can configure an Assistant
+  // or review saved Upload drafts before connecting a Torrent Client.
+  for(const [view,tab,loader] of [
+    ['assistant',undefined,'assistant'], ['upload','local','upload/local'],
+    ['library','activity','library/activity'],
+  ]){
+    const count=loaded.filter(value=>value===loader).length;
+    await navigate(view,tab);await settle();
+    assert.equal(state.view,view);
+    assert.equal(loaded.filter(value=>value===loader).length,count+1);
+    const hash=location.hash;
+    await enter();await settle();assert.equal(state.view,view);assert.equal(location.hash,hash);
+  }
   // A stale setup response cannot overwrite a newer navigation.
   state.setup.configured=true;
   let finish;

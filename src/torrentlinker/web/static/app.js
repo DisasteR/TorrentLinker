@@ -663,8 +663,9 @@ function resolveRoute(fragment) {
   const fallback = state.setup?.configured ? ["torrents"] : ["setup", "connections"];
   const parts = fragment.replace(/^#\//, "").split("/");
   const [view, tab, detail] = parts;
-  if (!fragment.startsWith("#/") || !Object.hasOwn(viewTabs, view) ||
-      (!state.setup?.configured && view !== "setup")) return fallback;
+  // Incomplete setup selects the landing page; it does not block explicit routes
+  // such as configuring the Assistant or reviewing saved Upload drafts.
+  if (!fragment.startsWith("#/") || !Object.hasOwn(viewTabs, view)) return fallback;
   const tabs = viewTabs[view];
   const validDetail = view === "setup" && tab === "agents" && agentTabs.includes(detail) ||
     view === "media" && mediaViewsByKind[tab]?.includes(detail) &&
