@@ -120,6 +120,8 @@ The `torrentlinker_config` volume holds configuration, catalogue, queue, job his
 
 After an abrupt restart, unfinished jobs are marked interrupted and are not replayed. Check the Torrent Client before retrying. Persisted Reseed Verification is monitored again. A queue entry with an uncertain send remains visible and is not automatically sent a second time.
 
+Repeating the same action for the same client and parameters while it is queued or running follows the existing job. Different parameters create separate jobs, and you can run the same action again after it ends. Confirmation requirements still apply. Separate agent proposals keep their own approval and budget handling, so they remain separate jobs; repeating approval of the same proposal follows its existing job. Automatic Catalogue refreshes only fetch new releases and remain separate from a manual history fetch.
+
 UI-entered credentials are encrypted in `credentials.enc`. Back up it and `credentials.key` together and protect the configuration volume. Someone who can read both files can decrypt the credentials. Desktop credentials still use the operating system keyring.
 
 Unless a reverse proxy signs users in, the Web UI password comes from `TL_WEB_PASSWORD_FILE` (recommended). Where files are impractical, such as a Portainer stack, set `TL_WEB_PASSWORD` instead. The file wins if both are set. Environment variables are visible through `docker inspect`, so prefer the file when you can.

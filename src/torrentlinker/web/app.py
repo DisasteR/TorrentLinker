@@ -220,6 +220,9 @@ def create_app(
                         stop=stop.is_set,
                         progress=lambda p: progress({"phase": "fetching", **asdict(p)}),
                     ),
+                    # This refresh only fetches new releases; a manual Catalogue
+                    # job also fetches history and must remain separate.
+                    parameters={"refresh_newest": True},
                 )
 
     @asynccontextmanager
@@ -937,6 +940,12 @@ def create_app(
                 update={"client_id": body.client_id or service.settings.default_client_id}
             )
             target = for_client(body.client_id)
+            parameters = body.model_dump(
+                mode="json", exclude_defaults=True, exclude={"kind", "client_id"}
+            )
+            existing = jobs.check_capacity(body.kind, body.client_id, parameters=parameters)
+            if existing is not None:
+                return {"id": existing}
             target.validate(body)
             if (
                 body.kind == "manage"
@@ -957,6 +966,7 @@ def create_app(
                 body.kind,
                 execute,
                 client_id=body.client_id,
+                parameters=parameters,
             )
         return {"id": identifier}
 

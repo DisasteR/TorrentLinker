@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import threading
@@ -29,6 +30,9 @@ class Jobs:
         self.db.row_factory = sqlite3.Row
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="torrentlinker")
         self.stops: dict[str, JobStop] = {}
+        # Pending work never survives restart. Keep only digests in memory, not
+        # request bodies that may contain paths, confirmation tokens or credentials.
+        self._request_keys: dict[str, str] = {}
         self.closed = False
         with self.db:
             self.db.execute(
@@ -54,22 +58,31 @@ class Jobs:
                 ).fetchone()
             )
 
-    def check_capacity(self, kind: str, client_id: str = "default") -> str | None:
-        """Check before reserving download budgets; return an existing refresh job if any.
+    def check_capacity(
+        self,
+        kind: str,
+        client_id: str = "default",
+        *,
+        parameters: dict[str, Any] | None = None,
+        deduplicate: bool = True,
+    ) -> str | None:
+        """Return identical pending work, otherwise check capacity before reservations.
 
         Callers that reserve before submit must hold this lock across both operations.
         """
         with self.lock:
             if self.closed:
                 raise ValueError("Server is shutting down.")
-            if kind == "refresh":
+            if deduplicate:
+                key = _request_key(parameters)
                 pending = self.db.execute(
-                    "SELECT id FROM jobs WHERE kind='refresh' AND status IN ('queued','running') "
-                    "AND client_id=? ORDER BY created LIMIT 1",
-                    (client_id,),
-                ).fetchone()
-                if pending is not None:
-                    return str(pending[0])
+                    "SELECT id FROM jobs WHERE kind=? AND status IN ('queued','running') "
+                    "AND client_id=? ORDER BY created",
+                    (kind, client_id),
+                ).fetchall()
+                for row in pending:
+                    if self._request_keys.get(row[0]) == key:
+                        return str(row[0])
             count = self.db.execute(
                 "SELECT count(*) FROM jobs WHERE status IN ('queued','running')"
             ).fetchone()[0]
@@ -83,12 +96,18 @@ class Jobs:
         work: Callable[[threading.Event, Callable[[Any], None]], Any],
         *,
         client_id: str = "default",
+        parameters: dict[str, Any] | None = None,
+        deduplicate: bool = True,
     ) -> str:
         with self.lock:
-            existing = self.check_capacity(kind, client_id)
+            existing = self.check_capacity(
+                kind, client_id, parameters=parameters, deduplicate=deduplicate
+            )
             if existing is not None:
                 return existing
             identifier = uuid.uuid4().hex
+            if deduplicate:
+                self._request_keys[identifier] = _request_key(parameters)
             stop = self.stops[identifier] = JobStop()
             with self.db:
                 self.db.execute(
@@ -108,6 +127,7 @@ class Jobs:
             self._update(identifier, status="cancelled")
             with self.lock:
                 self.stops.pop(identifier, None)
+                self._request_keys.pop(identifier, None)
             return
         self._update(identifier, status="running")
         try:
@@ -137,6 +157,7 @@ class Jobs:
         finally:
             with self.lock:
                 self.stops.pop(identifier, None)
+                self._request_keys.pop(identifier, None)
 
     def _update(self, identifier: str, **values: Any) -> None:
         with self.lock, self.db:
@@ -198,3 +219,8 @@ class Jobs:
                     stop.set()
         self.executor.shutdown(wait=True)
         self.db.close()
+
+
+def _request_key(parameters: dict[str, Any] | None) -> str:
+    encoded = json.dumps(parameters or {}, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()

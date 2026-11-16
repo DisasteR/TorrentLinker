@@ -724,7 +724,9 @@ class AgentService:
             self.limits(identifier, actor, grant, target, body)
             from torrentlinker.agent.budgets import reserve
 
-            self.jobs.check_capacity(body.kind, body.client_id)
+            # Separate proposals own separate approval/budget/revocation lifecycles.
+            # Repeating this proposal already returns its submitted job above.
+            self.jobs.check_capacity(body.kind, body.client_id, deduplicate=False)
             sizes = reserve(self.access, identifier, actor, grant, target, body)
             # Record intent before submitting. A crash never replays an uncertain mutation.
             with self.access.db:
@@ -852,7 +854,7 @@ class AgentService:
                             "UPDATE proposals SET status='finished' WHERE id=?", (identifier,)
                         )
 
-            job_id = self.jobs.submit(body.kind, work, client_id=body.client_id)
+            job_id = self.jobs.submit(body.kind, work, client_id=body.client_id, deduplicate=False)
             with self.access.db:
                 self.access.db.execute(
                     "UPDATE proposals SET status='submitted',job_id=? WHERE id=?",

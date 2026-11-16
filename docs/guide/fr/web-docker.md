@@ -122,6 +122,8 @@ Le volume `torrentlinker_config` conserve les paramètres, le catalogue, la file
 
 Après un arrêt brutal du serveur, une tâche inachevée est marquée interrompue. Vérifiez son résultat dans le client torrent avant de la relancer. Les vérifications de Reseed enregistrées reprennent leur suivi. Un envoi incertain reste visible dans la file ; il n'est pas renvoyé automatiquement.
 
+Répéter la même action pour le même client avec les mêmes paramètres suit la tâche existante tant qu’elle est en attente ou en cours. Des paramètres différents créent des tâches distinctes. Une fois la tâche terminée, vous pouvez relancer la même action. Les confirmations restent nécessaires. Des propositions d’agent distinctes conservent chacune leur approbation et leur budget ; répéter l’approbation d’une même proposition suit sa tâche existante. La mise à jour automatique du Catalogue ne récupère que les nouveautés et reste distincte d’une collecte manuelle de l’historique.
+
 Les identifiants saisis dans l'interface sont chiffrés dans `credentials.enc`. La clé de chiffrement `credentials.key` est dans le même volume : protégez le volume et sauvegardez les deux fichiers ensemble. Le chiffrement ne protège pas contre quelqu'un qui peut lire tout le volume. L'application de bureau continue d'utiliser le trousseau système.
 
 Sauf si un reverse proxy authentifie les utilisateurs, le mot de passe de l’interface web provient de `TL_WEB_PASSWORD_FILE` (recommandé). Si les fichiers sont peu pratiques, par exemple avec une pile Portainer, définissez `TL_WEB_PASSWORD`. Le fichier l’emporte si les deux sont définis. Les variables d’environnement sont visibles via `docker inspect` : préférez le fichier quand c’est possible.
