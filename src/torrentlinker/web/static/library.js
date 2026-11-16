@@ -65,6 +65,7 @@ function renderLibraryFolders() {
   }
 }
 async function libraryTab(tab) {
+  rememberTab("library", tab);
   document.querySelectorAll("[data-library-tab]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.libraryTab===tab)));
   $("library-items").hidden=tab!=="items";
   $("library-folder-manager").hidden=tab!=="folders";
@@ -243,7 +244,7 @@ $("candidate-expand").onclick=()=>{
   $("candidate-expand").textContent=expanded?say("Back to Local Items","Retour aux éléments"):say("Expand review","Agrandir");
 };
 
-$("settings-library-folders").onclick=()=>guard(async()=>{await navigate("library");await libraryTab("folders");});
+$("settings-library-folders").onclick=()=>guard(()=>navigate("library", "folders"));
 
 function renderLibraryDownloads() {
   const folders=state.setup.download_folders || {default:"",by_category:{},effective:{}};

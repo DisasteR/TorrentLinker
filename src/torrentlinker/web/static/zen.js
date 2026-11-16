@@ -2,6 +2,7 @@
 
 const zenSeeding = { generation: 0, expanded: new Set(), client: null, groups: [] };
 function zenTab(name) {
+  rememberTab("zen", name);
   $("zen-overview").hidden = name !== "seeding";
   for (const key of ["profile", "seeding", "plan", "catalogue"]) {
     const selected = key === name;

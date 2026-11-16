@@ -181,6 +181,8 @@ Créer un plan actualise les entrées récentes du catalogue. Les estimations Ze
 
 ## Utiliser l’interface web au quotidien
 
+La rubrique et l’onglet sélectionnés sont conservés dans le fragment de l’URL, par exemple `#/library/folders` ou `#/zen/plan`. Un rechargement, une reconnexion et les boutons Précédent/Suivant du navigateur restaurent cet emplacement. Vous pouvez l’ajouter aux favoris, même si TorrentLinker utilise un préfixe d’URL. Le contenu des formulaires et les fichiers sélectionnés ne sont pas enregistrés dans l’URL.
+
 Une fois l’assistant terminé, **Torrents** affiche le client connecté. Filtrez la liste par tracker, catégorie ou état, puis sélectionnez les torrents à gérer. Les commandes demandent confirmation lorsque nécessaire. **Activité** suit leur progression et permet d’annuler une tâche encore en cours.
 
 ![Gestion des torrents dans le navigateur](../images/web/torrents-fr.png)

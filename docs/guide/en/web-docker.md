@@ -175,6 +175,8 @@ Run API tests with `pytest tests/test_web_setup.py tests/test_web_jobs.py`. For 
 
 ## Use the Web UI day to day
 
+The selected workspace and tab are kept in the URL fragment, such as `#/library/folders` or `#/zen/plan`. Reloading, signing back in and browser Back/Forward restore that location. You can bookmark it, including when TorrentLinker runs under a URL prefix. Form contents and selected files are not saved in the URL.
+
 After setup, **Torrents** shows the connected client. Filter by tracker, category or state, then select the torrents to manage. Commands ask for confirmation when needed. **Activity** tracks progress and lets you cancel a running job.
 
 ![Torrent management in the browser](../images/web/torrents-en.png)

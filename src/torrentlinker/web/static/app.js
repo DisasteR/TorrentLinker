@@ -609,7 +609,8 @@ function clearAgentToken() {
   $("agent-token").value = "";
   $("agent-token-box").hidden = true;
 }
-async function settingsSection(section) {
+async function settingsSection(section, detail) {
+  rememberTab("setup", section, detail);
   state.settingsSection = section;
   document.querySelectorAll("[data-settings-panel]").forEach(el => {
     el.hidden = el.dataset.settingsPanel !== section;
@@ -619,28 +620,91 @@ async function settingsSection(section) {
     else el.removeAttribute("aria-current");
   });
   if (section !== "agents") clearAgentToken();
-  if (section === "agents") await loadAgents();
+  if (section === "agents") {
+    agentTab(detail || "connections");
+    await loadAgents();
+  }
   if (section === "assistant") await loadAssistantConnections();
   if (section === "companion") await loadZenProfile();
 }
 document.querySelectorAll("[data-settings-section]").forEach(el => {
   el.onclick = () => guard(() => settingsSection(el.dataset.settingsSection));
 });
+function agentTab(name) {
+  rememberTab("setup", "agents", name === "connections" ? undefined : name);
+  document.querySelectorAll("[data-agent-panel]").forEach(panel => {
+    panel.hidden = panel.dataset.agentPanel !== name;
+  });
+  document.querySelectorAll("[data-agent-tab]").forEach(tab => {
+    if (tab.dataset.agentTab === name) tab.setAttribute("aria-current", "page");
+    else tab.removeAttribute("aria-current");
+  });
+  if (name !== "new") clearAgentToken();
+}
 document.querySelectorAll("[data-agent-tab]").forEach(el => {
-  el.onclick = () => {
-    document.querySelectorAll("[data-agent-panel]").forEach(panel => {
-      panel.hidden = panel.dataset.agentPanel !== el.dataset.agentTab;
-    });
-    document.querySelectorAll("[data-agent-tab]").forEach(tab => {
-      if (tab === el) tab.setAttribute("aria-current", "page");
-      else tab.removeAttribute("aria-current");
-    });
-    if (el.dataset.agentTab !== "new") clearAgentToken();
-  };
+  el.onclick = () => agentTab(el.dataset.agentTab);
 });
-async function navigate(view, section = "connections") {
+
+// Only workspace locations belong in the fragment. Form state and filters stay local.
+const viewTabs = {
+  torrents: [], zen: ["profile", "seeding", "plan", "catalogue"], search: [],
+  feeds: [], queue: [], media: ["video", "music"], library: ["items", "folders", "activity"],
+  upload: ["local", "remote", "sources"], assistant: [], jobs: [], documentation: [],
+  setup: ["connections", "interface", "companion", "assistant", "agents"],
+};
+const agentTabs = ["connections", "new", "activity"];
+const mediaViewsByKind = {
+  video: ["recent", "continue", "films", "series", "anime", "rated", "unwatched", "all", "adult"],
+  music: ["albums", "artists", "tracks"],
+};
+const rememberedTabs = {};
+let activeRoute = "";
+function resolveRoute(fragment) {
+  const fallback = state.setup?.configured ? ["torrents"] : ["setup", "connections"];
+  const parts = fragment.replace(/^#\//, "").split("/");
+  const [view, tab, detail] = parts;
+  if (!fragment.startsWith("#/") || !Object.hasOwn(viewTabs, view) ||
+      (!state.setup?.configured && view !== "setup")) return fallback;
+  const tabs = viewTabs[view];
+  const validDetail = view === "setup" && tab === "agents" && agentTabs.includes(detail) ||
+    view === "media" && mediaViewsByKind[tab]?.includes(detail) &&
+      (detail !== "adult" || state.setup?.adult_content);
+  if (parts.length > 3 || (tab !== undefined && !tabs.includes(tab)) ||
+      (detail !== undefined && !validDetail)) return fallback;
+  const defaultDetail = view === "media" ? mediaViewsByKind[tab || tabs[0]][0] : "connections";
+  return tabs.length ? [view, tab || tabs[0], ...(detail && detail !== defaultDetail ? [detail] : [])] : [view];
+}
+function routeFragment(parts) { return "#/" + parts.join("/"); }
+function writeRoute(parts, replace = false) {
+  activeRoute = routeFragment(parts);
+  if (location.hash === activeRoute) return;
+  if (replace) history.replaceState(null, "", activeRoute);
+  else location.hash = activeRoute;
+}
+function rememberTab(view, tab, detail) {
+  if (state.view !== view || $("workspace").hidden) return;
+  const parts = [view, tab, ...(detail ? [detail] : [])];
+  rememberedTabs[view] = parts.slice(1);
+  writeRoute(parts);
+}
+async function openFragment() {
+  if ($("workspace").hidden) return;
+  const parts = resolveRoute(location.hash);
+  const fragment = routeFragment(parts);
+  if (location.hash !== fragment) history.replaceState(null, "", fragment);
+  if (activeRoute !== fragment) await navigate(...parts);
+}
+window.addEventListener("hashchange", () => guard(openFragment));
+async function navigate(view, section, detail) {
   if (view === "agents") { view = "setup"; section = "agents"; }
+  const requested = [view, ...(section ? [section, ...(detail ? [detail] : [])] : rememberedTabs[view] || [])];
+  const parts = resolveRoute(routeFragment(requested));
+  [view, section, detail] = parts;
+  rememberedTabs[view] = parts.slice(1);
+  const route = routeFragment(parts);
+  writeRoute(parts);
   if (view !== "media" && document.body.classList.contains("media-center-mode")) await mediaExitCenter();
+  if (activeRoute !== route) return;
   if (typeof mediaCloseChat === "function" && media.chat) mediaCloseChat();
   state.view = view;
   document.body.classList.toggle("media-view", view === "media");
@@ -655,20 +719,32 @@ async function navigate(view, section = "connections") {
     document.querySelector(`[data-view="${view}"]`)?.textContent || view;
   if (view === "setup") {
     await refreshSetup();
+    if (activeRoute !== route) return;
     step("client");
-    await settingsSection(section);
+    await settingsSection(section, detail);
   }
   if (view === "assistant") await loadAssistant();
-  if (view === "media") { await loadMedia(); guard(mediaAutoScan); }
+  if (view === "media") {
+    media.kind = section;
+    media.view = detail || mediaViewsByKind[section][0];
+    mediaViews();
+    await loadMedia(); guard(mediaAutoScan);
+  }
   if (view !== "setup") clearAgentToken();
   if (view === "documentation") await loadGuides();
   if (view === "torrents") await loadTorrents();
   if (view === "queue") await loadQueue();
   if (view === "feeds") await loadFeeds();
-  if (view === "upload") await loadUploadQueue();
-  if (view === "library") await loadLibrary();
+  if (view === "upload") {
+    showUploadView(section);
+    if (section === "remote") await loadRemoteUploads();
+    else if (section === "sources") await loadUploadSources();
+    else await loadUploadQueue();
+  }
+  if (view === "library") await libraryTab(section);
   if (view === "jobs") await loadJobs();
   if (view === "zen") {
+    zenTab(section);
     await refreshSetup();
     await Promise.all([loadZenProfile(true), loadZenSeeding(), api("zen/catalogue").then(showCatalogue), loadZenPlan()]);
   }
@@ -1383,7 +1459,9 @@ async function enter() {
   $("logout").hidden = state.setup.web_auth === "proxy";
   $("login-screen").hidden = true;
   $("workspace").hidden = false;
-  await navigate(state.setup.configured ? "torrents" : "setup");
+  const parts = resolveRoute(location.hash);
+  writeRoute(parts, true);
+  await navigate(...parts);
   if (state.setup.configured) await job({ kind: "refresh" }, loadTorrents);
   await pollJobs();
 }

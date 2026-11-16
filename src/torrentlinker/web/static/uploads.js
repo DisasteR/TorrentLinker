@@ -411,6 +411,7 @@ function showUploadSection(section) {
   uploadEditorState();
 }
 function showUploadView(view) {
+  rememberTab("upload", view);
   uploadUI.view = view;
   $("upload-workspace").hidden = view !== "local";
   $("upload-remote").hidden = view !== "remote";
