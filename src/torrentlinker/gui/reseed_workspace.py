@@ -51,6 +51,7 @@ class ReseedBoard(QWidget):
         scan.clicked.connect(lambda: window.scan())
         refresh = QPushButton(self.tr("Refresh"))
         refresh.clicked.connect(lambda: self.start([], "refresh"))
+        self.navigation_actions = [refresh, scan]
         heading.addWidget(refresh)
         heading.addWidget(scan)
         heading.addWidget(self.run_all)
@@ -266,6 +267,8 @@ class ReseedBoard(QWidget):
         self.run_all.setEnabled(
             not self.running and any(r["stage"] not in {"seeding", "incomplete"} for r in rows)
         )
+        for control in self.navigation_actions:
+            control.setEnabled(not self.running)
         self.root.setEnabled(not self.running)
         self.browse.setEnabled(not self.running)
         self.selection_changed()

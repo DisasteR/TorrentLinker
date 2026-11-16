@@ -21,7 +21,8 @@ async function loadReseed() {
     $("reseed-root").value=localStorage.getItem(`reseed-root:${client}`)||"";
   }
   reseedUI.rows=response.rows;
-  const running=jobs.find(j=>j.kind==="reseed-workspace" && j.client_id===client && ["running","queued"].includes(j.status));
+  const pending=jobs.filter(j=>j.kind==="reseed-workspace" && j.client_id===client);
+  const running=pending.find(j=>j.status==="running") || pending.find(j=>j.status==="queued");
   reseedUI.job=running?.id||null;
   if(running) reseedProgress(running.progress||{});
   else if(previousJob && previousJob!=="submitting") {
@@ -73,6 +74,7 @@ function renderReseed() {
   }
   $("reseed-empty").hidden=!!reseedUI.rows.length;
   $("reseed-run-all").disabled=!!reseedUI.job || !rows.some(r=>!["seeding","incomplete"].includes(r.stage));
+  $("reseed-refresh").disabled=!!reseedUI.job;$("reseed-scan").disabled=!!reseedUI.job;
   $("reseed-root").disabled=!!reseedUI.job;$("reseed-browse").disabled=!!reseedUI.job;reseedSelection();
 }
 function reseedSelection() {

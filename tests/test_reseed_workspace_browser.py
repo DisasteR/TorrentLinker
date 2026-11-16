@@ -80,6 +80,8 @@ def test_reseed_board_runs_pauses_and_preserves_original_on_small_screen(tmp_pat
             expect(page.locator("#reseed-progress-text")).to_contain_text(
                 "Client verification", timeout=20000
             )
+            expect(page.locator("#reseed-refresh")).to_be_disabled()
+            expect(page.locator("#reseed-scan")).to_be_disabled()
             page.locator("#reseed-pause").click()
             expect(page.locator("#reseed-pause")).to_have_text("Resume", timeout=10000)
             client.release.set()
