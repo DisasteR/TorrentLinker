@@ -36,7 +36,12 @@ def test_candidate_review_can_expand_without_losing_the_local_item(qtbot, tmp_pa
     window.show()
     tabs = window.findChild(QTabWidget, "librarySections")
     assert tabs is not None
-    assert [tabs.tabText(i) for i in range(tabs.count())] == ["Local Items", "Folders", "Activity"]
+    assert [tabs.tabText(i) for i in range(tabs.count())] == [
+        "Local Items",
+        "Reseed",
+        "Folders",
+        "Activity",
+    ]
     expand = window.findChild(QPushButton, "expandCandidateReview")
     assert expand is not None
     qtbot.mouseClick(expand, Qt.MouseButton.LeftButton)
@@ -128,7 +133,7 @@ def test_desktop_review_preserves_candidate_selection_across_local_items(
     if destination := os.getenv("TL_WEB_SCREENSHOTS"):
         Path(destination).mkdir(parents=True, exist_ok=True)
         window.grab().save(str(Path(destination) / "library-desktop.png"))
-        window.library_workspace.sections.setCurrentIndex(1)
+        window.library_workspace.sections.setCurrentWidget(window.library_workspace.editor)
         qtbot.wait(50)
         window.grab().save(str(Path(destination) / "library-desktop-folders.png"))
 

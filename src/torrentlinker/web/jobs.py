@@ -20,6 +20,7 @@ class JobStop(threading.Event):
     def __init__(self):
         super().__init__()
         self.plan_now = threading.Event()
+        self.paused = threading.Event()
 
 
 class Jobs:
@@ -130,10 +131,17 @@ class Jobs:
                 self._request_keys.pop(identifier, None)
             return
         self._update(identifier, status="running")
+        reseed_job = self.get(identifier)["kind"] == "reseed-workspace"
+        paused = getattr(stop, "paused", None)
+
+        def report(progress):
+            with self.lock:
+                if reseed_job:
+                    progress = {**progress, "paused": bool(paused and paused.is_set())}
+                self._update(identifier, progress=json.dumps(progress))
+
         try:
-            result = work(
-                stop, lambda progress: self._update(identifier, progress=json.dumps(progress))
-            )
+            result = work(stop, report)
         except Exception as error:
             # Never persist raw network exception text, which may include credentials.
             self._update(
@@ -210,6 +218,16 @@ class Jobs:
             if (row["progress"] or {}).get("phase") == "planning":
                 raise ValueError("This Plan is already being calculated.")
             self.stops[identifier].plan_now.set()
+
+    def pause_reseed(self, identifier: str, paused: bool) -> None:
+        with self.lock:
+            row = self.get(identifier)
+            if row["kind"] != "reseed-workspace" or identifier not in self.stops:
+                raise ValueError("This reseed run is no longer active.")
+            event = self.stops[identifier].paused
+            event.set() if paused else event.clear()
+            progress = row["progress"] or {}
+            self._update(identifier, progress=json.dumps({**progress, "paused": paused}))
 
     def close(self) -> None:
         with self.lock:

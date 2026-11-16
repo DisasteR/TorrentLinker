@@ -666,6 +666,10 @@ def create_app(
             "folder_errors": [str(error.path) for error in library.folder_errors],
         }
 
+    @app.get("/api/reseed-workspace")
+    def reseed_workspace(client_id: str = "") -> dict:
+        return {"rows": for_client(client_id).reseed_workspace.rows()}
+
     from torrentlinker.poster_cache import PosterCache, valid_poster_url
 
     posters = PosterCache(directory / "posters")
@@ -1001,6 +1005,14 @@ def create_app(
     def plan_from_cache(identifier: str) -> dict:
         try:
             jobs.plan_now(identifier)
+        except KeyError:
+            raise HTTPException(404, "Job not found.") from None
+        return {"ok": True}
+
+    @app.post("/api/jobs/{identifier}/pause-reseed")
+    def pause_reseed(identifier: str, paused: bool = True) -> dict:
+        try:
+            jobs.pause_reseed(identifier, paused)
         except KeyError:
             raise HTTPException(404, "Job not found.") from None
         return {"ok": True}

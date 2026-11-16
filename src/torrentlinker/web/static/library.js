@@ -68,6 +68,8 @@ async function libraryTab(tab) {
   rememberTab("library", tab);
   document.querySelectorAll("[data-library-tab]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.libraryTab===tab)));
   $("library-items").hidden=tab!=="items";
+  $("library-reseed").hidden=tab!=="reseed";
+  if(tab==="reseed") await loadReseed();
   $("library-folder-manager").hidden=tab!=="folders";
   $("library-activity").hidden=tab!=="activity";
   if(tab==="folders") {await refreshSetup();renderLibraryFolders();}
@@ -91,15 +93,14 @@ function newLibraryFolder() {
   $("library-folder-form-title").textContent=say("Add a Library Folder","Ajouter un dossier");
   $("library-folder-feedback").textContent="";
 }
-async function browseLibraryFolder(path="") {
+async function browseLibraryFolder(path="",target="library-folder-path") {
   const result=await api(`folders?path=${encodeURIComponent(path)}`);
-  $("dialog-title").textContent=say("Folders on the TorrentLinker server","Dossiers du serveur TorrentLinker");
-  const host=$("dialog-content");host.replaceChildren(element("p",result.path || say("Mounted roots","Racines montées")));
+  const host=$("dialog-content");host.replaceChildren(element("h2",say("Folders on the TorrentLinker server","Dossiers du serveur TorrentLinker")),element("p",result.path || say("Mounted roots","Racines montées")));
   if(result.path) {
-    host.append(button(say("Use this folder","Utiliser ce dossier"),()=>{$("library-folder-path").value=result.path;$("dialog").close();},"primary"));
-    host.append(button("↑",()=>browseLibraryFolder(result.parent)));
+    host.append(button(say("Use this folder","Utiliser ce dossier"),()=>{$(target).value=result.path;$("dialog").close();},"primary"));
+    host.append(button("↑",()=>browseLibraryFolder(result.parent,target)));
   }
-  for(const folder of result.folders) host.append(button(folder,()=>browseLibraryFolder(folder),"directory-button"));
+  for(const folder of result.folders) host.append(button(folder,()=>browseLibraryFolder(folder,target),"directory-button"));
   if(!result.path && !result.folders.length) host.append(element("p",say("No mounted roots. Set TL_STORAGE_ROOTS on the TorrentLinker server.","Aucune racine montée. Configurez TL_STORAGE_ROOTS sur le serveur.")));
   if(!$("dialog").open) $("dialog").showModal();
 }

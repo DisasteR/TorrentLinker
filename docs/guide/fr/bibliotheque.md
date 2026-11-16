@@ -1,5 +1,18 @@
 # Bibliothèque et remise en seed
 
+## Tableau de remise en seed
+
+Ouvrez **Bibliothèque → Remise en seed** dans l’application ou la Web UI. Les colonnes suivent les éléments à retrouver, les candidats, les liens à préparer, la vérification, les éléments à compléter et le partage. **Examiner** affiche les noms d’origine, les noms attendus et les cibles des liens.
+
+Choisissez un **dossier de liens** existant, hors bibliothèque. Le client torrent doit pouvoir lire ce dossier et les originaux. Dans la Web UI, le dossier doit appartenir à une racine de stockage montée. Les correspondances de chemins s’appliquent aux cibles des liens et à leur destination. Sous Windows, les liens symboliques nécessitent le mode développeur ou la permission correspondante ; un échec laisse les originaux inchangés.
+
+**Tout enchaîner** traite les éléments visibles : recherche, comparaison, liens, vérification locale, vérification dans le client puis partage. **Enchaîner la sélection** utilise votre sélection. Chaque étape est aussi accessible depuis **Examiner**. Les correspondances incomplètes, petits fichiers manquants, archives et candidats ambigus attendent votre examen. Choisissez un candidat complet dans **Examiner**, ou passez par **Éléments locaux** pour les archives et réparations. Le tableau ne télécharge pas de contenu manquant et ne renomme jamais les originaux.
+
+La progression suit les opérations et les vérifications. **Pause** prend effet entre les opérations et pendant le calcul local des hash ; une vérification du client peut se terminer pendant la pause. **Arrêter** conserve les étapes terminées et les liens. Recharger le navigateur retrouve la tâche du serveur. Après un redémarrage de l’application ou du serveur, analysez la bibliothèque puis reprenez explicitement le parcours conservé.
+
+Conservez les liens tant que leur torrent est utilisé : ils constituent son emplacement permanent. Retirer le torrent sans supprimer les données conserve les originaux et les liens. Les dossiers de liens ne sont jamais nettoyés automatiquement. Une vérification échouée retire uniquement le torrent du client et laisse l’élément à examiner.
+
+
 ## Explorateur de dossiers et examen des candidats
 
 L’application de bureau et l’interface web partagent trois sections : **Local Items**, **Folders** et **Activity**. Sélectionnez un dossier dans la colonne de gauche, puis un élément local pour examiner ses candidats sous le tableau. **Expand review** agrandit cet espace ; le retour conserve le candidat sélectionné.
