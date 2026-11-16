@@ -808,7 +808,10 @@ function renderJobs(rows) {
       text.append(
         element("strong", `${r.kind} · ${clientName(r.client_id)}`),
         element("p", r.status),
-        element("small", r.error || JSON.stringify(r.progress || {})),
+        element("small", r.error || (r.progress?.stage === "client-files"
+          ? say(`Reading client files: ${r.progress.done}/${r.progress.total} · up to ${Number(r.progress.requests_per_second).toFixed(2)} requests/s`,
+              `Lecture des fichiers du client : ${r.progress.done}/${r.progress.total} · jusqu’à ${Number(r.progress.requests_per_second).toFixed(2)} requêtes/s`)
+          : JSON.stringify(r.progress || {}))),
       );
       card.append(text);
       if (["queued", "running"].includes(r.status) && r.progress?.cancellable !== false)

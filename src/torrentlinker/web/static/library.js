@@ -216,7 +216,10 @@ async function loadLibraryActivity() {
   const rows=await api("jobs"),host=$("library-job-list");host.replaceChildren();
   for(const row of rows.filter(r=>["scan","check","check-all","reseed","reseed-all","search-library","library-review","library-reject","check-candidate","preview-unpack","unpack-reseed","library-evidence","import-provenance","find-compatible","combine-library","diagnose-repair","prepare-repair","refresh-repair","start-repair"].includes(r.kind))) {
     const card=element("div",undefined,"card");card.append(element("p",`${row.kind} · ${row.status}`));
-    if(row.progress?.total) card.append(element("p",`${bytes(row.progress.done)} / ${bytes(row.progress.total)}`));
+    if(row.progress?.stage === "client-files") {
+      const p=row.progress, rate=Number(p.requests_per_second).toFixed(2);
+      card.append(element("p",say(`Reading client files: ${p.done}/${p.total} · up to ${rate} requests/s`,`Lecture des fichiers du client : ${p.done}/${p.total} · jusqu’à ${rate} requêtes/s`)));
+    } else if(row.progress?.total) card.append(element("p",`${bytes(row.progress.done)} / ${bytes(row.progress.total)}`));
     if(row.error) card.append(element("p",row.error));
     if(["queued","running"].includes(row.status) && row.progress?.cancellable!==false) card.append(button(say("Cancel","Annuler"),async()=>{await api(`jobs/${row.id}/cancel`,{});await loadLibraryActivity();}));
     card.append(button(say("Details","Détails"),()=>navigate("jobs")));host.append(card);
