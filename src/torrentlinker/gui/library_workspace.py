@@ -223,7 +223,8 @@ class LibraryWorkspace(QWidget):
         self.rail.currentRowChanged.connect(self.select_folder)
         rail_layout.addWidget(self.rail)
         add = QPushButton(self.tr("Manage folders"))
-        add.clicked.connect(lambda: self.sections.setCurrentIndex(1))
+        self.editor: FolderEditor
+        add.clicked.connect(lambda: self.sections.setCurrentWidget(self.editor))
         rail_layout.addWidget(add)
         body.addWidget(rail)
         content = QWidget()
@@ -260,6 +261,15 @@ class LibraryWorkspace(QWidget):
             self.tr("Scan, search and Verification progress appears here.")
         )
         self.sections.addTab(self.activity, self.tr("Activity"))
+        from torrentlinker.gui.reseed_workspace import ReseedBoard
+
+        self.reseed = ReseedBoard(window)
+        self.sections.insertTab(1, self.reseed, self.tr("Reseed"))
+        self.sections.currentChanged.connect(
+            lambda _index: (
+                self.reseed.refresh() if self.sections.currentWidget() is self.reseed else None
+            )
+        )
         self.items = items
         self.toolbar, self.matches = toolbar, matches
         window.review.expand_button.clicked.connect(self.expand_review)

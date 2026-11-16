@@ -1,8 +1,21 @@
 # Library and reseeding
 
+## Reseed board
+
+Open **Library → Reseed** in either interface. The columns follow items to find, Candidates, links to prepare, Verification, items needing attention and sharing. **Inspect** shows original names, expected torrent names and prepared link targets.
+
+Choose an existing **Link Folder** outside Library Folders. The Torrent Client must be able to read it and the originals. In the Web UI it must be within a mounted storage root. Path Mappings apply to link targets and the destination. Windows requires Developer Mode or permission to create symlinks; a failure leaves originals unchanged.
+
+**Run all steps** processes the visible items through search, comparison, link preparation, local hashing, client verification and sharing. **Run selected** uses your selection. Each stage is also available from **Inspect**. Incomplete matches, missing small files, archives and ambiguous Candidates stop for review. Choose a full Candidate in **Inspect**, or use **Local Items** for archive and repair workflows. The board never downloads missing files or renames originals.
+
+Progress follows completed operations and hash checks. **Pause** takes effect between operations and during local hashing; a client hash check already running may finish while paused. **Stop** retains completed steps and links. Browser reloads reconnect to the server job. After restarting the application or server, scan again and explicitly continue the retained workflow.
+
+Keep the links while their torrent is in use: they are its permanent save location. Removing a torrent without deleting data keeps the originals and links. Link folders are never cleaned up automatically. A failed client check removes only the torrent and leaves the item for review.
+
+
 ## Folder explorer and Candidate review
 
-Desktop and WebUI use the same Library layout: **Local Items**, **Folders**, and **Activity**. Choose a Library Folder in the left rail, filter the Local Items, then select an item to open its Candidate review below the table. **Expand review** gives the Candidates more room; **Back to Local Items** restores the table without losing the selected Candidate.
+Desktop and WebUI use the same Library layout: **Local Items**, **Reseed**, **Folders**, and **Activity**. Choose a Library Folder in the left rail, filter the Local Items, then select an item to open its Candidate review below the table. **Expand review** gives the Candidates more room; **Back to Local Items** restores the table without losing the selected Candidate.
 
 Review **Summary**, **Files**, **Description**, **NFO**, and **Evidence** before acting. Files shows local counterparts, renamed paths and absent files. A Full Match compares file names and sizes; **Verify & reseed** still requires the Torrent Client's hash Verification. **Reject Candidate** remembers your decision for this Local Item. Searching, checking and rejecting never start a Reseed.
 

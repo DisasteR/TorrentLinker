@@ -196,6 +196,35 @@ def indexer_contents(
             result.append(replace(t, files=files))
     finally:
         store.cache_torrent_files(fresh)
+    # Linked reseeds use a persistent layout elsewhere. Classification must still
+    # associate verified sharing with the original Local Item, across restarts.
+    from torrentlinker.reseed_links import validate_links
+
+    linked = {r.get("hash"): (path, r) for path, r in store.reseed_records().items()}
+    for i, torrent in enumerate(result):
+        if torrent.hash not in linked:
+            continue
+        path, record = linked[torrent.hash]
+        if (
+            "torrentlinker:links" not in torrent.tags
+            or record.get("status") not in {"verified", "seeding"}
+            or str(torrent.save_path) != record.get("destination")
+            or torrent.progress < 1
+        ):
+            continue
+        try:
+            validate_links(record)
+        except (ValueError, OSError):
+            continue
+        base = Path(path).parent
+        result[i] = replace(
+            torrent,
+            save_path=base,
+            files={
+                str(Path(f["source"]).relative_to(base)).replace("\\", "/"): f["identity"][2]
+                for f in record["files"]
+            },
+        )
     return result
 
 

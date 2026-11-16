@@ -3374,6 +3374,10 @@ Fait aussi partie du pack {1}. Il n’est en seed seul qu’avec son propre torr
         <source>Combine Local Items</source>
         <translation>Combiner les éléments locaux</translation>
     </message>
+    <message>
+        <source>Reseed</source>
+        <translation>Remise en seed</translation>
+    </message>
 </context>
 <context>
     <name>LocalDrafts</name>
@@ -11282,6 +11286,213 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
     <message>
         <source>c411&apos;s listing does not show it</source>
         <translation>absent de la liste de c411</translation>
+    </message>
+</context>
+<context>
+    <name>ReseedBoard</name>
+    <message>
+        <source>Browse…</source>
+        <translation>Parcourir…</translation>
+    </message>
+    <message>
+        <source>Candidates found</source>
+        <translation>Candidats trouvés</translation>
+    </message>
+    <message>
+        <source>Check the bytes before seeding</source>
+        <translation>Vérifier le contenu avant de seeder</translation>
+    </message>
+    <message>
+        <source>Checking original files</source>
+        <translation>Vérification des originaux</translation>
+    </message>
+    <message>
+        <source>Choose an existing link folder outside the Library.</source>
+        <translation>Choisissez un dossier de liens existant hors de la bibliothèque.</translation>
+    </message>
+    <message>
+        <source>Client verification</source>
+        <translation>Vérification du client</translation>
+    </message>
+    <message>
+        <source>Compare</source>
+        <translation>Comparer</translation>
+    </message>
+    <message>
+        <source>Compare files before proceeding</source>
+        <translation>Comparer les fichiers avant de continuer</translation>
+    </message>
+    <message>
+        <source>Expected names, originals preserved</source>
+        <translation>Les bons noms, originaux conservés</translation>
+    </message>
+    <message>
+        <source>Expected names, without renaming originals. A persistent symlink folder reproduces the torrent layout. Keep it while seeding.</source>
+        <translation>Les bons noms, sans renommer vos fichiers. Un dossier de liens symboliques reprend l’arborescence du torrent. Conservez-le pendant le seed.</translation>
+    </message>
+    <message>
+        <source>Filter items…</source>
+        <translation>Filtrer les éléments…</translation>
+    </message>
+    <message>
+        <source>Find candidates</source>
+        <translation>Chercher les candidats</translation>
+    </message>
+    <message>
+        <source>Find → Compare → Prepare links → Verify → Seed. Incomplete or ambiguous matches stop for review.</source>
+        <translation>Chercher → Comparer → Préparer les liens → Vérifier → Partager. Les correspondances incomplètes ou ambiguës attendent votre examen.</translation>
+    </message>
+    <message>
+        <source>Finished · {0} seeded · {1} error(s)</source>
+        <translation>Terminé · {0} en partage · {1} erreur(s)</translation>
+    </message>
+    <message>
+        <source>Inspect</source>
+        <translation>Examiner</translation>
+    </message>
+    <message>
+        <source>Item processed</source>
+        <translation>Élément traité</translation>
+    </message>
+    <message>
+        <source>Keep the links while seeding</source>
+        <translation>Conserver les liens pendant le seed</translation>
+    </message>
+    <message>
+        <source>Link folder</source>
+        <translation>Dossier de liens</translation>
+    </message>
+    <message>
+        <source>Link folder (outside Library Folders, accessible to the client)</source>
+        <translation>Dossier de liens (hors bibliothèque, accessible au client)</translation>
+    </message>
+    <message>
+        <source>Links to prepare</source>
+        <translation>Liens à préparer</translation>
+    </message>
+    <message>
+        <source>Missing</source>
+        <translation>Manquant</translation>
+    </message>
+    <message>
+        <source>Needs attention</source>
+        <translation>À compléter</translation>
+    </message>
+    <message>
+        <source>Nothing here yet</source>
+        <translation>Rien ici pour l’instant</translation>
+    </message>
+    <message>
+        <source>Open this Local Item in the Local Items tab to review missing files or archives.</source>
+        <translation>Ouvrez cet élément dans l’onglet Éléments locaux pour examiner les fichiers manquants ou les archives.</translation>
+    </message>
+    <message>
+        <source>Pause</source>
+        <translation>Pause</translation>
+    </message>
+    <message>
+        <source>Pause requested. Waiting for the current operation.</source>
+        <translation>Pause demandée. En attente de la fin de l’opération en cours.</translation>
+    </message>
+    <message>
+        <source>Pause stops between operations. A client hash check may finish while paused. Completed steps are kept.</source>
+        <translation>La pause prend effet entre les opérations. Une vérification du client peut se terminer pendant la pause. Les étapes terminées sont conservées.</translation>
+    </message>
+    <message>
+        <source>Persistent link folder: </source>
+        <translation>Dossier de liens à conserver : </translation>
+    </message>
+    <message>
+        <source>Prepare links</source>
+        <translation>Préparer les liens</translation>
+    </message>
+    <message>
+        <source>Reseed</source>
+        <translation>Remise en seed</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Reprendre</translation>
+    </message>
+    <message>
+        <source>Review missing files and archives</source>
+        <translation>Examiner les fichiers manquants et archives</translation>
+    </message>
+    <message>
+        <source>Run all steps</source>
+        <translation>Tout enchaîner</translation>
+    </message>
+    <message>
+        <source>Run selected</source>
+        <translation>Enchaîner la sélection</translation>
+    </message>
+    <message>
+        <source>Run stopped. Completed steps are kept.</source>
+        <translation>Parcours arrêté. Les étapes terminées sont conservées.</translation>
+    </message>
+    <message>
+        <source>Scan folders</source>
+        <translation>Analyser les dossiers</translation>
+    </message>
+    <message>
+        <source>Search for compatible torrents</source>
+        <translation>Chercher des torrents compatibles</translation>
+    </message>
+    <message>
+        <source>Seeding</source>
+        <translation>En partage</translation>
+    </message>
+    <message>
+        <source>Select visible</source>
+        <translation>Sélectionner les éléments visibles</translation>
+    </message>
+    <message>
+        <source>Start seeding</source>
+        <translation>Partager</translation>
+    </message>
+    <message>
+        <source>Stop</source>
+        <translation>Arrêter</translation>
+    </message>
+    <message>
+        <source>To find</source>
+        <translation>À retrouver</translation>
+    </message>
+    <message>
+        <source>Use this Candidate</source>
+        <translation>Utiliser ce candidat</translation>
+    </message>
+    <message>
+        <source>Verification</source>
+        <translation>Vérification</translation>
+    </message>
+    <message>
+        <source>Verified</source>
+        <translation>Vérifié</translation>
+    </message>
+    <message>
+        <source>Verify</source>
+        <translation>Vérifier</translation>
+    </message>
+    <message>
+        <source>{0} Local Item(s). Originals keep their names. Keep the link folder while seeding.</source>
+        <translation>{0} élément(s). Les originaux gardent leur nom. Conservez le dossier de liens pendant le seed.</translation>
+    </message>
+    <message>
+        <source>{0} selected</source>
+        <translation>{0} sélectionné(s)</translation>
+    </message>
+    <message>
+        <source>Compare again</source>
+        <translation>Comparer à nouveau</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>Actualiser</translation>
+    </message>
+    <message>
+        <source>Show more</source>
+        <translation>Afficher la suite</translation>
     </message>
 </context>
 </TS>

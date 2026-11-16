@@ -648,7 +648,7 @@ document.querySelectorAll("[data-agent-tab]").forEach(el => {
 // Only workspace locations belong in the fragment. Form state and filters stay local.
 const viewTabs = {
   torrents: [], zen: ["profile", "seeding", "plan", "catalogue"], search: [],
-  feeds: [], queue: [], media: ["video", "music"], library: ["items", "folders", "activity"],
+  feeds: [], queue: [], media: ["video", "music"], library: ["items", "reseed", "folders", "activity"],
   upload: ["local", "remote", "sources"], assistant: [], jobs: [], documentation: [],
   setup: ["connections", "interface", "companion", "assistant", "agents"],
 };
@@ -794,6 +794,7 @@ async function pollJobs() {
   else workStatus("Up to date", "À jour");
   if (state.view === "jobs") renderJobs(rows);
   if (state.view === "queue") await loadQueue();
+  if (state.view === "library" && !$("library-reseed").hidden && reseedUI.job) await loadReseed();
 }
 async function loadJobs() {
   renderJobs(await api("jobs"));

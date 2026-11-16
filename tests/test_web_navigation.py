@@ -54,6 +54,7 @@ async function loadRemoteUploads() { loaded.push('upload/remote'); }
 async function loadUploadSources() { loaded.push('upload/sources'); }
 function showUploadView(tab) { rememberTab('upload', tab); }
 async function loadLibrary() { loaded.push('library/items'); }
+async function loadReseed() { loaded.push('library/reseed'); }
 async function loadLibraryActivity() { loaded.push('library/activity'); }
 function renderLibraryFolders() { loaded.push('library/folders'); }
 async function loadJobs() { loaded.push('jobs'); }

@@ -1,5 +1,6 @@
 """Pending requests share work; completed requests can be run again."""
 
+import json
 import shutil
 import subprocess
 import threading
@@ -166,7 +167,13 @@ def test_request_parameters_are_not_in_job_history_or_diagnostics(tmp_path):
     assert secret.encode() not in (tmp_path / "jobs.sqlite").read_bytes()
 
 
-def test_browser_tracks_the_existing_job_and_its_completion():
+@pytest.mark.parametrize(
+    "reseed_visible,reseed_running,expected_refreshes",
+    [(False, True, 0), (True, False, 0), (True, True, 4)],
+)
+def test_browser_tracks_the_existing_job_and_its_completion(
+    reseed_visible, reseed_running, expected_refreshes
+):
     node = shutil.which("node")
     if not node:
         pytest.skip("Node is unavailable")
@@ -176,7 +183,12 @@ def test_browser_tracks_the_existing_job_and_its_completion():
 const assert = require('node:assert/strict');
 const state = {clientId:'default', jobs:new Map(), view:'library'};
 const status = {dataset:{}};
-const $ = id => id === 'workspace' ? {hidden:false} : status;
+const [reseedVisible,reseedRunning,expectedRefreshes] = JSON.parse(process.argv[2]);
+const reseedUI = {job:reseedRunning ? 'reseed-job' : null};
+const nodes = {'workspace':{hidden:false}, 'library-reseed':{hidden:!reseedVisible}};
+const $ = id => nodes[id] || status;
+let reseedRefreshes = 0;
+async function loadReseed() { reseedRefreshes++; }
 const say = en => en;
 const toast = message => { throw new Error(message); };
 let phase = 'running', completions = 0, updates = 0;
@@ -198,10 +210,20 @@ eval(process.argv[1] + `
   phase='completed'; await pollJobs(); await pollJobs();
   assert.equal(completions,1);
   assert.equal(state.jobs.size,0);
+  assert.equal(reseedRefreshes,expectedRefreshes);
 })().catch(error => { console.error(error); process.exitCode=1; });
 `);
 """
     result = subprocess.run(
-        [node, "-e", script, functions], capture_output=True, text=True, timeout=10
+        [
+            node,
+            "-e",
+            script,
+            functions,
+            json.dumps([reseed_visible, reseed_running, expected_refreshes]),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     assert result.returncode == 0, result.stderr
