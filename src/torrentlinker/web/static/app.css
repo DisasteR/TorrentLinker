@@ -282,21 +282,14 @@ a {
   margin: 0;
 }
 .brandmark {
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: white;
+  display: block;
+  flex-shrink: 0;
   width: 64px;
   height: 64px;
-  border-radius: 18px;
-  font-size: 24px;
-  font-weight: 800;
 }
 .brandmark.small {
   width: 32px;
   height: 32px;
-  border-radius: 10px;
-  font-size: 13px;
 }
 .brand {
   display: flex;

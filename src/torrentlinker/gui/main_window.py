@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QEvent, QFile, QItemSelection, QSignalBlocker, Qt, QTimer
-from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeyEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -457,9 +457,18 @@ class MainWindow(QMainWindow):
         sidebar.setFixedWidth(172)
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(16, 24, 16, 16)
+        brand_row = QHBoxLayout()
+        brand_row.setSpacing(8)
+        logo = QLabel()
+        logo.setObjectName("brandLogo")
+        logo.setFixedSize(28, 28)
+        logo.setPixmap(QIcon(str(Path(__file__).parents[1] / "assets" / "icon.png")).pixmap(28, 28))
+        brand_row.addWidget(logo)
         brand = QLabel("TorrentLinker")
         brand.setProperty("role", "brand")
-        side.addWidget(brand)
+        brand.setStyleSheet("font-size: 14px;")
+        brand_row.addWidget(brand, 1)
+        side.addLayout(brand_row)
         side.addSpacing(24)
         side.addWidget(self.navigation, 1)
         self.reader_button = QPushButton(self.tr("Reading room"))
