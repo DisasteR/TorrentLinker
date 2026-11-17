@@ -58,29 +58,49 @@ def test_candidate_review_can_expand_without_losing_the_local_item(qtbot, tmp_pa
     ]
 
 
-def test_short_window_scrolls_the_page_instead_of_crushing_the_review(qtbot, tmp_path, monkeypatch):
+def test_short_review_dialog_scrolls_instead_of_crushing_the_review(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QDialog, QScrollArea
+
+    from torrentlinker.domain import ContentKind, ItemState, LibraryFolder, LocalItem
+    from torrentlinker.library import LibraryEntry
+
     window, _ = window_for(qtbot, tmp_path, monkeypatch)
+    entry = LibraryEntry(
+        LibraryFolder(tmp_path, 1, ContentKind.EBOOK),
+        LocalItem(tmp_path / "Book.epub", {"Book.epub": 400}),
+        ItemState.ORPHAN,
+    )
+    window.library_model.set_entries([entry])
     window.resize(1400, 700)
     window.tabs.setCurrentIndex(1)
-    window.library_workspace.sections.setCurrentWidget(window.library_workspace.explorer)
     window.show()
-    qtbot.waitExposed(window)
     workspace = window.library_workspace
-    review = window.review.height()
-    assert review >= window.review.minimumSizeHint().height()
-    for height in (400, 600, 900):
-        workspace.grip.resize_pane(height)
-        qtbot.wait(10)
-        assert workspace.items.geometry().bottom() < workspace.grip.y()  # no overlap
-        assert workspace.grip.geometry().bottom() < window.review.y()
-        assert window.review.height() >= review  # the page scrolls instead
-    assert window.library_view.height() > 800
-    assert window.workspace_scroll.verticalScrollBar().maximum() > 0
-    workspace.grip.resize_pane(0)
-    assert workspace.items.height() == workspace.items.minimumSizeHint().height()
-    window.resize(1400, 1400)
-    qtbot.wait(10)
-    assert window.review.height() > 600  # a tall window still goes to the review
+
+    def inspect_dialog(dialog):
+        dialog.resize(1100, 700)
+        dialog.show()
+        qtbot.waitExposed(dialog)
+        scroll = dialog.findChild(QScrollArea)
+        assert scroll is not None
+        review = window.review.height()
+        assert review >= window.review.minimumSizeHint().height()
+        for height in (400, 600, 900):
+            workspace.grip.resize_pane(height)
+            qtbot.waitUntil(lambda: workspace.items.geometry().bottom() < workspace.grip.y())
+            assert workspace.grip.geometry().bottom() < window.review.y()
+            assert window.review.height() >= review
+        assert window.library_view.height() > 800
+        assert scroll.verticalScrollBar().maximum() > 0
+        workspace.grip.resize_pane(0)
+        assert workspace.items.height() == workspace.items.minimumSizeHint().height()
+        dialog.resize(1400, 1400)
+        qtbot.waitUntil(lambda: window.review.height() > 600)
+        dialog.close()
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(QDialog, "exec", inspect_dialog)
+    workspace.open_review(str(entry.item.path))
+    assert workspace.sections.currentWidget() is workspace.reseed
 
 
 def test_desktop_review_preserves_candidate_selection_across_local_items(
