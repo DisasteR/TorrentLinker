@@ -11809,6 +11809,194 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
         <source>Site daily limit reached</source>
         <translation>Limite quotidienne du site atteinte</translation>
     </message>
+<message>
+            <source>Refresh library</source>
+            <translation>Actualiser la bibliothèque</translation>
+        </message>
+        <message>
+            <source>Prepare / waitlist</source>
+            <translation>Préparer / file d’attente</translation>
+        </message>
+        <message>
+            <source>Plan automatically</source>
+            <translation>Planifier automatiquement</translation>
+        </message>
+        <message>
+            <source>Automatic comments from my template</source>
+            <translation>Commentaires automatiques depuis mon modèle</translation>
+        </message>
+        <message>
+            <source>Schedule my prepared votes</source>
+            <translation>Programmer mes votes préparés</translation>
+        </message>
+        <message>
+            <source>Automatic chat from my selected messages</source>
+            <translation>Chat automatique depuis mes messages sélectionnés</translation>
+        </message>
+        <message>
+            <source>Publication starts</source>
+            <translation>Début des publications</translation>
+        </message>
+        <message>
+            <source>Publication ends</source>
+            <translation>Fin des publications</translation>
+        </message>
+        <message>
+            <source>Timezone</source>
+            <translation>Fuseau horaire</translation>
+        </message>
+        <message>
+            <source>General channel</source>
+            <translation>Canal général</translation>
+        </message>
+        <message>
+            <source>Class channel</source>
+            <translation>Canal de classe</translation>
+        </message>
+        <message>
+            <source>One selected message per line. At least five words each.</source>
+            <translation>Un message sélectionné par ligne. Au moins cinq mots chacun.</translation>
+        </message>
+        <message>
+            <source>Selected chat messages</source>
+            <translation>Messages sélectionnés pour le chat</translation>
+        </message>
+        <message>
+            <source>Add current suggestion to automatic chat</source>
+            <translation>Ajouter la suggestion actuelle au chat automatique</translation>
+        </message>
+        <message>
+            <source>Plans up to seven days ahead. Comments use {titre}. Votes keep your prepared choice. Disabling an action cancels only its automatic slots. Keep the companion connected; calendar times are estimates.</source>
+            <translation>Planifie jusqu’à sept jours à l’avance. Les commentaires utilisent {titre}. Les votes conservent votre choix. Désactiver une action annule uniquement ses créneaux automatiques. Gardez le compagnon connecté ; les horaires sont estimés.</translation>
+        </message>
+        <message>
+            <source>Your torrents, ready to contribute</source>
+            <translation>Vos torrents, prêts à contribuer</translation>
+        </message>
+        <message>
+            <source>Seeds load automatically through the companion. Choose a torrent to see its actions.</source>
+            <translation>Les torrents en seed se chargent automatiquement via le compagnon. Choisissez un torrent pour voir ses actions.</translation>
+        </message>
+        <message>
+            <source>Search torrents…</source>
+            <translation>Rechercher un torrent…</translation>
+        </message>
+        <message>
+            <source>Write a comment</source>
+            <translation>Écrire un commentaire</translation>
+        </message>
+        <message>
+            <source>Prepare a vote</source>
+            <translation>Préparer un vote</translation>
+        </message>
+        <message>
+            <source>Write in chat</source>
+            <translation>Écrire dans le chat</translation>
+        </message>
+        <message>
+            <source>Torrents</source>
+            <translation>Torrents</translation>
+        </message>
+        <message>
+            <source>No local action yet</source>
+            <translation>Aucune action locale</translation>
+        </message>
+        <message>
+            <source>No matching torrents. Discovery continues while the companion is connected.</source>
+            <translation>Aucun torrent correspondant. La recherche continue lorsque le compagnon est connecté.</translation>
+        </message>
+        <message>
+            <source>Selected day</source>
+            <translation>Jour sélectionné</translation>
+        </message>
+        <message>
+            <source>Week</source>
+            <translation>Semaine</translation>
+        </message>
+        <message>
+            <source>Month</source>
+            <translation>Mois</translation>
+        </message>
+        <message>
+            <source>Inspect selected operation</source>
+            <translation>Examiner l’opération sélectionnée</translation>
+        </message>
+        <message>
+            <source>Estimated local times. Site quotas and companion availability can delay sending.</source>
+            <translation>Heures locales estimées. Les quotas du site et la disponibilité du compagnon peuvent retarder l’envoi.</translation>
+        </message>
+        <message>
+            <source>Calendar</source>
+            <translation>Calendrier</translation>
+        </message>
+        <message>
+            <source>Search titles, messages or results…</source>
+            <translation>Rechercher un titre, un message ou un résultat…</translation>
+        </message>
+        <message>
+            <source>All actions</source>
+            <translation>Toutes les actions</translation>
+        </message>
+        <message>
+            <source>All time</source>
+            <translation>Tout l’historique</translation>
+        </message>
+        <message>
+            <source>Today</source>
+            <translation>Aujourd’hui</translation>
+        </message>
+        <message>
+            <source>7 days</source>
+            <translation>7 jours</translation>
+        </message>
+        <message>
+            <source>30 days</source>
+            <translation>30 jours</translation>
+        </message>
+        <message>
+            <source>Custom dates</source>
+            <translation>Dates personnalisées</translation>
+        </message>
+        <message>
+            <source>View operation history</source>
+            <translation>Voir l’historique de l’opération</translation>
+        </message>
+        <message>
+            <source>History</source>
+            <translation>Historique</translation>
+        </message>
+        <message>
+            <source>Edit / reschedule</source>
+            <translation>Modifier / reprogrammer</translation>
+        </message>
+        <message>
+            <source>Queue</source>
+            <translation>Mettre en file</translation>
+        </message>
+        <message>
+            <source>Pause</source>
+            <translation>Suspendre</translation>
+        </message>
+        <message>
+            <source>Cancel</source>
+            <translation>Annuler</translation>
+        </message>
+        <message>
+            <source>Automatic</source>
+            <translation>Automatique</translation>
+        </message>
+        <message>
+            <source>Manual</source>
+            <translation>Manuel</translation>
+        </message>
+        <message>
+        <source>Chat / draft</source>
+        <translation>Chat / brouillon</translation>
+    </message>
+    <message>
+        <source>When automatic votes are enabled, saved votes are scheduled using your choice and date.</source>
+        <translation>Si les votes automatiques sont activés, vos votes enregistrés sont programmés selon votre choix et votre date.</translation>
+    </message>
 </context>
 <context>
     <name>RenameDialog</name>

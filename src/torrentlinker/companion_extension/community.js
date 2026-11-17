@@ -48,11 +48,15 @@ export async function communityInTab(request) {
     if (!command) {
       const page = request.page;
       if (!Number.isSafeInteger(page) || page < 1 || page > 100000) throw new Error("schema");
-      const seeds = await get(`/api/profile/active-seeds?page=${page}&perPage=25`);
+      const seeds = request.seeds === false ? {data: []} : await get(`/api/profile/active-seeds?page=${page}&perPage=25`);
       if (!Array.isArray(seeds.data)) throw new Error("schema");
       const channels = await channelsFor(profile);
       if (String((await get("/api/user/profile")).id) !== request.accountId) return fail("refused", "account");
-      return {snapshot: {rules: limits, channels, page, candidates: seeds.data.slice(0, 50).map(s => ({
+      const total = seeds.meta?.total;
+      const pages = seeds.meta?.totalPages;
+      const has_more = request.seeds !== false && (Number.isInteger(pages) ? page < pages :
+        Number.isInteger(total) ? page * 25 < total : seeds.data.length >= 25);
+      return {snapshot: {rules: limits, channels, page, has_more, seeds: request.seeds !== false, scan: request.scan || "", candidates: seeds.data.slice(0, 50).map(s => ({
         hash: s.infoHash, title: String(s.name).slice(0, 300),
       }))}};
     }

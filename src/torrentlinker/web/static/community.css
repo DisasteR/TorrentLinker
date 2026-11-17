@@ -11,3 +11,43 @@
 @media (prefers-reduced-motion:reduce){#community-table tr{transition:none}}
 
 #zen-community-panel label[hidden] {display:none}
+#zen-community-panel .community-heading h2{margin-bottom:6px}
+#zen-community-panel .community-heading p{color:var(--muted,#9baab5)}
+#zen-community-panel .community-tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--border,#34424e);padding:12px 0;margin-bottom:16px}
+#zen-community-panel .community-tabs .active,#zen-community-panel .community-torrent.active{background:#29454a;border-color:#73b9b1}
+#zen-community-panel .community-page[hidden]{display:none}
+#zen-community-panel .community-split{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:20px;align-items:start}
+#zen-community-panel .community-library{display:grid;gap:8px}
+#zen-community-panel .community-torrent{display:flex;flex-direction:column;text-align:left;gap:8px;padding:18px;min-width:0;white-space:normal;overflow-wrap:anywhere}
+#zen-community-panel .community-torrent small{color:var(--muted,#9baab5)}
+#zen-community-panel .community-detail{position:sticky;top:12px;overflow-wrap:anywhere}
+#zen-community-panel .community-detail>button{margin:12px 8px 0 0}
+#zen-community-panel .community-operation{display:flex;flex-direction:column;text-align:left;gap:8px;width:100%;margin:8px 0;padding:16px;border-left:3px solid #7bbcb3;white-space:normal;overflow-wrap:anywhere}
+#zen-community-panel .community-operation.vote,#zen-community-panel .community-calendar-event.vote{border-left-color:#86addb}
+#zen-community-panel .community-operation.chat,#zen-community-panel .community-calendar-event.chat{border-left-color:#b79bd3}
+#zen-community-panel .community-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+#zen-community-panel .community-calendar-day{min-height:135px;background:var(--panel,#202b35);padding:5px;min-width:0;border:1px solid transparent}
+#zen-community-panel .community-calendar-grid.week .community-calendar-day{min-height:260px}
+#zen-community-panel .community-calendar-day.today{background:#253d40}
+#zen-community-panel .community-calendar-day.selected{border-color:#7bbcb3}
+#zen-community-panel .community-calendar-day>button:first-child{padding:5px;border:0;background:transparent;font-size:12px}
+#zen-community-panel .community-calendar-event{display:flex;flex-direction:column;gap:6px;text-align:left;width:100%;padding:8px 5px;margin-top:6px;border-left:3px solid #7bbcb3;white-space:normal;overflow-wrap:anywhere;font-size:12px}
+#zen-community-panel .community-calendar-event small{font-size:10px}
+#zen-community-panel .community-timeline{display:flex;align-items:end;gap:2px;overflow-x:auto;padding:10px 0}
+#zen-community-panel .community-timeline button{display:flex;flex:1;min-width:22px;flex-direction:column;align-items:center;gap:6px;padding:0;border:0;background:transparent;font-size:10px}
+#zen-community-panel .community-timeline span{display:block;background:#66aba3;width:100%;border-radius:3px 3px 0 0}
+#zen-community-panel .community-dialog{max-width:650px;width:calc(100% - 48px);max-height:85vh;overflow:auto;padding:24px;background:var(--panel,#202b35);color:inherit;border:1px solid #52606c;border-radius:14px;overflow-wrap:anywhere}
+#zen-community-panel .community-dialog::backdrop{background:#0009}
+#zen-community-panel .community-dialog button{margin:8px 8px 0 0}
+#zen-community-panel .community-event{border-left:2px solid #73b9b1;padding-left:16px;margin:18px 0;white-space:pre-wrap}
+#zen-community-panel .toolbar{flex-wrap:wrap}
+@media(max-width:850px){#zen-community-panel .community-split{grid-template-columns:1fr}#zen-community-panel .community-detail{position:static}#community-calendar{overflow-x:auto}#zen-community-panel .community-calendar-grid{min-width:650px}#zen-community-panel .community-form{grid-template-columns:1fr}}
+#zen-community-panel .community-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:24px;align-items:center}
+#zen-community-panel .community-heading>h2,#zen-community-panel .community-heading>p:not(.community-quotas){grid-column:1;margin:6px 0}
+#zen-community-panel .community-quotas{grid-column:2;grid-row:1/3;display:flex;gap:8px;margin:0}
+#zen-community-panel .community-quota{display:flex;flex-direction:column;gap:6px;padding:12px;min-width:92px;border:1px solid var(--border,#34424e);border-radius:10px}
+#zen-community-panel .community-quota small{font-size:11px;color:var(--muted,#9baab5)}
+#zen-community-panel .community-statusbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+#zen-community-panel .community-statusbar>p{font-size:12px;margin:0;color:var(--muted,#9baab5)}
+#zen-community-panel .toolbar select{width:auto;min-width:150px}
+@media(max-width:1050px){#zen-community-panel .community-heading{display:block}#zen-community-panel .community-quotas{margin:12px 0;flex-wrap:wrap}}

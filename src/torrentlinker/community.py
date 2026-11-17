@@ -6,6 +6,7 @@ before dispatch; ambiguous results are never automatically sent a second time.
 
 from __future__ import annotations
 
+import copy
 import html
 import json
 import math
@@ -20,9 +21,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from torrentlinker.community_schedule import AUTOMATION, in_window, next_slot, validate_automation
+
 KINDS = {"comment": "comment_post", "vote": "trust_vote", "chat": "shout_message"}
 EDITABLE = {"draft", "queued", "paused", "refused", "cancelled"}
 DEFAULTS = {
+    "automation": AUTOMATION,
     "enabled": False,
     "limits": {"comment": 5, "vote": 5, "chat": 5},
     "intervals": {"comment": 60, "vote": 60, "chat": 600},
@@ -73,7 +77,37 @@ class CommunityActions:
                 CREATE TABLE IF NOT EXISTS candidates (
                     account TEXT NOT NULL, hash TEXT NOT NULL, title TEXT NOT NULL,
                     seen REAL NOT NULL, PRIMARY KEY(account,hash));
+                CREATE TABLE IF NOT EXISTS events (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT, account TEXT NOT NULL,
+                    action_id TEXT NOT NULL, time REAL NOT NULL, state TEXT NOT NULL,
+                    content TEXT NOT NULL, note TEXT NOT NULL DEFAULT '');
+                CREATE INDEX IF NOT EXISTS event_account ON events(account, action_id, time);
             """)
+            columns = {r["name"] for r in db.execute("PRAGMA table_info(actions)")}
+            if "source" not in columns:
+                db.execute("ALTER TABLE actions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
+            columns = {r["name"] for r in db.execute("PRAGMA table_info(accounts)")}
+            if "discovered" not in columns:
+                db.execute("ALTER TABLE accounts ADD COLUMN discovered REAL NOT NULL DEFAULT 0")
+            if "scan" not in columns:
+                db.execute("ALTER TABLE accounts ADD COLUMN scan TEXT NOT NULL DEFAULT ''")
+            if "scan_started" not in columns:
+                db.execute("ALTER TABLE accounts ADD COLUMN scan_started REAL NOT NULL DEFAULT 0")
+
+    @staticmethod
+    def _settings(row: sqlite3.Row) -> dict[str, Any]:
+        return {**copy.deepcopy(DEFAULTS), **json.loads(row["settings"])}
+
+    def _event(self, db: sqlite3.Connection, account: str, identifier: str, note: str = "") -> None:
+        row = db.execute(
+            "SELECT * FROM actions WHERE id=? AND account=?", (identifier, account)
+        ).fetchone()
+        if row:
+            db.execute(
+                "INSERT INTO events(account,action_id,time,state,content,note) "
+                "VALUES (?,?,?,?,?,?)",
+                (account, identifier, self.clock(), row["state"], row["payload"], note),
+            )
 
     @contextmanager
     def _db(self) -> Iterator[sqlite3.Connection]:
@@ -101,11 +135,21 @@ class CommunityActions:
         return row
 
     def _expire(self, db: sqlite3.Connection, account: str) -> None:
+        expired = [
+            r["id"]
+            for r in db.execute(
+                "SELECT id FROM actions WHERE account=? AND state='sending' AND started<?",
+                (account, self.clock() - 180),
+            )
+        ]
         db.execute(
             """UPDATE actions SET state='uncertain', note='No receipt. Check c411; no retry.'
                       WHERE account=? AND state='sending' AND started<?""",
             (account, self.clock() - 180),
         )
+
+        for identifier in expired:
+            self._event(db, account, identifier, "receipt_timeout")
 
     @staticmethod
     def _item(row: sqlite3.Row) -> dict[str, Any]:
@@ -126,8 +170,27 @@ class CommunityActions:
                     "SELECT * FROM actions WHERE account=? ORDER BY position,created", (account,)
                 )
             ]
+            events: dict[str, list[dict[str, Any]]] = {}
+            for event in db.execute(
+                "SELECT * FROM events WHERE account=? ORDER BY sequence", (account,)
+            ):
+                events.setdefault(event["action_id"], []).append(
+                    {
+                        "time": event["time"],
+                        "state": event["state"],
+                        "note": event["note"],
+                        **json.loads(event["content"]),
+                    }
+                )
+            for item in items:
+                item["events"] = events.get(item["id"], [])
+                item["updated"] = (
+                    item["events"][-1]["time"]
+                    if item["events"]
+                    else item["posted"] or item["created"]
+                )
             snapshot = json.loads(row["snapshot"])
-            settings = json.loads(row["settings"])
+            settings = self._settings(row)
             quotas = {}
             for kind in KINDS:
                 used = sum(
@@ -143,8 +206,23 @@ class CommunityActions:
                     "site_used": rule.get("today"),
                     "limit": settings["limits"][kind],
                 }
+            reservations = {
+                k: [
+                    i["started"]
+                    for i in items
+                    if i["kind"] == k
+                    and i["state"] in ("sending", "uncertain", "posted")
+                    and (i["started"] or 0) > self.clock() - 86400
+                ]
+                for k in KINDS
+            }
+            for k in KINDS:
+                rule = snapshot.get("rules", {}).get(k, {})
+                reservations[k].extend(
+                    [self.clock()] * max(0, rule.get("today", 0) - len(reservations[k]))
+                )
             for item in items:
-                if item["state"] != "queued":
+                if item["state"] not in ("queued", "paused"):
                     continue
                 kind = item["kind"]
                 rule = snapshot.get("rules", {}).get(kind, {})
@@ -164,7 +242,16 @@ class CommunityActions:
                     )
                 if cap and len(recent) >= cap:
                     next_at = max(next_at, recent[-cap] + 86400)
-                item["next_at"] = next_at
+                slot = next_slot(
+                    max(next_at, self.clock()),
+                    reservations[kind],
+                    cap,
+                    max(30, settings["intervals"][kind], rule.get("cooldown", 0)),
+                    settings["automation"] if item["source"] == "automatic" else None,
+                )
+                item["next_at"] = slot if slot is not None else next_at
+                if slot is not None:
+                    reservations[kind].append(slot)
                 item["wait_reason"] = (
                     "Queue paused"
                     if not settings["enabled"]
@@ -186,13 +273,14 @@ class CommunityActions:
                     dict(r)
                     for r in db.execute(
                         "SELECT hash,title,seen FROM candidates WHERE account=? "
-                        "ORDER BY seen DESC,title LIMIT 500",
+                        "ORDER BY seen DESC,title",
                         (account,),
                     )
                 ],
                 "channels": snapshot.get("channels", []),
                 "quotas": quotas,
                 "synced_at": row["synced"],
+                "discovered_at": row["discovered"],
                 "retry_at": row["retry_at"],
                 "page": row["page"],
                 "refresh_pending": bool(row["refresh"]),
@@ -200,6 +288,10 @@ class CommunityActions:
             }
 
     def settings(self, account: str, values: dict[str, Any]) -> None:
+        values = copy.deepcopy(values)
+        with self._db() as db:
+            previous = self._settings(self._account(db, account))
+        values.setdefault("automation", previous["automation"])
         if set(values) != set(DEFAULTS) or type(values["enabled"]) is not bool:
             raise ValueError("Invalid community settings.")
         for field in ("limits", "intervals"):
@@ -214,31 +306,98 @@ class CommunityActions:
             raise ValueError("Invalid templates.")
         if any(not isinstance(t, str) or len(t) > 500 for t in values["templates"].values()):
             raise ValueError("Templates must contain at most 500 characters.")
+        validate_automation(values["automation"])
+        if (
+            values["automation"]["enabled"]
+            and values["automation"]["kinds"]["comment"]
+            and len(values["templates"]["comment"].strip()) < 3
+        ):
+            raise ValueError("Write a comment template before enabling automatic comments.")
         with self._db() as db:
             self._account(db, account)
             db.execute(
                 "UPDATE accounts SET settings=? WHERE account=?", (json.dumps(values), account)
             )
+            config = values["automation"]
+            snapshot = json.loads(self._account(db, account)["snapshot"])
+            channels = {
+                c["id"] for c in snapshot.get("channels", []) if c["kind"] in config["channels"]
+            }
+            messages = {normalized(m) for m in config["messages"]}
+            for item in db.execute(
+                "SELECT * FROM actions WHERE account=? AND source='automatic' "
+                "AND state IN ('queued','paused')",
+                (account,),
+            ).fetchall():
+                payload = json.loads(item["payload"])
+                removed = item["kind"] == "chat" and (
+                    item["subject"] not in channels
+                    or normalized(payload["content"]) not in messages
+                )
+                if not config["enabled"] or not config["kinds"][item["kind"]] or removed:
+                    db.execute(
+                        "UPDATE actions SET "
+                        "state='cancelled',revision=revision+1,note='automation_disabled' "
+                        "WHERE id=?",
+                        (item["id"],),
+                    )
+                    self._event(db, account, item["id"], "automation_disabled")
+                elif item["kind"] == "comment":
+                    content = (
+                        values["templates"]["comment"]
+                        .replace("{titre}", payload["title"])
+                        .replace("{title}", payload["title"])
+                    )
+                    if not 3 <= len(content.strip()) <= 500:
+                        raise ValueError(
+                            "The rendered comment template must contain 3 to 500 characters."
+                        )
+                    if content != payload["content"]:
+                        payload["content"] = content
+                        db.execute(
+                            "UPDATE actions SET payload=?,revision=revision+1 WHERE id=?",
+                            (json.dumps(payload), item["id"]),
+                        )
+                        self._event(db, account, item["id"], "template_updated")
+            self._plan(db, account)
 
     def refresh(self, account: str, page: int = 1) -> None:
         bounded(page, 1, 100000)
         with self._db() as db:
             self._account(db, account)
-            db.execute("UPDATE accounts SET page=?,refresh=1 WHERE account=?", (page, account))
+            db.execute(
+                "UPDATE accounts SET page=?,refresh=1,scan_started=?,scan=? WHERE account=?",
+                (page, self.clock(), secrets.token_hex(16), account),
+            )
 
     def demand(self, account: str) -> dict[str, Any]:
         with self._db() as db:
             row = self._account(db, account)
-            settings = json.loads(row["settings"])
+            settings = self._settings(row)
             return {
                 "collect": bool(row["refresh"]) or settings["enabled"],
+                "seeds": bool(row["refresh"]),
+                "scan": row["scan"],
                 "page": row["page"],
                 "retry_at": row["retry_at"],
             }
 
     def observe(self, account: str, data: dict[str, Any]) -> None:
         # Data returned by the extension is deliberately much narrower than c411's bodies.
-        if set(data) != {"rules", "channels", "candidates", "page"}:
+        if set(data) - {
+            "rules",
+            "channels",
+            "candidates",
+            "page",
+            "has_more",
+            "seeds",
+            "scan",
+        } or not {
+            "rules",
+            "channels",
+            "candidates",
+            "page",
+        } <= set(data):
             raise ValueError("Invalid community snapshot.")
         rules = data["rules"]
         if not isinstance(rules, dict) or set(rules) != set(KINDS):
@@ -278,6 +437,14 @@ class CommunityActions:
                 (account, c["hash"], str(c.get("title", ""))[:300], self.clock())
             )
         page = bounded(data["page"], 1, 100000)
+        if "seeds" in data and type(data["seeds"]) is not bool:
+            raise ValueError("Invalid seed collection flag.")
+        if "scan" in data and (
+            not isinstance(data["scan"], str) or not re.fullmatch(r"[a-f0-9]{32}|", data["scan"])
+        ):
+            raise ValueError("Invalid discovery scan.")
+        if "has_more" in data and type(data["has_more"]) is not bool:
+            raise ValueError("Invalid page status.")
         with self._db() as db:
             row = self._account(db, account)
             db.execute(
@@ -285,15 +452,36 @@ class CommunityActions:
                 (
                     json.dumps({"rules": clean_rules, "channels": clean_channels}),
                     self.clock(),
-                    int(page != row["page"]),
+                    row["refresh"],
                     account,
                 ),
             )
+            matching_scan = "scan" not in data or data["scan"] == row["scan"]
+            collected_seeds = data.get("seeds", True) and matching_scan
+            if not collected_seeds:
+                clean_candidates = []
+            if row["refresh"] and page == row["page"] and collected_seeds:
+                more = data.get("has_more", False) and page < 100000
+                db.execute(
+                    "UPDATE accounts SET page=?,refresh=?,discovered=? WHERE account=?",
+                    (
+                        page + 1 if more else page,
+                        int(more),
+                        row["discovered"] if more else self.clock(),
+                        account,
+                    ),
+                )
+                if not more and row["scan_started"]:
+                    db.execute(
+                        "DELETE FROM candidates WHERE account=? AND seen<?",
+                        (account, row["scan_started"]),
+                    )
             db.executemany(
                 "INSERT INTO candidates VALUES (?,?,?,?) ON CONFLICT(account,hash) "
                 "DO UPDATE SET title=excluded.title,seen=excluded.seen",
                 clean_candidates,
             )
+            self._plan(db, account)
 
     def save(self, account: str, data: dict[str, Any]) -> str:
         kind = data.get("kind")
@@ -360,7 +548,8 @@ class CommunityActions:
             if old:
                 # Editing always returns the item to draft, requiring Queue again.
                 db.execute(
-                    "UPDATE actions SET kind=?,subject=?,payload=?,due=?,state='draft',"
+                    "UPDATE actions SET "
+                    "kind=?,subject=?,payload=?,due=?,state='draft',source='manual',"
                     "revision=revision+1,note='' WHERE id=?",
                     (kind, subject, payload, due, identifier),
                 )
@@ -378,6 +567,7 @@ class CommunityActions:
                     "VALUES (?,?,?,?,?,'draft',?,?,?)",
                     (identifier, account, kind, subject, payload, due, self.clock(), self.clock()),
                 )
+            self._event(db, account, identifier)
         return identifier
 
     def control(self, account: str, identifier: str, action: str, revision: int) -> None:
@@ -406,7 +596,7 @@ class CommunityActions:
                         raise ValueError("This action is already in the journal.")
             if action in states:
                 db.execute(
-                    "UPDATE actions SET state=?,revision=revision+1 WHERE id=?",
+                    "UPDATE actions SET state=?,revision=revision+1,note='' WHERE id=?",
                     (states[action], identifier),
                 )
             elif action == "first":
@@ -419,19 +609,21 @@ class CommunityActions:
                 )
             else:
                 raise ValueError("Unknown queue action.")
+            self._event(db, account, identifier, action)
 
     def claim(self, account: str) -> dict[str, Any] | None:
         now = self.clock()
         with self._db() as db:
             row = self._account(db, account)
             self._expire(db, account)
-            settings = json.loads(row["settings"])
+            settings = self._settings(row)
             if not settings["enabled"] or now < row["retry_at"] or now - row["synced"] > 90:
                 return None
             if db.execute(
                 "SELECT 1 FROM actions WHERE account=? AND state='sending'", (account,)
             ).fetchone():
                 return None
+            self._plan(db, account)
             rules = json.loads(row["snapshot"]).get("rules", {})
             for job in db.execute(
                 "SELECT * FROM actions WHERE account=? AND state='queued' AND due<=? "
@@ -439,6 +631,14 @@ class CommunityActions:
                 (account, now),
             ).fetchall():
                 kind = job["kind"]
+                if job["source"] == "automatic":
+                    config = settings["automation"]
+                    if (
+                        not config["enabled"]
+                        or not config["kinds"][kind]
+                        or in_window(now, config) > now
+                    ):
+                        continue
                 rule = rules.get(kind)
                 if not rule or rule["locked"]:
                     continue
@@ -464,6 +664,7 @@ class CommunityActions:
                     "WHERE id=?",
                     (attempt, now, job["id"]),
                 )
+                self._event(db, account, job["id"])
                 return {
                     "id": job["id"],
                     "attempt": attempt,
@@ -519,7 +720,7 @@ class CommunityActions:
                     (self.clock() + max(30, wait), account),
                 )
             if note in ("auth", "account", "token"):
-                settings = json.loads(self._account(db, account)["settings"])
+                settings = self._settings(self._account(db, account))
                 settings["enabled"] = False
                 db.execute(
                     "UPDATE accounts SET settings=? WHERE account=?",
@@ -536,3 +737,149 @@ class CommunityActions:
                     row["id"],
                 ),
             )
+
+            self._event(db, account, row["id"], note)
+
+    def discover(self, account: str) -> None:
+        """Request a bounded background scan when the Community view is opened."""
+        with self._db() as db:
+            row = self._account(db, account)
+            if not row["refresh"] and (
+                not row["discovered"] or self.clock() - row["discovered"] > 21600
+            ):
+                db.execute(
+                    "UPDATE accounts SET refresh=1,page=1,scan_started=?,scan=? WHERE account=?",
+                    (self.clock(), secrets.token_hex(16), account),
+                )
+
+    def _plan(self, db: sqlite3.Connection, account: str) -> None:
+        row = self._account(db, account)
+        settings = self._settings(row)
+        config = settings["automation"]
+        if not config["enabled"]:
+            return
+        now = self.clock()
+        items = [dict(r) for r in db.execute("SELECT * FROM actions WHERE account=?", (account,))]
+        active = sum(i["state"] in ("draft", "queued", "paused", "sending") for i in items)
+        snapshot = json.loads(row["snapshot"])
+        rules = snapshot.get("rules", {})
+        for kind in KINDS:
+            if not config["kinds"][kind]:
+                continue
+            rule = rules.get(kind, {})
+            cap = min(settings["limits"][kind], rule.get("limit", 0))
+            if not cap or rule.get("locked", True):
+                continue
+            reservations = [
+                i["started"]
+                for i in items
+                if i["kind"] == kind
+                and i["state"] in ("sending", "uncertain", "posted")
+                and (i["started"] or 0) > now - 86400
+            ]
+            # External sends reserve capacity conservatively until a later snapshot.
+            reservations.extend([now] * max(0, rule.get("today", 0) - len(reservations)))
+            reservations.extend(
+                max(now, i["due"])
+                for i in items
+                if i["kind"] == kind and i["state"] in ("queued", "paused")
+            )
+            interval = max(30, settings["intervals"][kind], rule.get("cooldown", 0))
+            proposals = []
+            known = {
+                i["subject"]
+                for i in items
+                if i["kind"] == kind
+                and not (i["state"] == "cancelled" and i["note"] == "automation_disabled")
+            }
+            if kind == "comment":
+                for candidate in db.execute(
+                    "SELECT * FROM candidates WHERE account=? ORDER BY seen DESC,title", (account,)
+                ):
+                    if candidate["hash"] not in known:
+                        content = (
+                            settings["templates"]["comment"]
+                            .replace("{titre}", candidate["title"])
+                            .replace("{title}", candidate["title"])
+                        )
+                        if 3 <= len(content.strip()) <= 500:
+                            proposals.append(
+                                (
+                                    None,
+                                    candidate["hash"],
+                                    {"title": candidate["title"], "content": content, "vote": ""},
+                                )
+                            )
+            elif kind == "vote":
+                proposed = set()
+                for item in sorted(items, key=lambda i: i["created"], reverse=True):
+                    if item["kind"] != "vote" or item["subject"] in proposed:
+                        continue
+                    recover = item["state"] == "cancelled" and item["note"] == "automation_disabled"
+                    if item["state"] != "draft" and not recover:
+                        continue
+                    if recover and any(
+                        other["kind"] == "vote"
+                        and other["subject"] == item["subject"]
+                        and other["state"] != "cancelled"
+                        for other in items
+                    ):
+                        continue
+                    proposals.append((item["id"], item["subject"], json.loads(item["payload"])))
+                    proposed.add(item["subject"])
+            else:
+                channels = [
+                    c for c in snapshot.get("channels", []) if c["kind"] in config["channels"]
+                ]
+                seen = {
+                    normalized(json.loads(i["payload"])["content"])
+                    for i in items
+                    if i["kind"] == "chat"
+                    and not (i["state"] == "cancelled" and i["note"] == "automation_disabled")
+                }
+                if channels:
+                    for message in config["messages"]:
+                        if normalized(message) not in seen:
+                            channel = channels[len(proposals) % len(channels)]
+                            proposals.append(
+                                (
+                                    None,
+                                    channel["id"],
+                                    {
+                                        "title": channel["name"],
+                                        "content": message.strip(),
+                                        "vote": "",
+                                    },
+                                )
+                            )
+                            seen.add(normalized(message))
+            for identifier, subject, payload in proposals:
+                if active >= MAX_ITEMS and not identifier:
+                    break
+                earliest = (
+                    max(now, next(i["due"] for i in items if i["id"] == identifier))
+                    if identifier
+                    else now
+                )
+                slot = next_slot(earliest, reservations, cap, interval, config)
+                if slot is None or slot >= now + 7 * 86400:
+                    continue
+                if identifier:
+                    db.execute(
+                        "UPDATE actions SET "
+                        "state='queued',source='automatic',due=?,revision=revision+1,note='' "
+                        "WHERE id=?",
+                        (slot, identifier),
+                    )
+                else:
+                    identifier = secrets.token_hex(16)
+                    db.execute(
+                        "INSERT INTO "
+                        "actions(id,account,kind,subject,payload,state,due,"
+                        "created,position,source) "
+                        "VALUES (?,?,?,?,?,'queued',?,?,?,'automatic')",
+                        (identifier, account, kind, subject, json.dumps(payload), slot, now, slot),
+                    )
+                    active += 1
+                reservations.append(slot)
+                self._event(db, account, identifier, "automatic")

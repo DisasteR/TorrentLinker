@@ -203,7 +203,7 @@ async function communityCommands() {
         return frames[0]?.result;
       } finally {clearTimeout(watchdog); clearInterval(beat);}
     };
-    const observed = await run({accountId: connection.accountId, page: demand.page});
+    const observed = await run({accountId: connection.accountId, page: demand.page, seeds: demand.seeds, scan: demand.scan});
     if (!observed?.snapshot) {
       communityRetry[key] = Date.now() + Math.max(60, observed?.retryAfter || 60) * 1000;
       await chrome.storage.local.set({communityRetry});

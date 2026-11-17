@@ -501,7 +501,9 @@ class ProfileWorkspace:
 
     def community_state(self) -> dict[str, Any]:
         with self.lock:
-            return {**self.community.state(self.community_account()), "paired": bool(self._pair)}
+            account = self.community_account()
+            self.community.discover(account)
+            return {**self.community.state(account), "paired": bool(self._pair)}
 
     def community_update(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         with self.lock:

@@ -128,3 +128,18 @@ def test_web_owner_and_extension_protocol_share_journal(tmp_path, monkeypatch):
         w.refresh(setup.settings.indexer.url, "rotated-key")
         assert w.community_state()["items"][0]["state"] == "posted"
         assert not w.community_state()["paired"]
+
+
+def test_calendar_and_history_keep_selection_during_refresh(qtbot, tmp_path, monkeypatch):
+    _, _, w = ready(tmp_path, monkeypatch)
+    identifier = w.community.save(
+        "42", {"kind": "comment", "subject": H, "content": "Un commentaire de test conservé"}
+    )
+    w.community.control("42", identifier, "queue", 1)
+    view = CommunityView(w)
+    qtbot.addWidget(view)
+    view.calendar_rows.setCurrentRow(0)
+    view.history_rows.setCurrentRow(0)
+    view.refresh()
+    assert view.calendar_rows.currentRow() == 0
+    assert view.history_rows.currentRow() == 0
