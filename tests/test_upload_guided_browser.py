@@ -178,9 +178,11 @@ def test_manual_upload_and_postimages_return_preserve_description(tmp_path, host
             page.screenshot(path="/tmp/upload-guided-web.png", full_page=True)
             page.set_viewport_size({"width": 390, "height": 844})
             expect(frame.locator(".track")).to_have_count(1)
-            assert frame.locator("body").evaluate(
-                "(n)=>document.documentElement.scrollWidth<=innerWidth"
-            )
+            # Resize propagates asynchronously to the embedded document.
+            page.wait_for_function("""() => {
+                const frame = document.getElementById('upload-frame').contentWindow;
+                return frame.document.documentElement.scrollWidth <= frame.innerWidth;
+            }""")
             assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
             assert not errors, errors
             browser.close()

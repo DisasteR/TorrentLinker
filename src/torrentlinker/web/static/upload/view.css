@@ -207,6 +207,8 @@ main {
   margin: 24px 0 20px;
 }
 .step {
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-align: left;
   padding: 13px 12px;
   position: relative;
@@ -658,7 +660,7 @@ dialog select {
     display: block;
   }
   .steps {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 650px) {

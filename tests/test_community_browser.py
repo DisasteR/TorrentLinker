@@ -236,8 +236,10 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
     app, setup = prepared(tmp_path / "server", monkeypatch)
     w = setup.profile_workspace()
     w.refresh(setup.settings.indexer.url, "fake-key")
-    clock = [time.time()]
-    w.clock = lambda: clock[0]
+    # Keep wall-clock progression during browser setup; only offset cooldowns.
+    # A frozen clock can fall behind a minute-rounded UI due time in slow CI.
+    clock = [0.0]
+    w.clock = lambda: time.time() + clock[0]
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
