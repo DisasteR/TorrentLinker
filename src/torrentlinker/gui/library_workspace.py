@@ -9,6 +9,8 @@ from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -17,6 +19,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -199,11 +202,9 @@ class LibraryWorkspace(QWidget):
         self.scan_errors: list[ScanError] = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        heading = QLabel(self.tr("Explore your folders. Review Candidates. Verify before seeding."))
-        heading.setProperty("role", "muted")
-        layout.addWidget(heading)
         self.sections = QTabWidget()
         self.sections.setObjectName("librarySections")
+        self.sections.setDocumentMode(True)
         layout.addWidget(self.sections)
         explorer = QWidget()
         body = QHBoxLayout(explorer)
@@ -224,7 +225,7 @@ class LibraryWorkspace(QWidget):
         rail_layout.addWidget(self.rail)
         add = QPushButton(self.tr("Manage folders"))
         self.editor: FolderEditor
-        add.clicked.connect(lambda: self.sections.setCurrentWidget(self.editor))
+        add.clicked.connect(self.open_folders)
         rail_layout.addWidget(add)
         body.addWidget(rail)
         content = QWidget()
@@ -243,6 +244,7 @@ class LibraryWorkspace(QWidget):
         stack.addWidget(self.grip)
         stack.addWidget(window.review, 1)
         body.addWidget(content, 1)
+        self.explorer = explorer
         self.sections.addTab(explorer, self.tr("Local Items"))
         self.editor = FolderEditor(
             window.settings.library_folders, adult=window.settings.adult_content
@@ -270,6 +272,10 @@ class LibraryWorkspace(QWidget):
                 self.reseed.refresh() if self.sections.currentWidget() is self.reseed else None
             )
         )
+        # The guided view owns navigation. Keep the advanced comparison tools in
+        # a dialog, rather than a second Library landing page.
+        self.sections.tabBar().hide()
+        self.sections.setCurrentWidget(self.reseed)
         self.items = items
         self.toolbar, self.matches = toolbar, matches
         window.review.expand_button.clicked.connect(self.expand_review)
@@ -277,6 +283,49 @@ class LibraryWorkspace(QWidget):
         window.library_model.modelReset.connect(self.refresh)
         window.statusBar().messageChanged.connect(self.record_activity)
         self.refresh()
+
+    def open_folders(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("Library Folders"))
+        dialog.resize(1000, 650)
+        layout = QVBoxLayout(dialog)
+        index = self.sections.indexOf(self.editor)
+        self.sections.removeTab(index)
+        self.editor.set_folders(self.owner.settings.library_folders)
+        layout.addWidget(self.editor)
+        self.editor.show()
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.exec()
+        self.sections.insertTab(index, self.editor, self.tr("Folders"))
+        self.sections.setCurrentWidget(self.reseed)
+
+    def open_review(self, path: str) -> None:
+        entry = next(
+            (e for e in self.owner.library_model.entries if str(e.item.path) == path), None
+        )
+        if entry is None:
+            raise ValueError("Scan the Library and select a current Local Item.")
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("Compare files and repair"))
+        dialog.resize(1100, 760)
+        layout = QVBoxLayout(dialog)
+        index = self.sections.indexOf(self.explorer)
+        self.sections.removeTab(index)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.explorer)
+        layout.addWidget(scroll)
+        self.explorer.show()
+        self.owner.review.set_entry(entry)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.exec()
+        scroll.takeWidget()
+        self.sections.insertTab(index, self.explorer, self.tr("Local Items"))
+        self.sections.setCurrentWidget(self.reseed)
 
     def record_activity(self, message: str) -> None:
         if message:

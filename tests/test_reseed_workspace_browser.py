@@ -63,61 +63,55 @@ def test_reseed_board_runs_pauses_and_preserves_original_on_small_screen(tmp_pat
             page = browser.new_page(viewport={"width": 1280, "height": 900}, locale="en-US")
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
+            page.add_init_script("localStorage.setItem('tl-theme','dark')")
             page.goto(f"http://127.0.0.1:{port}/#/library/reseed")
             page.locator("#login-password").fill("test-password-long")
             page.locator("#login-form button").click()
-            expect(page.locator("#reseed-board")).to_contain_text(original.name)
-            expect(page.locator("#reseed-root")).to_be_hidden()
-            page.locator("#reseed-settings").click()
-            page.locator("#reseed-browse").click()
-            page.locator("#dialog").get_by_role("button", name=str(links), exact=True).click()
-            page.locator("#dialog").get_by_role(
-                "button", name="Use this folder", exact=True
-            ).click()
-            expect(page.locator("#reseed-root")).to_have_value(str(links))
-            page.locator("#reseed-folder-form button[type=submit]").click()
-            expect(page.locator("#toast")).to_contain_text("Link folder saved")
+            frame = page.frame_locator("#reseed-frame")
+            expect(frame.locator(".torrent")).to_contain_text(original.name)
+            frame.locator(".guided button").first.click()
+            frame.get_by_role("button", name="Parcourir…").click()
+            frame.get_by_role("button", name=str(links), exact=True).click()
+            frame.get_by_role("button", name="Choisir ce dossier", exact=True).click()
+            expect(frame.locator("#root-form [name=path]")).to_have_value(str(links))
+            frame.get_by_role("button", name="Enregistrer", exact=True).click()
+            expect(frame.locator("#dialog")).not_to_be_visible()
             page.reload()
-            page.locator("#reseed-folder-settings summary").click()
-            expect(page.locator("#reseed-root")).to_have_value(str(links))
-            page.goto(f"http://127.0.0.1:{port}/#/library/reseed")
-            expect(page.locator("#reseed-root-status")).to_have_text("Link folder configured")
-            expect(page.locator("#reseed-root")).to_be_hidden()
-            page.locator("#reseed-run-all").click()
-            page.locator("#reseed-details").get_by_role(
-                "button", name="Run all steps", exact=True
-            ).click()
-            expect(page.locator("#reseed-progress-text")).to_contain_text(
-                "Client verification", timeout=20000
+            expect(frame.locator(".guided button").first).to_contain_text(
+                "Dossier de liens configuré"
             )
-            expect(page.locator("#reseed-refresh")).to_be_disabled()
-            expect(page.locator("#reseed-scan")).to_be_disabled()
-            page.locator("#reseed-pause").click()
-            expect(page.locator("#reseed-pause")).to_have_text("Resume", timeout=10000)
+            page.on("dialog", lambda dialog: dialog.accept())
+            frame.get_by_role("button", name="Tout enchaîner", exact=True).click()
+            expect(frame.locator(".torrent .badge")).to_contain_text("Vérifier", timeout=20000)
+            frame.get_by_role("button", name="Suspendre le parcours", exact=True).click()
+            expect(frame.get_by_role("button", name="Reprendre le parcours")).to_be_visible(
+                timeout=10000
+            )
             client.release.set()
             assert not client.started
-            # Reload reattaches to the server-owned run, including its pause state.
             page.reload()
-            expect(page.locator("#reseed-pause")).to_have_text("Resume", timeout=10000)
-            assert not client.started
+            expect(frame.get_by_role("button", name="Reprendre le parcours")).to_be_visible(
+                timeout=10000
+            )
             page.set_viewport_size({"width": 390, "height": 844})
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-            page.locator("#reseed-pause").click()
-            expect(page.locator('[data-stage="seeding"]')).to_contain_text(
-                original.name, timeout=20000
-            )
-            expect(page.locator("#reseed-progress-text")).to_contain_text("Finished", timeout=10000)
-            expect(page.locator("#reseed-run-buttons")).to_be_hidden()
+            frame.get_by_role("button", name="Reprendre le parcours", exact=True).click()
+            expect(frame.locator(".torrent .badge")).to_have_text("En partage", timeout=20000)
             assert client.started == [meta.infohash]
-            page.locator('[data-stage="seeding"]').get_by_role("button", name="Inspect").click()
-            expect(page.locator("#reseed-details")).to_contain_text("Release.mkv")
-            expect(page.locator("#reseed-details")).to_contain_text(str(original))
-            page.get_by_role("button", name="Close", exact=True).click()
+            frame.locator(".torrent").click()
+            expect(frame.locator(".inspector")).to_contain_text("Release.mkv")
+            expect(frame.locator(".inspector")).to_contain_text(str(original))
+            frame.locator(".inspector").get_by_role("button", name="Fermer", exact=True).click()
+            page.locator("#theme").select_option("light")
+            expect(frame.locator("html")).to_have_attribute("data-theme", "light")
+            page.locator("#theme").select_option("dark")
+            expect(frame.locator("html")).to_have_attribute("data-theme", "dark")
             destination = os.getenv("TL_WEB_SCREENSHOTS")
             if destination:
                 Path(destination).mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(Path(destination) / "reseed-mobile.png"), full_page=True)
                 page.set_viewport_size({"width": 1560, "height": 1000})
+                frame.locator("body").evaluate("() => window.scrollTo(0,0)")
                 page.screenshot(path=str(Path(destination) / "reseed-web.png"), full_page=True)
             assert not errors
             assert (original.read_bytes(), original.stat().st_ino) == before

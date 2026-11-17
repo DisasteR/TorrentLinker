@@ -25,17 +25,22 @@ if TYPE_CHECKING:
 ASSETS = Path(__file__).parents[1] / "web" / "static" / "community"
 
 
-class CommunityBridge(QObject):
+class ViewBridge(QObject):
     environment = Signal(str)
 
-    def __init__(self, workspace: ProfileWorkspace, parent: QObject):
+    def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-        self.workspace = workspace
         self.environment_value = "{}"
 
     @Slot()
     def ready(self) -> None:
         self.environment.emit(self.environment_value)
+
+
+class CommunityBridge(ViewBridge):
+    def __init__(self, workspace: ProfileWorkspace, parent: QObject | None):
+        super().__init__(parent)
+        self.workspace = workspace
 
     @Slot(str, str, result=str)
     def request(self, path: str, payload: str) -> str:
@@ -72,12 +77,14 @@ class CommunityBridge(QObject):
             return json.dumps({"error": str(error)})
 
 
-class CommunityView(QWidget):
-    def __init__(self, workspace: ProfileWorkspace, language: str = "en"):
+class BundledView(QWidget):
+    def __init__(self, bridge: ViewBridge, assets: Path, channel_name: str, language: str = "en"):
         super().__init__()
-        self.workspace = workspace
+        self.assets = assets
+        self.channel_name = channel_name
         self.language = language
-        self.bridge = CommunityBridge(workspace, self)
+        self.bridge = bridge
+        bridge.setParent(self)
         self.web: QWebEngineView | None = None
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -99,6 +106,8 @@ class CommunityView(QWidget):
         )
         from PySide6.QtWebEngineWidgets import QWebEngineView
 
+        assets = self.assets
+
         class LocalAssets(QWebEngineUrlRequestInterceptor):
             def interceptRequest(self, info: QWebEngineUrlRequestInfo) -> None:
                 url = info.requestUrl()
@@ -107,7 +116,7 @@ class CommunityView(QWidget):
                     or url.isLocalFile()
                     and Path(url.toLocalFile()).resolve()
                     in {
-                        ASSETS / name
+                        assets / name
                         for name in ("view.html", "view.css", "view.js", "transport.js")
                     }
                 )
@@ -133,7 +142,7 @@ class CommunityView(QWidget):
                     return False
                 return (
                     target.isLocalFile()
-                    and Path(target.toLocalFile()).resolve() == ASSETS / "view.html"
+                    and Path(target.toLocalFile()).resolve() == assets / "view.html"
                 )
 
         self.web = QWebEngineView(self)
@@ -150,11 +159,11 @@ class CommunityView(QWidget):
         ):
             settings.setAttribute(attribute, False)
         self.channel = QWebChannel(page)
-        self.channel.registerObject("community", self.bridge)
+        self.channel.registerObject(self.channel_name, self.bridge)
         page.setWebChannel(self.channel)
         self.web.loadFinished.connect(self.refresh)
         self._layout.addWidget(self.web)
-        self.web.setUrl(QUrl.fromLocalFile(str(ASSETS / "view.html")))
+        self.web.setUrl(QUrl.fromLocalFile(str(assets / "view.html")))
 
     def refresh(self) -> None:
         self.bridge.environment_value = json.dumps(
@@ -190,3 +199,9 @@ class CommunityView(QWidget):
         super().changeEvent(event)
         if event.type() == QEvent.Type.PaletteChange and hasattr(self, "bridge"):
             self.refresh()
+
+
+class CommunityView(BundledView):
+    def __init__(self, workspace: ProfileWorkspace, language: str = "en"):
+        self.workspace = workspace
+        super().__init__(CommunityBridge(workspace, None), ASSETS, "community", language)

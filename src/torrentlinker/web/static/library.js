@@ -65,6 +65,8 @@ function renderLibraryFolders() {
   }
 }
 async function libraryTab(tab) {
+  tab = tab || "reseed";
+  document.querySelector(".library-nav").hidden = tab === "reseed";
   rememberTab("library", tab);
   document.querySelectorAll("[data-library-tab]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.libraryTab===tab)));
   $("library-items").hidden=tab!=="items";

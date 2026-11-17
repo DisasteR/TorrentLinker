@@ -323,6 +323,14 @@ class Store:
             ).fetchall()
         return {path: json.loads(payload) for path, payload in rows}
 
+    def reseed_record(self, path: str) -> dict:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT payload FROM reseed_workspace WHERE client_id=? AND item_path=?",
+                (self.client_id, path),
+            ).fetchone()
+        return json.loads(row[0]) if row else {}
+
     def save_reseed_record(self, path: str, record: dict) -> None:
         with self._lock, self._db:
             self._db.execute(

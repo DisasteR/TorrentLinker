@@ -28,7 +28,8 @@ const $ = id => {
   if (!nodes.has(id)) nodes.set(id, {hidden:false, classList:{toggle(){}}, setAttribute(){}});
   return nodes.get(id);
 };
-const document = {querySelectorAll:()=>[], querySelector:()=>null,
+const document = {querySelectorAll:()=>[],
+  querySelector:selector=>selector===".library-nav"?$("library-nav"):null,
   body:{classList:{contains:()=>false,toggle(){}}}};
 const state = {view:'torrents', setup:{configured:true, indexer_configured:true}};
 const media = {kind:'video', view:'recent'};

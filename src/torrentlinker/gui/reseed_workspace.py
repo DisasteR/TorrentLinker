@@ -1,119 +1,78 @@
-"""Native column board backed by the same workflow as the Web UI."""
+"""Desktop host for the same guided Library workspace as the Web UI."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QApplication,
-    QCheckBox,
-    QDialog,
-    QDialogButtonBox,
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QProgressBar,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
-)
+import json
+from pathlib import Path
+
+from PySide6.QtCore import QTimer, Signal, Slot
+from PySide6.QtWidgets import QApplication, QFileDialog
 
 from torrentlinker.agent.desktop import DesktopSetup
-from torrentlinker.gui.tasks import run_with_progress
+from torrentlinker.domain import ContentKind, LibraryFolder
+from torrentlinker.gui.community_view import BundledView, ViewBridge
+from torrentlinker.gui.tasks import run_in_background, run_with_progress
 from torrentlinker.reseed_workspace import ReseedWorkspace
 from torrentlinker.web.jobs import JobStop
 from torrentlinker.web.library import Library
+from torrentlinker.web.setup import Connection
+
+ASSETS = Path(__file__).parents[1] / "web" / "static" / "reseed"
 
 
-class ReseedBoard(QWidget):
-    def __init__(self, window):
+class ReseedBridge(ViewBridge):
+    response = Signal(int, str)
+
+    def __init__(self, board):
         super().__init__()
+        self.board = board
+        self.environment_value = "{}"
+
+    @Slot(int, str, str)
+    def requestAsync(self, identifier: int, action: str, payload: str) -> None:
+        def done(value):
+            self.response.emit(identifier, json.dumps({"data": value}, ensure_ascii=False))
+
+        def failed(error):
+            self.response.emit(identifier, json.dumps({"error": str(error)}))
+
+        try:
+            body = json.loads(payload)
+            if not isinstance(body, dict):
+                raise ValueError("Invalid reseed request.")
+            if (
+                body.get("_client", self.board.owner.settings.active_client_id)
+                != self.board.owner.settings.active_client_id
+            ):
+                raise ValueError("The target client changed. Reopen the Library.")
+            body.pop("_client", None)
+            if action == "add-client":
+                self.board.add_client(body, done, failed)
+            else:
+                done(self.board.request(action, body))
+        except Exception as error:
+            failed(error)
+
+
+class ReseedBoard(BundledView):
+    def __init__(self, window):
         self.owner = window
         self.rows: list[dict] = []
-        self.selected: set[str] = set()
-        self.stop = JobStop()
         self.running = False
-        self.active_path = ""
-        self.limits: dict[str, int] = {}
-        layout = QVBoxLayout(self)
-        heading = QHBoxLayout()
-        title = QLabel(self.tr("Reseed"))
-        title.setStyleSheet("font-size: 23px; font-weight: 600")
-        heading.addWidget(title, 1)
-        self.run_all = QPushButton(self.tr("Run all steps"))
-        self.run_all.setProperty("role", "primary")
-        self.run_all.setObjectName("reseedRunAll")
-        self.run_all.clicked.connect(lambda: self.confirm(self.visible_rows(), "all"))
-        scan = QPushButton(self.tr("Scan folders"))
-        scan.clicked.connect(lambda: window.scan())
-        refresh = QPushButton(self.tr("Refresh"))
-        refresh.clicked.connect(lambda: self.start([], "refresh"))
-        self.navigation_actions = [refresh, scan]
-        heading.addWidget(refresh)
-        heading.addWidget(scan)
-        heading.addWidget(self.run_all)
-        layout.addLayout(heading)
-        self.link_root = ""
-        root_row = QHBoxLayout()
-        self.root_status = QLabel()
-        root_row.addWidget(self.root_status, 1)
-        self.client_settings = QPushButton(self.tr("Client settings"))
-        self.client_settings.setObjectName("reseedClientSettings")
-        self.client_settings.clicked.connect(self.configure_root)
-        root_row.addWidget(self.client_settings)
-        layout.addLayout(root_row)
-        toolbar = QHBoxLayout()
-        self.query = QLineEdit()
-        self.query.setPlaceholderText(self.tr("Filter items…"))
-        self.query.textChanged.connect(self.render)
-        toolbar.addWidget(self.query, 1)
-        self.count = QLabel()
-        toolbar.addWidget(self.count)
-        select = QPushButton(self.tr("Select visible"))
-        select.clicked.connect(self.select_visible)
-        toolbar.addWidget(select)
-        self.run_selected = QPushButton(self.tr("Run selected"))
-        self.run_selected.clicked.connect(
-            lambda: self.confirm([r for r in self.rows if r["path"] in self.selected], "all")
-        )
-        toolbar.addWidget(self.run_selected)
-        layout.addLayout(toolbar)
-        self.progress_panel = QWidget()
-        progress_layout = QVBoxLayout(self.progress_panel)
-        self.status = QLabel()
-        self.status.setWordWrap(True)
-        progress_layout.addWidget(self.status)
-        progress_row = QHBoxLayout()
-        self.meter = QProgressBar()
-        progress_row.addWidget(self.meter, 1)
-        self.pause = QPushButton(self.tr("Pause"))
-        self.pause.clicked.connect(self.toggle_pause)
-        self.cancel = QPushButton(self.tr("Stop"))
-        self.cancel.clicked.connect(self.stop_run)
-        progress_row.addWidget(self.pause)
-        progress_row.addWidget(self.cancel)
-        progress_layout.addLayout(progress_row)
-        hint = QLabel(
-            self.tr(
-                "Pause stops between operations. A client hash check may finish while paused. "
-                "Completed steps are kept."
-            )
-        )
-        hint.setWordWrap(True)
-        progress_layout.addWidget(hint)
-        self.progress_panel.hide()
-        layout.addWidget(self.progress_panel)
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setMinimumHeight(380)
-        layout.addWidget(self.scroll, 1)
-        window.library_model.modelReset.connect(self.refresh)
+        self.stop = JobStop()
+        self.link_root = window.settings.profile().reseed_link_root
+        self.progress_value: dict = {}
+        self.error = ""
+        self.current_service: ReseedWorkspace | None = None
+        self.configuring = False
+        self.scanning = False
+        super().__init__(ReseedBridge(self), ASSETS, "reseed", window.settings.language)
+        self.setMinimumHeight(620)
+        window.library_model.modelReset.connect(self.refresh_rows)
         app = QApplication.instance()
         if app:
             app.aboutToQuit.connect(self.stop_run)
-        self.refresh()
+        self.refresh_rows()
 
     def service(self):
         setup = DesktopSetup(
@@ -121,357 +80,203 @@ class ReseedBoard(QWidget):
             self.owner.settings_path,
             self.owner.store.for_client(self.owner.settings.active_client_id),
         )
-        # The local owner chooses this folder directly, as in the download-folder picker.
         if self.link_root:
-            from pathlib import Path
-
             setup._folder_candidate = Path(self.link_root)
         library = Library(setup)
         library.entries = list(self.owner.library_model.entries)
         return ReseedWorkspace(library)
 
-    def refresh(self):
-        if not self.running:
+    def refresh_rows(self):
+        if self.running and self.current_service:
+            self.current_service.library.entries = list(self.owner.library_model.entries)
+            self.rows = self.current_service.rows()
+        else:
             self.link_root = self.owner.settings.profile().reseed_link_root
             self.rows = self.service().rows()
-            if not self.link_root:
-                from pathlib import Path
-
-                previous = next(
-                    (r.get("destination") for r in self.rows if r.get("destination")), None
-                )
-                if previous:
-                    self.link_root = str(Path(previous).parent)
-            self.render()
-
-    def configure_root(self):
-        self.owner.open_settings()
         self.refresh()
 
-    def visible_rows(self):
-        return [r for r in self.rows if self.query.text().casefold() in r["name"].casefold()]
+    def refresh(self):
+        self.bridge.environment_value = json.dumps(
+            {
+                "mode": "desktop",
+                "language": self.language,
+                "theme": "dark" if self.palette().window().color().lightness() < 128 else "light",
+                "active": self.isVisible(),
+                "client": self.owner.settings.active_client_id,
+            }
+        )
+        self.bridge.ready()
 
-    def stages(self):
-        return [
-            ("find", self.tr("To find"), "#63a4d0", self.tr("Search for compatible torrents")),
-            (
-                "candidates",
-                self.tr("Candidates found"),
-                "#55bcb9",
-                self.tr("Compare files before proceeding"),
-            ),
-            (
-                "links",
-                self.tr("Links to prepare"),
-                "#5cc9a5",
-                self.tr("Expected names, originals preserved"),
-            ),
-            (
-                "verify",
-                self.tr("Verification"),
-                "#72bf80",
-                self.tr("Check the bytes before seeding"),
-            ),
-            (
-                "incomplete",
-                self.tr("Needs attention"),
-                "#d5a449",
-                self.tr("Review missing files and archives"),
-            ),
-            ("seeding", self.tr("Seeding"), "#60bd67", self.tr("Keep the links while seeding")),
-        ]
-
-    def render(self):
-        offset = self.scroll.horizontalScrollBar().value()
-        body = QWidget()
-        columns = QHBoxLayout(body)
-        rows = self.visible_rows()
-        for stage, name, color, hint in self.stages():
-            lane = QFrame()
-            lane.setObjectName(f"reseedLane{stage}")
-            lane.setMinimumWidth(170)
-            lane.setStyleSheet(
-                f"QFrame#reseedLane{stage} {{border: 1px solid {color}; "
-                f"border-top: 3px solid {color}; border-radius: 10px;}}"
-            )
-            stack = QVBoxLayout(lane)
-            entries = [r for r in rows if r["stage"] == stage]
-            title = QLabel(f"{name} · {len(entries)}")
-            title.setStyleSheet("font-weight: 600; padding: 5px")
-            stack.addWidget(title)
-            subtitle = QLabel(hint)
-            subtitle.setWordWrap(True)
-            stack.addWidget(subtitle)
-            limit = self.limits.get(stage, 50)
-            for row in entries[:limit]:
-                card = QFrame()
-                card.setObjectName("reseedCard")
-                active = self.running and row["path"] == self.active_path
-                card.setStyleSheet(
-                    f"QFrame#reseedCard {{border: {2 if active else 1}px solid {color}; "
-                    "border-radius: 8px;}"
+    def request(self, action, body):
+        if action == "state":
+            setup = self.service().setup.snapshot()
+            return {
+                "rows": self.rows,
+                "setup": setup,
+                "running": self.running,
+                "paused": self.stop.paused.is_set(),
+                "progress": self.progress_value,
+                "error": self.error,
+                "scanning": self.scanning or "" in self.progress_value.get("active", {}),
+            }
+        if action == "run":
+            self.start(body.get("paths", []), "all", body.get("key", ""))
+        elif action == "enqueue":
+            if not self.current_service:
+                raise ValueError("Start the reseed workflow first.")
+            self.current_service.enqueue(body["paths"], body.get("key", ""))
+        elif action == "pause-item":
+            if not self.current_service:
+                raise ValueError("Start the reseed workflow first.")
+            self.current_service.control(body["paths"], paused=bool(body["paused"]))
+            self.progress_value["paused_paths"] = sorted(self.current_service.paused_paths())
+        elif action == "pause":
+            self.stop.paused.set() if body["paused"] else self.stop.paused.clear()
+        elif action == "stop":
+            self.stop_run()
+        elif action == "scan":
+            if self.running and self.current_service:
+                self.current_service.request_scan(body.get("folders"))
+            else:
+                if self.scanning:
+                    raise ValueError("A folder scan is already running.")
+                service = self.service()
+                self.current_service = service
+                self.scanning = True
+                self.stop = JobStop()
+                run_with_progress(
+                    lambda report: service.library.scan(self.stop, report, body.get("folders")),
+                    lambda value: None,
+                    self.scan_finished,
+                    self.failed,
                 )
-                box = QVBoxLayout(card)
-                check = QCheckBox()
-                check.setAccessibleName(row["name"])
-                check.setToolTip(row["path"])
-                check.setChecked(row["path"] in self.selected)
-                check.setEnabled(not self.running and stage != "seeding")
-                check.toggled.connect(lambda enabled, path=row["path"]: self.select(path, enabled))
-                heading = QHBoxLayout()
-                heading.addWidget(check, 0, Qt.AlignmentFlag.AlignTop)
-                name = QLabel(row["name"])
-                name.setTextFormat(Qt.TextFormat.PlainText)
-                name.setWordWrap(True)
-                heading.addWidget(name, 1)
-                box.addLayout(heading)
-                if row.get("status") == "verified":
-                    box.addWidget(QLabel(self.tr("Verified")))
-                if row.get("error"):
-                    error = QLabel(row["error"])
-                    error.setWordWrap(True)
-                    error.setMaximumWidth(240)
-                    box.addWidget(error)
-                inspect = QPushButton(self.tr("Inspect"))
-                inspect.clicked.connect(lambda _=False, value=row: self.inspect(value))
-                box.addWidget(inspect)
-                if active:
-                    busy = QProgressBar()
-                    busy.setRange(0, 0)
-                    busy.setFixedHeight(5)
-                    box.addWidget(busy)
-                stack.addWidget(card)
-            if len(entries) > limit:
-                more = QPushButton(self.tr("Show more"))
-                more.clicked.connect(lambda _=False, key=stage: self.show_more(key))
-                stack.addWidget(more)
-            if not entries:
-                stack.addWidget(QLabel(self.tr("Nothing here yet")))
-            stack.addStretch()
-            columns.addWidget(lane)
-        self.scroll.setWidget(body)
-        self.scroll.horizontalScrollBar().setValue(offset)
-        self.run_all.setEnabled(
-            not self.running and any(r["stage"] not in {"seeding", "incomplete"} for r in rows)
-        )
-        for control in self.navigation_actions:
-            control.setEnabled(not self.running)
-        self.root_status.setText(
-            self.tr("Link folder configured")
-            if self.link_root
-            else self.tr("Choose a link folder in Client settings")
-        )
-        self.root_status.setToolTip(self.link_root)
-        self.client_settings.setEnabled(not self.running)
-        self.selection_changed()
-
-    def show_more(self, stage):
-        self.limits[stage] = self.limits.get(stage, 50) + 50
-        self.render()
-
-    def select(self, path, enabled):
-        self.selected.add(path) if enabled else self.selected.discard(path)
-        self.selection_changed()
-
-    def selection_changed(self):
-        self.count.setText(self.tr("{0} selected").format(len(self.selected)))
-        self.run_selected.setEnabled(not self.running and bool(self.selected))
-
-    def select_visible(self):
-        if not self.running:
-            self.selected.update(
-                r["path"]
-                for r in self.visible_rows()
-                if r["stage"] not in {"seeding", "incomplete"}
-            )
-            self.render()
-
-    def action_label(self, action):
-        return {
-            "all": self.tr("Run all steps"),
-            "find": self.tr("Find candidates"),
-            "compare": self.tr("Compare"),
-            "prepare": self.tr("Prepare links"),
-            "verify": self.tr("Verify"),
-            "seed": self.tr("Start seeding"),
-        }[action]
-
-    def inspect(self, row):
-        dialog = QDialog(self)
-        dialog.setWindowTitle(row["name"])
-        dialog.resize(700, 550)
-        layout = QVBoxLayout(dialog)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        body = QWidget()
-        details = QVBoxLayout(body)
-
-        def text(value):
-            label = QLabel(value)
-            label.setTextFormat(Qt.TextFormat.PlainText)
-            label.setWordWrap(True)
-            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            details.addWidget(label)
-
-        text(row["path"])
-        if row.get("destination"):
-            text(self.tr("Persistent link folder: ") + row["destination"])
-        for f in row.get("files", []):
-            text(f"{f['source']}\n↳ {f['name']}\n→ {f['target']}")
-        for candidate in row.get("candidates", []):
-            text(candidate["title"] + " · " + candidate["match"])
-            for f in candidate.get("files", []):
-                text(f"{f['local'] or self.tr('Missing')}\n↳ {f['torrent']}")
-            if (
-                row["stage"] == "candidates"
-                and candidate["match"] == "full"
-                and not candidate["archive"]
-            ):
-                choose = QPushButton(self.tr("Use this Candidate"))
-                choose.setEnabled(not self.running)
-                choose.clicked.connect(
-                    lambda _=False, key=candidate["key"]: (
-                        dialog.accept(),
-                        self.start([row["path"]], "compare", key),
+        elif action == "browse":
+            return {
+                "selected": QFileDialog.getExistingDirectory(
+                    self, self.tr("Choose folder"), body.get("path", "")
+                )
+            }
+        elif action == "manage-folders":
+            self.owner.library_workspace.open_folders()
+        elif action == "review":
+            self.owner.library_workspace.open_review(body["path"])
+        elif action in {"settings", "add-folder", "save-root"}:
+            if self.running or self.scanning or self.configuring:
+                raise ValueError("Stop the current operation before changing settings.")
+            if action == "settings":
+                self.owner.open_settings()
+            elif action == "add-folder":
+                path = Path(body["local"]).expanduser().resolve()
+                if not path.is_dir():
+                    raise ValueError("Folder is unavailable.")
+                folders = [f for f in self.owner.settings.library_folders if f.path != path]
+                folders.append(LibraryFolder(path, None, ContentKind(body.get("kind", "other"))))
+                if not self.owner.save_library_folders(folders, scan=False):
+                    raise ValueError(
+                        "The folder could not be saved. Wait for the current operation."
                     )
-                )
-                details.addWidget(choose)
-        if row.get("error"):
-            text(row["error"])
-        if row["stage"] == "incomplete":
-            text(
-                self.tr(
-                    "Open this Local Item in the Local Items tab "
-                    "to review missing files or archives."
-                )
-            )
-        scroll.setWidget(body)
-        layout.addWidget(scroll)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(dialog.reject)
-        action = {
-            "find": "find",
-            "candidates": "compare",
-            "links": "prepare",
-            "verify": "seed" if row.get("status") == "verified" else "verify",
-        }.get(row["stage"])
-        if action:
-            go = buttons.addButton(
-                self.action_label(action), QDialogButtonBox.ButtonRole.ActionRole
-            )
-            go.setEnabled(not self.running)
-            go.clicked.connect(lambda: (dialog.accept(), self.confirm([row], action)))
-        if row.get("error") and row["stage"] != "seeding":
-            retry = buttons.addButton(
-                self.tr("Compare again"), QDialogButtonBox.ButtonRole.ActionRole
-            )
-            retry.setEnabled(not self.running)
-            retry.clicked.connect(lambda: (dialog.accept(), self.start([row["path"]], "compare")))
-        layout.addWidget(buttons)
-        dialog.exec()
+            else:
+                path = Path(body["path"]).expanduser().resolve()
+                if not path.is_dir():
+                    raise ValueError("Folder is unavailable.")
+                if not self.owner.save_reseed_folder(str(path)):
+                    raise ValueError("Wait for the current settings operation to finish.")
+                self.link_root = str(path)
+            self.refresh_rows()
+        else:
+            raise ValueError("Unknown reseed operation.")
+        return {"ok": True}
 
-    def confirm(self, rows, action):
-        paths = [r["path"] for r in rows if r["stage"] not in {"seeding", "incomplete"}]
-        if not paths:
-            return
-        if action in {"all", "prepare"} and not self.link_root:
-            self.client_settings.setFocus()
-            QMessageBox.information(
-                self,
-                self.tr("Link folder"),
-                self.tr("Choose a link folder in Client settings"),
+    def add_client(self, body, done, failed):
+        if self.running or self.scanning or self.configuring:
+            raise ValueError("Stop the current operation before changing clients.")
+        connection = Connection(**body)
+        if not connection.name.strip():
+            raise ValueError("Enter a name for this Torrent Client.")
+        setup = self.service().setup
+        profile = setup.settings.add_client(connection.name, connection.client)
+        self.configuring = True
+
+        def work():
+            return setup.for_client(profile.id).test_client(connection, save=False)
+
+        def finished(result):
+            self.configuring = False
+            from torrentlinker.web.setup import CLIENT_SETTINGS
+
+            name = CLIENT_SETTINGS[connection.client]
+            profile.host = connection.host
+            profile.username = connection.username
+            target = setup.for_client(profile.id)
+            values = {}
+            if connection.password is not None:
+                values[target.settings.secret_name(name + "-password")] = connection.password
+            if connection.api_key is not None and name == "qbit":
+                values[target.settings.secret_name("qbit-api-key")] = connection.api_key
+            try:
+                if not self.owner.save_new_client_profile(profile, target.secrets, values):
+                    raise ValueError("Wait for the current settings operation to finish.")
+            except Exception as error:
+                failed(error)
+                return
+            done({**result, "client_id": profile.id})
+            QTimer.singleShot(
+                0,
+                lambda: self.owner.client_selector.setCurrentIndex(
+                    self.owner.client_selector.findData(profile.id)
+                ),
             )
-            return
-        message = self.tr(
-            "{0} Local Item(s). Originals keep their names. Keep the link folder while seeding."
-        ).format(len(paths))
-        if action == "all":
-            message += "\n\n" + self.tr(
-                "Find → Compare → Prepare links → Verify → Seed. "
-                "Incomplete or ambiguous matches stop for review."
-            )
-        if (
-            QMessageBox.question(self, self.action_label(action), message + "\n\n" + self.link_root)
-            == QMessageBox.StandardButton.Yes
-        ):
-            self.start(paths, action)
+
+        def failure(error):
+            self.configuring = False
+            failed(error)
+
+        run_in_background(work, finished, failure)
+
+    def scan_finished(self, result):
+        self.scanning = False
+        if self.current_service:
+            self.owner.library_model.set_entries(list(self.current_service.library.entries))
 
     def start(self, paths, action, key=""):
+        if self.scanning or self.configuring:
+            raise ValueError("Wait for the current setup or initial scan to finish.")
         if self.running:
-            return
-        service, root = self.service(), self.link_root
+            raise ValueError("A reseed workflow is already active.")
+        service = self.service()
         if action != "refresh":
             service.setup._indexer = self.owner.indexer()
+        self.current_service = service
         self.stop = JobStop()
-        self.running = True
-        self.progress_panel.show()
-        self.pause.setEnabled(True)
-        self.cancel.setEnabled(True)
-        self.pause.setText(self.tr("Pause"))
-        self.render()
+        self.running, self.error = True, ""
+        self.progress_value = {}
         run_with_progress(
-            lambda report: service.run(paths, action, root, self.stop, report, key),
+            lambda report: service.run(paths, action, self.link_root, self.stop, report, key),
             self.progress,
             self.finished,
             self.failed,
         )
 
     def progress(self, value):
-        phase = value.get("phase", "")
-        label = {
-            "local-hash": self.tr("Checking original files"),
-            "client-hash": self.tr("Client verification"),
-            "item-complete": self.tr("Item processed"),
-        }.get(phase)
-        if label is None:
-            label = self.action_label(phase)
-        self.status.setText(
-            f"{label} · {value.get('done', 0)}/{value.get('total', 0)}\n{value.get('path', '')}"
-        )
-        fraction = value.get("fraction")
-        if fraction is not None:
-            self.meter.setRange(0, 100)
-            self.meter.setValue(round(fraction * 100))
-        else:
-            self.meter.setRange(0, max(1, value.get("total", 1)))
-            self.meter.setValue(value.get("done", 0))
-        changed = self.active_path != value.get("path", "") or "rows" in value
-        self.active_path = value.get("path", "")
+        if value.get("scan_complete") and self.current_service:
+            self.owner.library_model.set_entries(list(self.current_service.library.entries))
+        self.progress_value = value
+        self.error = "\n".join(e["message"] for e in value.get("errors", []))
         if "rows" in value:
             self.rows = value["rows"]
-        if changed:
-            self.render()
-
-    def toggle_pause(self):
-        if self.stop.paused.is_set():
-            self.stop.paused.clear()
-            self.pause.setText(self.tr("Pause"))
-        else:
-            self.stop.paused.set()
-            self.pause.setText(self.tr("Resume"))
-            self.status.setText(self.tr("Pause requested. Waiting for the current operation."))
 
     def stop_run(self):
         self.stop.set()
 
     def finished(self, result):
         self.running = False
-        self.pause.setEnabled(False)
-        self.cancel.setEnabled(False)
         self.rows = result["rows"]
-        self.selected.clear()
-        self.status.setText(
-            self.tr("Run stopped. Completed steps are kept.")
-            if result.get("cancelled")
-            else self.tr("Finished · {0} seeded · {1} error(s)").format(
-                result["seeded"], len(result["errors"])
-            )
-        )
-        self.render()
+        self.error = "\n".join(e["message"] for e in result.get("errors", []))
+        self.progress_value = {"active": {}, "paused_paths": []}
+        self.refresh()
 
     def failed(self, error):
+        self.scanning = False
         self.running = False
-        self.pause.setEnabled(False)
-        self.cancel.setEnabled(False)
-        self.status.setText(str(error))
-        self.refresh()
+        self.error = str(error)
+        self.refresh_rows()

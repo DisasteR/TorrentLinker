@@ -330,7 +330,7 @@ def create_app(
             "default-src 'self'; script-src 'self'; style-src 'self'; "
             "img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         )
-        if route == "/static/community/view.html":
+        if route in {"/static/community/view.html", "/static/reseed/view.html"}:
             # This bundled component may be embedded only by our own Web UI.
             # Other pages remain unframeable; the component has no network access.
             response.headers["Content-Security-Policy"] = (
@@ -694,7 +694,24 @@ def create_app(
         return {
             "rows": target.reseed_workspace.rows(),
             "link_root": target.setup.settings.profile().reseed_link_root,
+            "paused_paths": sorted(target.reseed_workspace.paused_paths()),
         }
+
+    @app.post("/api/reseed-workspace/control")
+    def control_reseed(body: dict, client_id: str = "") -> dict:
+        target = for_client(client_id).reseed_workspace
+        paths = body.get("paths", [])
+        if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
+            raise ValueError("Select Local Items first.")
+        if body.get("action") == "enqueue":
+            target.enqueue(paths, body.get("key", ""))
+        elif body.get("action") == "scan":
+            target.request_scan(body.get("folders"))
+        elif body.get("action") == "pause-item":
+            target.control(paths, paused=bool(body.get("paused")))
+        else:
+            raise ValueError("Unknown reseed operation.")
+        return {"paused_paths": sorted(target.paused_paths())}
 
     from torrentlinker.poster_cache import PosterCache, valid_poster_url
 

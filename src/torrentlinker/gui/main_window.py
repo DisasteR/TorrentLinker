@@ -2318,7 +2318,7 @@ class MainWindow(QMainWindow):
             self.scan()
 
     @agent_settings_change
-    def save_library_folders(self, folders: list[LibraryFolder]) -> bool:
+    def save_library_folders(self, folders: list[LibraryFolder], *, scan: bool = True) -> bool:
         if not self.add_folder_action.isEnabled() or self.batch is not None:
             self.statusBar().showMessage(self.tr("Wait for the Library operation to finish."))
             return False
@@ -2335,8 +2335,30 @@ class MainWindow(QMainWindow):
         self.library_model.set_entries(
             [entry for entry in self.library_model.entries if entry.folder.path in valid]
         )
-        if folders:
+        if folders and scan:
             self.scan()
+        return True
+
+    @agent_settings_change
+    def save_reseed_folder(self, path: str) -> bool:
+        self.settings.profile().reseed_link_root = path
+        self.settings.save(self.settings_path)
+        if self.agent_runtime:
+            self.agent_runtime.reset(self.settings)
+        return True
+
+    @agent_settings_change
+    def save_new_client_profile(self, profile, secrets, values) -> bool:
+        secrets.update(values)
+        self.settings.client_profiles.append(profile)
+        try:
+            self.settings.save(self.settings_path)
+        except Exception:
+            self.settings.client_profiles.remove(profile)
+            raise
+        if self.agent_runtime:
+            self.agent_runtime.reset(self.settings)
+        self.client_selector.addItem(profile.name, profile.id)
         return True
 
     def set_media_center(self, enabled: bool) -> None:

@@ -33,6 +33,7 @@ def library_theme(qapp, monkeypatch):
 def test_candidate_review_can_expand_without_losing_the_local_item(qtbot, tmp_path, monkeypatch):
     window, _ = window_for(qtbot, tmp_path, monkeypatch)
     window.tabs.setCurrentIndex(1)
+    window.library_workspace.sections.setCurrentWidget(window.library_workspace.explorer)
     window.show()
     tabs = window.findChild(QTabWidget, "librarySections")
     assert tabs is not None
@@ -61,6 +62,7 @@ def test_short_window_scrolls_the_page_instead_of_crushing_the_review(qtbot, tmp
     window, _ = window_for(qtbot, tmp_path, monkeypatch)
     window.resize(1400, 700)
     window.tabs.setCurrentIndex(1)
+    window.library_workspace.sections.setCurrentWidget(window.library_workspace.explorer)
     window.show()
     qtbot.waitExposed(window)
     workspace = window.library_workspace

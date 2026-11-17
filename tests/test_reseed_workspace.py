@@ -232,3 +232,142 @@ def test_linked_torrents_cannot_download_or_delete_through_management(tmp_path):
     starts = list(client.started)
     assert manage(client, [meta.infohash], "resume")[0].outcome == "verifying"
     assert client.started == starts and original.exists()
+
+
+def test_other_items_compare_while_one_item_is_verifying(tmp_path):
+    """A slow disk check must not hold up another item's candidate work."""
+    board, client, original, links, meta = workspace(tmp_path)
+    other = original.with_name("Another movie.mkv")
+    other.write_bytes(original.read_bytes())
+    folder = board.library.entries[0].folder
+    board.library.entries.append(LibraryEntry(folder, scan_item(other), ItemState.ORPHAN))
+    candidate = Candidate(
+        meta.name, other.stat().st_size, "https://c411.org/download/fixture", infohash=meta.infohash
+    )
+    remember_candidates(board.setup.store, board.setup.indexer(), other, [candidate])
+    hashing = threading.Event()
+    compared = threading.Event()
+    stop = JobStop()
+    observed = []
+
+    def report(p):
+        observed.append(p)
+        if p["path"] == str(original) and p["phase"] == "local-hash":
+            hashing.set()
+            assert compared.wait(3), "Candidate work blocked behind another item's hash check"
+            stop.set()
+        if p["path"] == str(other) and p["phase"] == "compare":
+            assert hashing.wait(3), "First item did not reach verification"
+            compared.set()
+
+    result = board.run([str(original), str(other)], "all", str(links), stop, report)
+    assert hashing.is_set() and compared.is_set(), result
+    assert any(len(p.get("active", {})) > 1 for p in observed)
+
+
+def test_paused_item_does_not_block_others_and_can_resume(tmp_path):
+    board, client, original, links, meta = workspace(tmp_path)
+
+    second = original.with_name("Second.mkv")
+    second.write_bytes(original.read_bytes())
+    entry = board.library.entries[0]
+    board.library.entries.append(LibraryEntry(entry.folder, scan_item(second), ItemState.ORPHAN))
+    candidate = Candidate(
+        meta.name,
+        second.stat().st_size,
+        "https://c411.org/download/fixture",
+        infohash=meta.infohash,
+    )
+    remember_candidates(board.setup.store, board.setup.indexer(), second, [candidate])
+    board.control([str(original)], paused=True)
+    stop = JobStop()
+    saw_pause = []
+
+    def progress(value):
+        if value.get("path") == str(second) and value.get("phase") == "item-complete":
+            saw_pause.append(str(original) in value["paused_paths"])
+            board.control([str(original)], paused=False)
+
+    result = board.run([str(original), str(second)], "find", str(links), stop, progress)
+    assert result["done"] == 2
+    assert saw_pause and saw_pause[0]
+
+
+def test_scan_during_run_admits_new_items_without_restarting_library(tmp_path):
+    board, client, original, links, meta = workspace(tmp_path)
+    second = original.with_name("Newly discovered.mkv")
+    stop = JobStop()
+    scans = []
+
+    def progress(value):
+        if value["phase"] == "find" and not second.exists():
+            second.write_bytes(original.read_bytes())
+            board.request_scan()
+        if value.get("scan_complete"):
+            scans.append(value)
+            stop.set()
+
+    result = board.run([str(original)], "all", str(links), stop, progress)
+    assert scans
+    assert str(second) in {row["path"] for row in scans[0]["rows"]}
+    assert result["total"] == 2
+    assert result["cancelled"]
+
+
+def test_missing_item_does_not_abort_other_items(tmp_path):
+    board, client, original, links, meta = workspace(tmp_path)
+    result = board.run(
+        [str(tmp_path / "gone"), str(original)], "all", str(links), JobStop(), lambda p: None
+    )
+    assert result["done"] == 2
+    assert len(result["errors"]) == 1
+    assert client.started == [meta.infohash]
+
+
+def test_completed_item_can_rejoin_the_active_run(tmp_path):
+    board, _, original, links, _ = workspace(tmp_path)
+    reports = []
+
+    def progress(value):
+        if value["phase"] == "item-complete":
+            reports.append(value)
+            if len(reports) == 1:
+                board.enqueue([str(original)])
+
+    result = board.run([str(original)], "find", str(links), JobStop(), progress)
+    assert len(reports) == 2
+    assert result["done"] == result["total"] == 1
+
+
+def test_failed_scan_reports_error_and_other_item_still_seeds(tmp_path):
+    board, client, original, links, meta = workspace(tmp_path)
+    requested = []
+    errors = []
+
+    def progress(value):
+        if value["phase"] == "find" and not requested:
+            requested.append(True)
+            (original.parent / "unsafe-link").symlink_to(original)
+            board.request_scan()
+        errors.extend(value.get("errors", []))
+
+    result = board.run([str(original)], "all", str(links), JobStop(), progress)
+    assert result["errors"] and errors
+    assert "symbolic links" in result["errors"][0]["message"]
+    assert client.started == [meta.infohash]
+
+
+def test_selected_folder_scan_preserves_other_registered_folders_only(tmp_path):
+    board, _, original, _, _ = workspace(tmp_path)
+    extra = tmp_path / "Other"
+    extra.mkdir()
+    file = extra / "Book.epub"
+    file.write_bytes(b"book")
+    folder = LibraryFolder(extra, 1, ContentKind.EBOOK)
+    board.setup.settings.library_folders.append(folder)
+    board.library.entries.append(LibraryEntry(folder, scan_item(file), ItemState.ORPHAN))
+    board.library.scan(JobStop(), lambda p: None, [str(original.parent)])
+    assert file in {e.item.path for e in board.library.entries}
+    board.setup.settings.library_folders.remove(folder)
+    board.library.scan(JobStop(), lambda p: None)
+    assert file not in {e.item.path for e in board.library.entries}

@@ -3300,6 +3300,10 @@ Fait aussi partie du pack {1}. Il n’est en seed seul qu’avec son propre torr
 <context>
     <name>LibraryWorkspace</name>
     <message>
+        <source>Compare files and repair</source>
+        <translation>Comparer les fichiers et réparer</translation>
+    </message>
+    <message>
         <location filename="../gui/library_workspace.py" line="170"/>
         <source>Explore your folders. Review Candidates. Verify before seeding.</source>
         <translation>Parcourir les dossiers. Examiner les candidats. Vérifier avant de seeder.</translation>
@@ -11314,6 +11318,10 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
 </context>
 <context>
     <name>ReseedBoard</name>
+    <message>
+        <source>Choose folder</source>
+        <translation>Choisir un dossier</translation>
+    </message>
     <message>
         <source>Browse…</source>
         <translation>Parcourir…</translation>

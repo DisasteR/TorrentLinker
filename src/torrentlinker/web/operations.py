@@ -701,7 +701,7 @@ class Operations:
         if request.kind == "search-options":
             return self.search_options(request.category)
         if request.kind == "scan":
-            return self.library.scan(stop, progress)
+            return self.library.scan(stop, progress, request.paths or None)
         if request.kind == "diagnose-repair":
             from torrentlinker.review import candidate_key, remembered_candidates
 
