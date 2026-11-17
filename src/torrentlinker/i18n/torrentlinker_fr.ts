@@ -12033,4 +12033,11 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
         <translation>N</translation>
     </message>
 </context>
+<context>
+    <name>CommunityBridge</name>
+    <message>
+        <source>Export community history</source>
+        <translation>Exporter l’historique de la communauté</translation>
+    </message>
+</context>
 </TS>

@@ -8,19 +8,18 @@ Your active seeds and writable general/class channels load automatically when yo
 open Community. Discovery continues page by page in the background. Search the
 **Torrents** list and select a title to see its local actions or prepare a comment
 or vote. **Refresh library** starts a new scan; otherwise the cache is refreshed
-after six hours. This does not scan disks or torrent file lists. You can still
-enter an info hash directly. The site checks eligibility before each publication.
+after six hours. This does not scan disks or torrent file lists. The site checks eligibility before each publication.
 
 Choose a comment, your own confidence vote, or a chat message. Write and edit its
 text, pick a channel where applicable, and set **Send after** in your local time.
-**Save draft** stores it without sending. Select **Queue** to schedule it. Use
-**Settings & templates** to enable the queue, set each action's daily maximum
+**Save draft** stores it without sending. **Schedule** adds it to the waitlist. Use
+the settings icon to enable the queue, set each action's daily maximum
 and minimum interval, and edit reusable comment/chat templates. Defaults are
 five per action, with 60 seconds between comments/votes and 600 seconds between
 chat messages. Sending starts disabled. A maximum of zero disables that action.
 
 The French picker provides 200 editable quotes, jokes and tiny poems. Selecting
-one only fills the editor. Quotations retain their authors in the text.
+one fills the editor and live preview. Quotations retain their authors in the text.
 General and class channels share one chat budget. Chat messages require at
 least five words; repeated messages are refused. The queue does not create
 positive votes automatically or invent an opinion about downloaded content.
@@ -51,20 +50,21 @@ claim a fixed Zen payout.
 
 ## Calendar and history
 
-**Calendar** shows upcoming operations by week or month, with a daily agenda.
+**Waitlist → Calendar** shows upcoming operations by week or month, with a daily agenda.
+The Calendar/List switch changes the view without leaving the waitlist.
 Automatic and manual origins are identified. Open an operation to inspect its
-text, pause, cancel or edit its date. Desktop uses a month selector and a day,
-week or month agenda. Both interfaces show local-time estimates that include
+text, pause, cancel or edit its date. Desktop and WebUI share the same calendar. Both show local-time estimates that include
 reserved quota and cooldowns. These are not guaranteed publication times.
 
 **History** keeps the text and state transitions of each operation. Search titles
 or messages, filter by action, and choose today, 7 days, 30 days, all time or an
 inclusive date range. Navigate the monthly timeline and select a day to retrieve
 older operations. Open an entry to inspect its edits, attempts and receipt.
+**Export** saves the filtered operations as JSON.
 
 ## Automatic mode
 
-In **Settings / auto** on WebUI or **Settings & templates** on desktop, enable
+Open **Automatic mode** above the four Community tabs, then enable
 **Plan automatically** and choose comments, prepared votes and/or chat. Sending
 still requires the queue to be running. Set the daily limits and intervals,
 publication hours and IANA timezone. The planner reserves up to seven days ahead.

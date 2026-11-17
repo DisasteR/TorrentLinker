@@ -330,6 +330,13 @@ def create_app(
             "default-src 'self'; script-src 'self'; style-src 'self'; "
             "img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         )
+        if route == "/static/community/view.html":
+            # This bundled component may be embedded only by our own Web UI.
+            # Other pages remain unframeable; the component has no network access.
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                "img-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'"
+            )
         return response
 
     @app.exception_handler(RequestValidationError)

@@ -280,20 +280,18 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
             worker = context.service_workers[0]
             page.locator("[data-view=zen]").first.click()
             page.locator("#zen-community-tab").click()
-            expect(page.locator("#community-library")).to_be_visible()
+            ui = page.frame_locator("#community-frame")
+            expect(ui.locator("#community-library")).to_be_visible()
+            expect(ui.locator(".tabs button")).to_have_count(4)
             worker.evaluate("chrome.alarms.create('companion-commands', {delayInMinutes: 0.001})")
-            expect(page.locator("#community-candidate option")).to_have_count(2, timeout=15000)
-            expect(page.locator("#community-channel option")).to_have_count(3)
-            expect(page.locator("#community-suggestion option")).to_have_count(201)
-            page.locator("[data-community-page=settings]").click()
-            page.locator("#community-enabled").check()
-            page.get_by_role("button", name="Save settings", exact=True).click()
-            page.locator("[data-community-page=editor]").click()
-            page.locator("#community-candidate").select_option(H)
-            page.locator("#community-content").fill("Merci pour ce partage bien utile")
-            page.get_by_role("button", name="Save draft", exact=True).click()
-            expect(page.locator("#community-table tbody tr")).to_have_count(1)
-            page.locator("#community-table").get_by_role("button", name="Queue", exact=True).click()
+            expect(ui.locator(".torrent")).to_have_count(1, timeout=15000)
+            ui.get_by_role("button", name="Community settings", exact=True).click()
+            ui.locator("#community-enabled").check()
+            ui.get_by_role("button", name="Save settings", exact=True).click()
+            expect(ui.locator("#drawer")).not_to_be_visible()
+            ui.locator("#community-content").fill("Merci pour ce partage bien utile  \n")
+            ui.get_by_role("button", name="Schedule", exact=True).click()
+            expect(ui.locator("#toast")).to_contain_text("Action scheduled")
             # Fail the first receipt ACK, after the app already committed it.
             original = w.community.receipt
             failures = [1]
@@ -306,8 +304,8 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
 
             monkeypatch.setattr(w.community, "receipt", receipt)
             worker.evaluate("chrome.alarms.create('companion-commands', {delayInMinutes: 0.001})")
-            page.locator("[data-community-page=history]").click()
-            expect(page.locator("#community-history-results")).to_contain_text(
+            ui.locator(".tabs [data-tab=history]").click()
+            expect(ui.locator("#community-history-results")).to_contain_text(
                 "Posted", timeout=20000
             )
             assert len(site.posts) == 1
@@ -333,8 +331,8 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
             page = context.new_page()
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.goto(f"http://127.0.0.1:{port}/#/zen/community")
-            page.locator("[data-community-page=editor]").click()
-            expect(page.locator("#community-content")).to_be_visible()
+            ui = page.frame_locator("#community-frame")
+            expect(ui.locator("#community-library")).to_be_visible()
             worker.evaluate("chrome.alarms.create('companion-commands', {delayInMinutes: 0.001})")
             for _ in range(100):
                 stored = worker.evaluate("chrome.storage.local.get('communityReceipts')")
@@ -345,26 +343,24 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
             assert len(site.posts) == 1
             for kind, subject in [("vote", H), ("chat", "135")]:
                 clock[0] += 61
-                page.locator("[data-community-page=editor]").click()
-                page.locator("#community-kind").select_option(kind)
+                ui.locator("[data-tab=" + ("chat" if kind == "chat" else "torrents") + "]").click()
                 if kind == "chat":
-                    page.locator("#community-channel").select_option(subject)
-                    page.locator("#community-suggestion").select_option(index=1)
+                    expect(ui.locator("[data-command=channel]")).to_have_count(2)
+                    expect(ui.locator("#community-suggestion option")).to_have_count(201)
+                    ui.locator(f'[data-channel="{subject}"]').click()
+                    ui.locator("#community-suggestion").select_option(index=1)
                 else:
-                    page.locator("#community-subject").fill(subject)
-                    page.locator("#community-vote").select_option("approve")
-                page.get_by_role("button", name="Save draft", exact=True).click()
-                row = page.locator("#community-table tbody tr").last
-                expect(row).to_contain_text("Draft")
-                row.get_by_role("button", name="Queue", exact=True).click()
+                    ui.locator("[data-kind=vote]").click()
+                    ui.locator("#community-vote").select_option("approve")
+                ui.get_by_role("button", name="Schedule", exact=True).click()
+                expect(ui.locator("#toast")).to_contain_text("Action scheduled")
                 worker.evaluate(
                     "chrome.alarms.create('companion-commands', {delayInMinutes: 0.001})"
                 )
-                page.locator("[data-community-page=history]").click()
-                expect(page.locator("#community-history-results")).to_contain_text(
-                    "Posted", timeout=20000
+                ui.locator(".tabs [data-tab=history]").click()
+                expect(ui.locator("#community-history-results .pill.green")).to_have_count(
+                    2 if kind == "vote" else 3, timeout=20000
                 )
-                expect(page.locator("#community-table tbody tr")).to_have_count(0, timeout=20000)
             assert len(site.posts) == 3
             assert site.posts[-1][0] == "/api/messages/channels/135/messages"
             assert not errors, errors
@@ -372,27 +368,22 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
             target.mkdir(parents=True, exist_ok=True)
             page.screenshot(path=str(target / "tl-community-web.png"), full_page=True)
             # Language changes preserve the owner's unsaved draft.
-            page.locator("[data-community-page=editor]").click()
-            page.locator("#community-content").fill(
-                "Un brouillon à conserver sans aucune modification"
-            )
+            ui.locator("[data-tab=chat]").click()
+            ui.locator("#chat-content").fill("Un brouillon à conserver sans aucune modification")
             page.locator("#language").select_option("fr")
-            expect(
-                page.get_by_role("button", name="Enregistrer le brouillon", exact=True)
-            ).to_be_visible()
-            expect(page.locator("#community-content")).to_have_value(
+            expect(ui.get_by_role("button", name="Brouillon", exact=True)).to_be_visible()
+            expect(ui.locator("#chat-content")).to_have_value(
                 "Un brouillon à conserver sans aucune modification"
             )
-            expect(page.get_by_role("button", name="Suspendre la file", exact=True)).to_be_visible()
-            page.locator("[data-community-page=history]").click()
-            page.locator("#community-history-results button").filter(
+            ui.locator(".tabs [data-tab=history]").click()
+            ui.locator("#community-history-results button").filter(
                 has_text="Merci pour ce partage"
             ).click()
-            expect(page.locator(".community-dialog")).to_contain_text("XP en attente, 24 h")
-            page.get_by_role("button", name="Fermer", exact=True).click()
-            expect(page.locator("#zen-community-panel")).to_contain_text("Connecté.")
+            expect(ui.locator("#drawer")).to_contain_text("XP en attente, 24 h")
+            ui.get_by_role("button", name="Fermer", exact=True).click()
             page.set_viewport_size({"width": 600, "height": 900})
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert ui.locator("body").evaluate("el => el.scrollWidth <= innerWidth")
             page.screenshot(path=str(target / "tl-community-web-fr.png"), full_page=True)
             # The new controls persist their configuration and plan without posting.
             from tests.test_community import observation
@@ -403,39 +394,71 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
             )
             page.set_viewport_size({"width": 1280, "height": 1000})
             page.locator("#language").select_option("en")
-            page.locator("[data-community-page=settings]").click()
-            page.locator("#community-enabled").uncheck()
-            page.locator("#community-auto-enabled").check()
-            page.locator("#community-auto-comment").check()
-            page.locator("#community-settings fieldset").first.locator("textarea").fill(
-                "Merci pour le partage de {titre}"
-            )
-            page.get_by_role("button", name="Save settings", exact=True).click()
-            page.locator("[data-community-page=calendar]").click()
-            expect(page.locator("#community-calendar")).to_contain_text("Future release")
-            page.get_by_role("button", name="Month", exact=True).click()
-            expect(page.locator(".community-calendar-day")).to_have_count(42)
-            page.locator(".community-calendar-event").filter(has_text="Future release").click()
-            expect(page.locator(".community-dialog")).to_contain_text(
-                "Merci pour le partage de Future release"
-            )
-            page.get_by_role("button", name="Close", exact=True).click()
+            ui.get_by_role("button", name="Community settings", exact=True).click()
+            ui.locator("#community-enabled").uncheck()
+            ui.get_by_role("button", name="Save settings", exact=True).click()
+            expect(ui.locator("#drawer")).not_to_be_visible()
+            ui.get_by_role("button", name="Automatic mode", exact=True).click()
+            ui.locator("#community-auto-enabled").check()
+            ui.locator("#community-auto-comment").check()
+            ui.locator("#auto-template").fill("Merci pour le partage de {titre}")
+            ui.get_by_role("button", name="Apply to calendar", exact=True).click()
+            expect(ui.locator("#community-calendar")).to_contain_text("Future release")
+            expect(ui.locator(".calendar-cell")).to_have_count(7)
+            ui.get_by_role("button", name="Month", exact=True).click()
+            assert ui.locator(".calendar-cell").count() in (28, 35, 42)
+            ui.locator(".calendar-event").filter(has_text="Future release").click()
+            expect(ui.locator("#drawer")).to_contain_text("Merci pour le partage de Future release")
+            ui.get_by_role("button", name="Close", exact=True).click()
             page.reload()
-            page.locator("[data-community-page=settings]").click()
-            expect(page.locator("#community-auto-comment")).to_be_checked()
-            page.locator("[data-community-page=history]").click()
-            page.locator("#community-history-search").fill("Future release")
-            page.locator("#community-history-kind").select_option("comment")
-            page.locator("#community-history-period").select_option("custom")
-            page.locator("#community-history-from").fill("2000-01-01")
-            page.locator("#community-history-to").fill("2000-01-02")
-            expect(page.locator("#community-history-results")).to_contain_text("0 operations")
-            page.locator("#community-history-period").select_option("all")
-            expect(page.locator("#community-history-results")).to_contain_text("Future release")
+            ui.get_by_role("button", name="Auto · active", exact=True).click()
+            expect(ui.locator("#community-auto-comment")).to_be_checked()
+            ui.get_by_role("button", name="Close", exact=True).click()
+            ui.locator(".tabs [data-tab=history]").click()
+            ui.locator("#community-history-search").fill("Future release")
+            ui.locator("#community-history-kind").select_option("comment")
+            ui.locator("[data-period=custom]").click()
+            ui.locator("#community-history-from").fill("2000-01-01")
+            ui.locator("#community-history-to").fill("2000-01-02")
+            expect(ui.locator(".history-summary")).to_contain_text("0 operations")
+            ui.locator("[data-period=all]").click()
+            expect(ui.locator("#community-history-results")).to_contain_text("Future release")
+            # The approved narrow layout opens the selected torrent in a drawer.
+            page.set_viewport_size({"width": 600, "height": 900})
+            ui.locator("[data-tab=torrents]").click()
+            ui.locator(".torrent").filter(has_text="Future release").click()
+            expect(ui.locator("#drawer")).to_be_visible()
+            expect(ui.locator("#drawer")).to_contain_text("Future release")
+            ui.get_by_role("button", name="Close", exact=True).click()
+            page.set_viewport_size({"width": 1280, "height": 1000})
+            ui.locator(".tabs [data-tab=history]").click()
+            with page.expect_download() as downloaded:
+                ui.get_by_role("button", name="Export", exact=True).click()
+            assert "Future release" in Path(downloaded.value.path()).read_text(encoding="utf-8-sig")
             assert len(site.posts) == 3
             assert not errors, errors
-            page.locator("[data-community-page=calendar]").click()
+            ui.locator("[data-tab=queue]").click()
             page.screenshot(path=str(target / "tl-community-calendar-built.png"), full_page=True)
+            page.locator("#language").select_option("fr")
+            page.locator("#theme").select_option("dark")
+            expect(ui.locator("html")).to_have_attribute("data-theme", "dark")
+            ui.locator("[data-tab=torrents]").click()
+            page.screenshot(path=str(target / "tl-community-library-final.png"), full_page=True)
+            # A response from before logout must not restore the old account.
+            delayed = []
+            snapshot = w.community_state()
+            page.route("**/api/community", lambda route: delayed.append(route))
+            for _ in range(50):
+                if delayed:
+                    break
+                page.wait_for_timeout(100)
+            assert delayed
+            page.locator("#logout").click()
+            expect(page.locator("#login-screen")).to_be_visible()
+            for route in delayed:
+                route.fulfill(json=snapshot)
+            expect(ui.locator(".torrent")).to_have_count(0)
+            expect(ui.locator(".tabs")).to_have_count(0)
             context.close()
     finally:
         server.should_exit = True

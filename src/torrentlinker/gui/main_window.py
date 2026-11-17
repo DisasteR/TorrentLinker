@@ -341,7 +341,9 @@ class MainWindow(QMainWindow):
         self.zen_tab = ZenTab(self.seeding_loader, lambda: self.settings.zen, settings.uploads)
         from torrentlinker.gui.community_view import CommunityView
 
-        self.community_view = CommunityView(self.account_workspace)
+        self.community_view = CommunityView(
+            self.account_workspace, i18n.pick_language(self.settings.language)
+        )
         self.zen_tab.pages.addTab(self.community_view, self.tr("Community"))
         self.zen_tab.profile_view.refresh_requested.connect(self.refresh_profile)
         self.zen_tab.profile_view.refresh_requested.connect(self.refresh_torrent_clients)

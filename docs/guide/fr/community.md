@@ -10,20 +10,19 @@ Les torrents en seed et les canaux général/de classe se chargent automatiqueme
 Recherchez un titre dans **Torrents**, puis sélectionnez-le pour consulter vos
 actions locales, écrire un commentaire ou préparer un vote. **Actualiser la
 bibliothèque** relance la recherche ; sinon le cache est renouvelé après six
-heures. Aucun disque ni liste de fichiers de torrent n'est parcouru. Vous pouvez
-aussi saisir un hash directement. Le site vérifie l'éligibilité avant chaque envoi.
+heures. Aucun disque ni liste de fichiers de torrent n'est parcouru. Le site vérifie l'éligibilité avant chaque envoi.
 
 Choisissez un commentaire, votre vote de confiance ou un message de chat.
 Rédigez le texte, choisissez le canal si nécessaire et réglez **Envoyer après**
-à votre heure locale. **Enregistrer le brouillon** ne publie rien. Sélectionnez
-**Mettre en file**, puis activez la file dans **Réglages et modèles**.
+à votre heure locale. **Brouillon** ne publie rien. **Programmer** ajoute l’action à la file.
+L’icône des réglages permet d’activer les envois.
 Vous pouvez modifier les modèles de commentaire/chat, la limite de chaque action
 et l'intervalle minimum. Par défaut, chaque action est limitée à cinq par jour,
 avec 60 secondes entre commentaires/votes et 600 secondes entre messages de chat.
 Les envois sont initialement désactivés. Une limite de zéro désactive l'action.
 
 Le sélecteur français propose 200 citations, blagues et petits poèmes modifiables.
-Choisir une suggestion remplit seulement l'éditeur. L'auteur reste dans le texte
+Choisir une suggestion remplit l'éditeur et son aperçu. L'auteur reste dans le texte
 des citations. Les canaux général et de classe partagent le même quota de chat.
 Un message de chat doit contenir au moins cinq mots ; les répétitions sont refusées.
 Vous choisissez vous-même votre vote. Aucun avis positif n'est créé automatiquement.
@@ -55,22 +54,23 @@ les lignes du journal XP aux publications et ne promet pas de gain Zen fixe.
 
 ## Calendrier et historique
 
-Le **Calendrier** affiche les prochaines opérations par semaine ou par mois et
+Dans **File d’attente**, le **Calendrier** affiche les opérations par semaine ou par mois et
 leur détail quotidien. L'origine manuelle ou automatique est indiquée. Ouvrez
 une opération pour lire son texte, la suspendre, l'annuler ou modifier sa date.
-Sur ordinateur, le calendrier mensuel accompagne un agenda du jour, de la semaine
-ou du mois. Les horaires locaux tiennent compte des créneaux réservés et des
+Le bouton **Liste** affiche les cartes de la file. Le même calendrier est disponible
+sur ordinateur et dans la WebUI. Les horaires locaux tiennent compte des créneaux réservés et des
 limites. Ils restent estimés.
 
 L'**Historique** conserve les textes et les changements d'état de chaque opération.
 Recherchez un titre ou un message, filtrez par action et choisissez aujourd'hui,
 7 jours, 30 jours, tout l'historique ou une plage de dates incluse. Parcourez les
 mois puis cliquez sur un jour pour retrouver les opérations anciennes. Chaque
-entrée détaille ses modifications, tentatives et reçu.
+entrée détaille ses modifications, tentatives et reçu. **Exporter** enregistre
+les opérations filtrées au format JSON.
 
 ## Mode automatique
 
-Dans **Réglages / auto** sur la WebUI ou **Réglages et modèles** sur ordinateur,
+Ouvrez **Mode automatique** au-dessus des quatre onglets de Communauté, puis
 activez **Planifier automatiquement** et choisissez les commentaires, votes
 préparés et/ou messages du chat. La file doit aussi être active pour envoyer.
 Réglez les plafonds, intervalles, heures de publication et fuseau IANA, par exemple
