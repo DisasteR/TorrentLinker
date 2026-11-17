@@ -67,12 +67,22 @@ def test_reseed_board_runs_pauses_and_preserves_original_on_small_screen(tmp_pat
             page.locator("#login-password").fill("test-password-long")
             page.locator("#login-form button").click()
             expect(page.locator("#reseed-board")).to_contain_text(original.name)
+            expect(page.locator("#reseed-root")).to_be_hidden()
+            page.locator("#reseed-settings").click()
             page.locator("#reseed-browse").click()
             page.locator("#dialog").get_by_role("button", name=str(links), exact=True).click()
             page.locator("#dialog").get_by_role(
                 "button", name="Use this folder", exact=True
             ).click()
             expect(page.locator("#reseed-root")).to_have_value(str(links))
+            page.locator("#reseed-folder-form button[type=submit]").click()
+            expect(page.locator("#toast")).to_contain_text("Link folder saved")
+            page.reload()
+            page.locator("#reseed-folder-settings summary").click()
+            expect(page.locator("#reseed-root")).to_have_value(str(links))
+            page.goto(f"http://127.0.0.1:{port}/#/library/reseed")
+            expect(page.locator("#reseed-root-status")).to_have_text("Link folder configured")
+            expect(page.locator("#reseed-root")).to_be_hidden()
             page.locator("#reseed-run-all").click()
             page.locator("#reseed-details").get_by_role(
                 "button", name="Run all steps", exact=True

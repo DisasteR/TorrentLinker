@@ -48,6 +48,10 @@ class ClientSelection(BaseModel):
     client_id: str = ""
 
 
+class ReseedFolder(ClientSelection):
+    path: str = Field(default="", max_length=4096)
+
+
 class Announce(BaseModel):
     value: str = Field(max_length=4096)
 
@@ -534,6 +538,17 @@ def create_app(
     def folders(path: str = "") -> dict:
         return service.browse(path)
 
+    @app.post("/api/setup/reseed-folder")
+    def save_reseed_folder(body: ReseedFolder) -> dict:
+        with jobs.lock:
+            idle()
+            setup = for_client(body.client_id).setup
+            value = body.path.strip()
+            path = str(setup.path_under_root(value)) if value else ""
+            setup.settings.profile().reseed_link_root = path
+            setup.save()
+            return {"reseed_link_root": path}
+
     @app.post("/api/setup/test-folder")
     def test_folder(body: FolderSetup) -> dict:
         return for_client(body.client_id).setup.folder(body, probe=True)
@@ -668,7 +683,11 @@ def create_app(
 
     @app.get("/api/reseed-workspace")
     def reseed_workspace(client_id: str = "") -> dict:
-        return {"rows": for_client(client_id).reseed_workspace.rows()}
+        target = for_client(client_id)
+        return {
+            "rows": target.reseed_workspace.rows(),
+            "link_root": target.setup.settings.profile().reseed_link_root,
+        }
 
     from torrentlinker.poster_cache import PosterCache, valid_poster_url
 

@@ -435,7 +435,33 @@ class SettingsDialog(QDialog):
         )
         hint.setWordWrap(True)
         layout.addWidget(hint)
+        self.reseed_link_root = QLineEdit(self.settings.profile().reseed_link_root)
+        self.reseed_link_root.setObjectName("reseedLinkRoot")
+        self.reseed_link_root.setPlaceholderText("/media/reseed-links")
+        links = QGroupBox(self.tr("Reseed link folder (optional)"))
+        links_layout = QVBoxLayout(links)
+        link_row = QHBoxLayout()
+        link_row.addWidget(self.reseed_link_root, 1)
+        browse = QPushButton(self.tr("Browse…"))
+        browse.clicked.connect(self._choose_reseed_folder)
+        link_row.addWidget(browse)
+        links_layout.addLayout(link_row)
+        help_text = QLabel(
+            self.tr(
+                "Used by the Reseed board for all clients. Choose a folder outside the Library, "
+                "accessible to this client, and keep the links while seeding. "
+                "qBittorrent can also reseed from Local Items without this folder."
+            )
+        )
+        help_text.setWordWrap(True)
+        links_layout.addWidget(help_text)
+        layout.addWidget(links)
         return box
+
+    def _choose_reseed_folder(self):
+        path = choose_directory(self, self.tr("Link folder"), self.reseed_link_root.text())
+        if path:
+            self.reseed_link_root.setText(path)
 
     def _chosen_client(self) -> TorrentClient:
         return TorrentClient(self.client.currentData())
@@ -1468,6 +1494,7 @@ class SettingsDialog(QDialog):
         self._save_secrets()
         s = self.settings
         s.profile().name = self.client_name.text().strip()
+        s.profile().reseed_link_root = self.reseed_link_root.text().strip()
         s.proxy.address = self.proxy_address.text().strip()
         s.proxy.username = self.proxy_user.text().strip()
         s.proxy.torrent_client = self.proxy_client.isChecked()

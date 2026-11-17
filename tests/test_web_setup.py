@@ -357,3 +357,53 @@ def test_scan_without_a_client_shows_unknown_seeding_status(tmp_path):
         assert result["status"] in {"completed", "partial"}, result
         rows = browser.get("/api/library").json()["rows"]
         assert [(r["name"], r["state"]) for r in rows] == [("book.epub", "unknown")]
+
+
+def test_reseed_folder_is_persistent_scoped_and_confined_to_storage(tmp_path):
+    from torrentlinker.config import Settings
+
+    config = tmp_path / "config"
+    config.mkdir()
+    links = tmp_path / "links"
+    links.mkdir()
+    settings = Settings()
+    other = settings.add_client("Other client")
+    settings.save(config / "settings.json")
+    with TestClient(create_app(config, password="test-password-long", roots=(links,))) as browser:
+        assert (
+            browser.post("/api/setup/reseed-folder", json={"path": str(links)}).status_code == 403
+        )
+        browser.headers["X-TorrentLinker"] = "1"
+        browser.post("/api/login", json={"password": "test-password-long"})
+        assert (
+            browser.post(
+                "/api/setup/reseed-folder", json={"client_id": other.id, "path": str(tmp_path)}
+            ).status_code
+            == 400
+        )
+        assert (
+            browser.post(
+                "/api/setup/reseed-folder", json={"client_id": other.id, "path": str(links)}
+            ).status_code
+            == 200
+        )
+        assert (
+            browser.get("/api/setup", params={"client_id": "default"}).json()["reseed_link_root"]
+            == ""
+        )
+        assert browser.get("/api/reseed-workspace", params={"client_id": other.id}).json()[
+            "link_root"
+        ] == str(links)
+        loaded = Settings.load(config / "settings.json")
+        assert loaded.for_client(other.id).profile().reseed_link_root == str(links)
+        assert loaded.for_client("default").profile().reseed_link_root == ""
+        assert (
+            browser.post(
+                "/api/setup/reseed-folder", json={"client_id": other.id, "path": ""}
+            ).status_code
+            == 200
+        )
+        assert (
+            Settings.load(config / "settings.json").for_client(other.id).profile().reseed_link_root
+            == ""
+        )

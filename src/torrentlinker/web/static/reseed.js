@@ -1,5 +1,5 @@
 "use strict";
-const reseedUI = {rows:[], selected:new Set(), client:null, job:null, paused:false, activePath:"", generation:0, limits:{}};
+const reseedUI = {rows:[], root:"", selected:new Set(), client:null, job:null, paused:false, activePath:"", generation:0, limits:{}};
 const reseedStages = () => [
   ["find",say("To find","À retrouver"),say("Search for compatible torrents","Chercher des torrents compatibles")],
   ["candidates",say("Candidates found","Candidats trouvés"),say("Compare files before proceeding","Comparer les fichiers avant de continuer")],
@@ -18,8 +18,8 @@ async function loadReseed() {
   if(generation!==reseedUI.generation || client!==state.clientId) return;
   if(reseedUI.client!==client) {
     reseedUI.selected.clear(); reseedUI.client=client;
-    $("reseed-root").value=localStorage.getItem(`reseed-root:${client}`)||"";
   }
+  reseedUI.root=response.link_root || localStorage.getItem(`reseed-root:${client}`) || "";
   reseedUI.rows=response.rows;
   const pending=jobs.filter(j=>j.kind==="reseed-workspace" && j.client_id===client);
   const running=pending.find(j=>j.status==="running") || pending.find(j=>j.status==="queued");
@@ -75,7 +75,9 @@ function renderReseed() {
   $("reseed-empty").hidden=!!reseedUI.rows.length;
   $("reseed-run-all").disabled=!!reseedUI.job || !rows.some(r=>!["seeding","incomplete"].includes(r.stage));
   $("reseed-refresh").disabled=!!reseedUI.job;$("reseed-scan").disabled=!!reseedUI.job;
-  $("reseed-root").disabled=!!reseedUI.job;$("reseed-browse").disabled=!!reseedUI.job;reseedSelection();
+  $("reseed-settings").disabled=!!reseedUI.job;
+  $("reseed-root-status").textContent=reseedUI.root?say("Link folder configured","Dossier de liens configuré"):say("Choose a link folder in Client settings","Choisissez un dossier de liens dans les paramètres du client");
+  $("reseed-root-status").title=reseedUI.root;reseedSelection();
 }
 function reseedSelection() {
   $("reseed-selection").textContent=say(`${reseedUI.selected.size} selected`,`${reseedUI.selected.size} sélectionné(s)`);
@@ -102,14 +104,14 @@ function inspectReseed(row) {
 function confirmReseed(paths,action) {
   const chosen=paths.filter(p=>reseedUI.rows.some(r=>r.path===p && !["seeding","incomplete"].includes(r.stage)));
   if(!chosen.length)return;
-  if(["prepare","all"].includes(action) && !$("reseed-root").value.trim()) {$("reseed-root").focus();toast(say("Choose an existing link folder outside the Library.","Choisissez un dossier de liens existant hors de la bibliothèque."));return;}
+  if(["prepare","all"].includes(action) && !reseedUI.root) {guard(openReseedSettings);toast(say("Choose a link folder in Client settings","Choisissez un dossier de liens dans les paramètres du client"));return;}
   const dialog=$("reseed-details"), content=$("reseed-detail-content");
-  content.replaceChildren(element("h2",reseedAction(action)),element("p",say(`${chosen.length} Local Item(s). Originals keep their names. Keep the link folder while seeding.`,`${chosen.length} élément(s). Les originaux gardent leur nom. Conservez le dossier de liens pendant le seed.`)),element("pre",$("reseed-root").value));
+  content.replaceChildren(element("h2",reseedAction(action)),element("p",say(`${chosen.length} Local Item(s). Originals keep their names. Keep the link folder while seeding.`,`${chosen.length} élément(s). Les originaux gardent leur nom. Conservez le dossier de liens pendant le seed.`)),element("pre",reseedUI.root));
   if(action==="all")content.append(element("p",say("Find → Compare → Prepare links → Verify → Seed. Incomplete or ambiguous matches stop for review. Pause takes effect between operations; a client hash check may finish while paused.","Chercher → Comparer → Préparer les liens → Vérifier → Partager. Les correspondances incomplètes ou ambiguës attendent votre examen. La pause prend effet entre les opérations ; une vérification du client peut se terminer pendant la pause.")));
   const actions=element("div",undefined,"actions");actions.append(button(say("Cancel","Annuler"),()=>dialog.close()),button(reseedAction(action),()=>{dialog.close();return startReseed(chosen,action);}));content.append(actions);dialog.showModal();
 }
 async function startReseed(paths,action,key="") {
-  const root=$("reseed-root").value.trim();localStorage.setItem(`reseed-root:${state.clientId}`,root);
+  const root=reseedUI.root;
   reseedUI.job="submitting";reseedUI.paused=false;renderReseed();
   try {
     reseedUI.job=await job({kind:"reseed-workspace",paths,reseed_action:action,link_root:root,candidate_key:key},async result=>{
@@ -137,3 +139,23 @@ $("reseed-refresh").onclick=()=>guard(()=>job({kind:"reseed-workspace",reseed_ac
 $("reseed-scan").onclick=()=>guard(()=>job({kind:"scan"},loadReseed));
 
 $("reseed-browse").onclick=()=>guard(()=>browseLibraryFolder("","reseed-root"));
+
+async function openReseedSettings() {
+  await navigate("setup", "connections");
+  $("reseed-folder-settings").open=true;
+  $("reseed-root").focus();
+}
+$("reseed-settings").onclick=()=>guard(openReseedSettings);
+$("reseed-folder-form").onsubmit=event=>{
+  event.preventDefault();
+  guard(async()=>{
+    const client=state.clientId;
+    const result=await api("setup/reseed-folder",{path:$("reseed-root").value.trim()});
+    localStorage.removeItem(`reseed-root:${client}`);
+    if(client!==state.clientId)return;
+    state.setup.reseed_link_root=result.reseed_link_root;
+    reseedUI.root=result.reseed_link_root;
+    $("reseed-root").value=result.reseed_link_root;
+    toast(say("Link folder saved for this client.","Dossier de liens enregistré pour ce client."));
+  });
+};

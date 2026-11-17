@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
-    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -56,26 +55,14 @@ class ReseedBoard(QWidget):
         heading.addWidget(scan)
         heading.addWidget(self.run_all)
         layout.addLayout(heading)
-        note = QLabel(
-            self.tr(
-                "Expected names, without renaming originals. A persistent symlink folder "
-                "reproduces the torrent layout. Keep it while seeding."
-            )
-        )
-        note.setWordWrap(True)
-        note.setStyleSheet("padding: 14px; border-left: 3px solid #55bcb9;")
-        layout.addWidget(note)
-        layout.addWidget(
-            QLabel(self.tr("Link folder (outside Library Folders, accessible to the client)"))
-        )
+        self.link_root = ""
         root_row = QHBoxLayout()
-        self.root = QLineEdit()
-        self.root.setObjectName("reseedLinkRoot")
-        self.root.setPlaceholderText("/media/reseed-links")
-        root_row.addWidget(self.root, 1)
-        self.browse = QPushButton(self.tr("Browse…"))
-        self.browse.clicked.connect(self.choose_root)
-        root_row.addWidget(self.browse)
+        self.root_status = QLabel()
+        root_row.addWidget(self.root_status, 1)
+        self.client_settings = QPushButton(self.tr("Client settings"))
+        self.client_settings.setObjectName("reseedClientSettings")
+        self.client_settings.clicked.connect(self.configure_root)
+        root_row.addWidget(self.client_settings)
         layout.addLayout(root_row)
         toolbar = QHBoxLayout()
         self.query = QLineEdit()
@@ -135,31 +122,31 @@ class ReseedBoard(QWidget):
             self.owner.store.for_client(self.owner.settings.active_client_id),
         )
         # The local owner chooses this folder directly, as in the download-folder picker.
-        if self.root.text().strip():
+        if self.link_root:
             from pathlib import Path
 
-            setup._folder_candidate = Path(self.root.text().strip())
+            setup._folder_candidate = Path(self.link_root)
         library = Library(setup)
         library.entries = list(self.owner.library_model.entries)
         return ReseedWorkspace(library)
 
     def refresh(self):
         if not self.running:
+            self.link_root = self.owner.settings.profile().reseed_link_root
             self.rows = self.service().rows()
-            if not self.root.text():
+            if not self.link_root:
                 from pathlib import Path
 
                 previous = next(
                     (r.get("destination") for r in self.rows if r.get("destination")), None
                 )
                 if previous:
-                    self.root.setText(str(Path(previous).parent))
+                    self.link_root = str(Path(previous).parent)
             self.render()
 
-    def choose_root(self):
-        chosen = QFileDialog.getExistingDirectory(self, self.tr("Link folder"), self.root.text())
-        if chosen:
-            self.root.setText(chosen)
+    def configure_root(self):
+        self.owner.open_settings()
+        self.refresh()
 
     def visible_rows(self):
         return [r for r in self.rows if self.query.text().casefold() in r["name"].casefold()]
@@ -269,8 +256,13 @@ class ReseedBoard(QWidget):
         )
         for control in self.navigation_actions:
             control.setEnabled(not self.running)
-        self.root.setEnabled(not self.running)
-        self.browse.setEnabled(not self.running)
+        self.root_status.setText(
+            self.tr("Link folder configured")
+            if self.link_root
+            else self.tr("Choose a link folder in Client settings")
+        )
+        self.root_status.setToolTip(self.link_root)
+        self.client_settings.setEnabled(not self.running)
         self.selection_changed()
 
     def show_more(self, stage):
@@ -382,12 +374,12 @@ class ReseedBoard(QWidget):
         paths = [r["path"] for r in rows if r["stage"] not in {"seeding", "incomplete"}]
         if not paths:
             return
-        if action in {"all", "prepare"} and not self.root.text().strip():
-            self.root.setFocus()
+        if action in {"all", "prepare"} and not self.link_root:
+            self.client_settings.setFocus()
             QMessageBox.information(
                 self,
                 self.tr("Link folder"),
-                self.tr("Choose an existing link folder outside the Library."),
+                self.tr("Choose a link folder in Client settings"),
             )
             return
         message = self.tr(
@@ -399,9 +391,7 @@ class ReseedBoard(QWidget):
                 "Incomplete or ambiguous matches stop for review."
             )
         if (
-            QMessageBox.question(
-                self, self.action_label(action), message + "\n\n" + self.root.text()
-            )
+            QMessageBox.question(self, self.action_label(action), message + "\n\n" + self.link_root)
             == QMessageBox.StandardButton.Yes
         ):
             self.start(paths, action)
@@ -409,7 +399,7 @@ class ReseedBoard(QWidget):
     def start(self, paths, action, key=""):
         if self.running:
             return
-        service, root = self.service(), self.root.text().strip()
+        service, root = self.service(), self.link_root
         if action != "refresh":
             service.setup._indexer = self.owner.indexer()
         self.stop = JobStop()

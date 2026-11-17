@@ -9123,6 +9123,22 @@ Le torrent est ensuite ajouté à votre client torrent avec les fichiers décomp
         <source>Retry Agent access</source>
         <translation>Réessayer l’accès des agents</translation>
     </message>
+    <message>
+        <source>Reseed link folder (optional)</source>
+        <translation>Dossier de liens pour la remise en seed (facultatif)</translation>
+    </message>
+    <message>
+        <source>Link folder</source>
+        <translation>Dossier de liens</translation>
+    </message>
+    <message>
+        <source>Used by the Reseed board for all clients. Choose a folder outside the Library, accessible to this client, and keep the links while seeding. qBittorrent can also reseed from Local Items without this folder.</source>
+        <translation>Utilisé par le tableau de remise en seed pour tous les clients. Choisissez un dossier hors bibliothèque, accessible à ce client, et conservez les liens pendant le seed. qBittorrent peut aussi remettre en seed depuis les éléments locaux sans ce dossier.</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>Parcourir…</translation>
+    </message>
 </context>
 <context>
     <name>SizeField</name>
@@ -11501,6 +11517,18 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
     <message>
         <source>Show more</source>
         <translation>Afficher la suite</translation>
+    </message>
+    <message>
+        <source>Client settings</source>
+        <translation>Paramètres du client</translation>
+    </message>
+    <message>
+        <source>Link folder configured</source>
+        <translation>Dossier de liens configuré</translation>
+    </message>
+    <message>
+        <source>Choose a link folder in Client settings</source>
+        <translation>Choisissez un dossier de liens dans les paramètres du client</translation>
     </message>
 </context>
 <context>

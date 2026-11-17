@@ -205,7 +205,7 @@ async function guard(fn) {
   }
 }
 async function api(path, body, method) {
-  const scoped = ["setup", "torrents", "library", "queue", "upload/queue", "upload/drafts"];
+  const scoped = ["reseed-workspace", "setup", "torrents", "library", "queue", "upload/queue", "upload/drafts"];
   if (body === undefined && scoped.includes(path.split("?")[0]) && state.clientId && !new URLSearchParams(path.split("?")[1]).has("client_id")) {
     const id = state.clientId === "all" && path === "setup" ? state.setup?.default_client_id || "" : state.clientId;
     path += (path.includes("?") ? "&" : "?") + "client_id=" + encodeURIComponent(id);
@@ -372,6 +372,8 @@ async function refreshSetup() {
   for (const [id, category] of categories.filter(([, c]) => !c.parent || !categories.some(([key]) => key === String(c.parent)))) appendCategory(id, category);
   for (const option of $("plan-category").options) option.selected = oldCategories.has(option.value);
   $("client-name").value = state.setup.name;
+  $("reseed-folder-settings").hidden = false;
+  $("reseed-root").value = state.setup.reseed_link_root || localStorage.getItem(`reseed-root:${state.setup.client_id}`) || "";
   const oldDestinations = $("plan-clients").dataset.owner === state.setup.client_id ? new Map(
     [...$("plan-clients").querySelectorAll("input[data-client-id]")].map(e => [e.dataset.clientId, {
       checked:e.checked, budget:$("plan-clients").querySelector(`input[data-budget-id="${CSS.escape(e.dataset.clientId)}"]`).value,
@@ -1746,6 +1748,7 @@ $("target-client").onchange = () => guard(async () => {
 });
 $("add-client").onclick = () => {
   state.addingClient = true;
+  $("reseed-folder-settings").hidden = true;
   $("client-name").value = ""; $("client-host").value = "";
   $("client-username").value = ""; $("client-password").value = ""; $("client-key").value = "";
   $("client-name").focus();

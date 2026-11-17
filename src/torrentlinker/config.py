@@ -124,6 +124,7 @@ class ClientProfile:
     path_mappings: list[PathMapping] = field(default_factory=list)
     download_folders: DownloadFolders = field(default_factory=DownloadFolders)
     enabled: bool = True
+    reseed_link_root: str = ""
 
     def secret_name(self, name: str) -> str:
         # The original profile keeps its existing OS keyring/deployment secrets.

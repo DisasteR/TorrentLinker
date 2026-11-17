@@ -248,6 +248,7 @@ class Setup:
             return {
                 "client_id": self.settings.active_client_id,
                 "name": self.settings.profile().name,
+                "reseed_link_root": self.settings.profile().reseed_link_root,
                 "default_client_id": (self._root or self).settings.default_client_id,
                 "clients": [
                     {"id": p.id, "name": p.name, "client": p.client, "enabled": p.enabled}

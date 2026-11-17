@@ -15,10 +15,14 @@ def test_native_board_runs_the_shared_workflow(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
     window.tabs.setCurrentIndex(1)
     window.library_workspace.sections.setCurrentWidget(board)
-    board.root.setText(str(links))
+    window.settings.profile().reseed_link_root = str(links)
     board.refresh()
     window.resize(1400, 1000)
     window.show()
+    from PySide6.QtWidgets import QLineEdit
+
+    assert board.findChild(QLineEdit, "reseedLinkRoot") is None
+    assert board.link_root == str(links)
     assert len(board.rows) == 1 and board.rows[0]["stage"] == "find"
     before = original.read_bytes(), original.stat().st_ino
     board.run_all.click()
@@ -33,3 +37,28 @@ def test_native_board_runs_the_shared_workflow(qtbot, tmp_path, monkeypatch):
     if output := os.getenv("TL_WEB_SCREENSHOTS"):
         Path(output).mkdir(parents=True, exist_ok=True)
         window.grab().save(str(Path(output) / "reseed-desktop.png"))
+
+
+def test_link_folder_is_edited_in_client_settings_without_leaking_between_clients(
+    qtbot, monkeypatch
+):
+    from torrentlinker.config import Settings
+    from torrentlinker.gui.settings_dialog import SettingsDialog
+
+    settings = Settings()
+    original = settings.active_client_id
+    other = settings.add_client("NAS")
+    settings.select_client(other.id)
+    monkeypatch.setattr(SettingsDialog, "_save_secrets", lambda self: None)
+    dialog = SettingsDialog(settings, secret_values={})
+    qtbot.addWidget(dialog)
+    dialog.reseed_link_root.setText("/media/nas-links")
+    dialog._save()
+    assert settings.profile().reseed_link_root == "/media/nas-links"
+    settings.select_client(original)
+    assert settings.profile().reseed_link_root == ""
+    cancelled = SettingsDialog(settings, secret_values={})
+    qtbot.addWidget(cancelled)
+    cancelled.reseed_link_root.setText("/do-not-save")
+    cancelled.reject()
+    assert settings.profile().reseed_link_root == ""
