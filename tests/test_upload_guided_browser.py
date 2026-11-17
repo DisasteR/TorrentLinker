@@ -71,6 +71,7 @@ def test_manual_upload_and_postimages_return_preserve_description(tmp_path, host
             page.goto(base)
             page.locator("#login-password").fill("test-password-long")
             page.locator("#login-form button").click()
+            page.locator("#language").select_option("fr")
             page.locator("[data-view=upload]").first.click()
             frame = page.frame_locator("#upload-frame")
 

@@ -139,7 +139,7 @@ function tracking() {
 const statusLabel = (s) =>
   ({
     queued: "À compléter",
-    sending: "Envoi en cours",
+    sending: "Envoi lancé · vérifier sur c411",
     sent: "Brouillon c411",
     uncertain: "Envoi à vérifier",
   })[s] || s;
@@ -578,7 +578,7 @@ document.addEventListener("click", async (e) => {
       const i = items.find((i) => i.id === b.dataset.history);
       selected = i.id;
       dialog(
-        `<h2>${esc(i.name)}</h2><div class="timeline">${i.events.map((s) => `<p>${esc(s)}</p>`).join("")}</div><pre>${esc(JSON.stringify(i.record.result || {}, null, 2))}</pre>${i.record.status === "uncertain" ? `<p>Vérifiez les brouillons sur c411 avant de permettre un nouvel essai.</p><button data-action="reset-send" data-id="${esc(i.id)}">J’ai vérifié c411, autoriser un nouvel essai</button>` : ""}`,
+        `<h2>${esc(i.name)}</h2><div class="timeline">${i.events.map((s) => `<p>${esc(s)}</p>`).join("")}</div><pre>${esc(JSON.stringify(i.record.result || {}, null, 2))}</pre>${["sending", "uncertain"].includes(i.record.status) ? `<p>Vérifiez les brouillons sur c411 avant de permettre un nouvel essai.</p><button data-action="reset-send" data-id="${esc(i.id)}">J’ai vérifié c411, autoriser un nouvel essai</button>` : ""}`,
       );
       return;
     }
