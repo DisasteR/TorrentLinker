@@ -799,10 +799,7 @@ class MainWindow(QMainWindow):
             and self.tabs.widget(index) is not self.media_tab
         ):
             self.set_media_center(False)
-        owns_scroll = self.tabs.widget(index) is self.upload_workspace
-        policy = QSizePolicy.Policy.Ignored if owns_scroll else QSizePolicy.Policy.Preferred
-        self.tabs.setSizePolicy(policy, policy)
-        self.tabs.updateGeometry()
+        self._sync_workspace_scrolling()
         self.workspace_scroll.horizontalScrollBar().setValue(0)
         if self.tabs.widget(index) is self.zen_tab:  # opening on the Catalogue page
             self._zen_page_changed(self.zen_tab.pages.currentIndex())
@@ -2145,7 +2142,16 @@ class MainWindow(QMainWindow):
                 )
             )
 
+    def _sync_workspace_scrolling(self) -> None:
+        community = self.zen_tab.pages.currentWidget() is self.community_view
+        self.zen_tab.setProperty("ownsScrolling", community)
+        owns_scroll = bool(self.tabs.currentWidget().property("ownsScrolling"))
+        policy = QSizePolicy.Policy.Ignored if owns_scroll else QSizePolicy.Policy.Preferred
+        self.tabs.setSizePolicy(policy, policy)
+        self.tabs.updateGeometry()
+
     def _zen_page_changed(self, index: int) -> None:
+        self._sync_workspace_scrolling()
         if self.zen_tab.pages.widget(index) is self.zen_tab.catalogue_page:
             self.refresh_site_counts(max_age=3600)
 

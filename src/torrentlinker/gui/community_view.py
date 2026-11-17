@@ -80,6 +80,7 @@ class CommunityBridge(ViewBridge):
 class BundledView(QWidget):
     def __init__(self, bridge: ViewBridge, assets: Path, channel_name: str, language: str = "en"):
         super().__init__()
+        self.setProperty("ownsScrolling", True)
         self.assets = assets
         self.channel_name = channel_name
         self.language = language

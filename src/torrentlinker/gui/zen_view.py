@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QTableWidget,
     QTableWidgetItem,
-    QTabWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -1109,7 +1108,9 @@ class ZenTab(QWidget):
         self.catalogue = CatalogueBox()
         self.plan_view = PlanView()
         layout.setContentsMargins(0, 0, 0, 0)
-        self.pages = QTabWidget()
+        from torrentlinker.gui.workspace_tabs import WorkspaceTabs
+
+        self.pages = WorkspaceTabs()
         self.profile_view = ProfileView()
         profile_scroll = QScrollArea()
         profile_scroll.setWidgetResizable(True)

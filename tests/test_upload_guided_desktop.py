@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 
-from tests.test_community_interfaces import js, wait_js
+from tests.test_community_interfaces import js, ready, wait_js
 from tests.test_library_folders import window_for
 
 
@@ -73,4 +73,35 @@ def test_desktop_manual_source_and_shared_rendering(qtbot, tmp_path, monkeypatch
             ),
             timeout=5000,
         )
+    from tests.test_community import observation
+
+    (tmp_path / "community").mkdir()
+    _, _, profile = ready(tmp_path / "community", monkeypatch)
+    observed = observation()
+    observed["candidates"] = [
+        {"hash": f"{index:040x}", "title": f"Community sample {index}"} for index in range(30)
+    ]
+    profile.community.observe("42", observed)
+    window.community_view.bridge.workspace = profile
+    window.community_view.workspace = profile
+    for workspace, panel in (
+        (window.zen_tab, window.community_view),
+        (window.library_workspace, window.library_workspace.reseed),
+        (window.upload_workspace, window.upload_workspace),
+    ):
+        window.tabs.setCurrentWidget(workspace)
+        if workspace is window.zen_tab:
+            window.zen_tab.pages.setCurrentWidget(panel)
+        for width, height in ((1560, 1050), (800, 560)):
+            window.resize(width, height)
+            wait_js(qtbot, panel, "document.readyState==='complete'")
+            if panel is window.community_view:
+                wait_js(qtbot, panel, "document.querySelectorAll('.torrent').length >= 20")
+            qtbot.wait(200)
+            assert (
+                js(qtbot, panel, "parseFloat(getComputedStyle(document.body).paddingRight)") >= 16
+            )
+            assert window.workspace_scroll.verticalScrollBar().maximum() == 0
+            assert window.workspace_scroll.horizontalScrollBar().maximum() == 0
+            window.grab().save(f"/tmp/panel-scroll-{panel.channel_name}-{width}.png")
     view.close()

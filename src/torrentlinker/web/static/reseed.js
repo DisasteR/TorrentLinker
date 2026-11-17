@@ -6,11 +6,11 @@ reseedFrame.id = "reseed-frame";
 reseedFrame.title = "Bibliothèque";
 reseedFrame.src = "static/reseed/view.html";
 reseedFrame.style.cssText =
-  "width:100%;height:calc(100vh - 200px);min-height:440px;border:0;display:block";
+  "width:100%;height:calc(100vh - 200px);min-height:240px;border:0;display:block";
 $("library-reseed").replaceChildren(reseedFrame);
 const reseedEnvironment = () => {
   if (!$("library-reseed").hidden)
-    reseedFrame.style.height = `${Math.max(440, innerHeight - reseedFrame.getBoundingClientRect().top - 24)}px`;
+    reseedFrame.style.height = `${Math.max(240, innerHeight - reseedFrame.getBoundingClientRect().top - 40)}px`;
   reseedFrame.contentWindow?.postMessage(
     {
       type: "reseed-environment",

@@ -69,6 +69,11 @@ def test_reseed_board_runs_pauses_and_preserves_original_on_small_screen(tmp_pat
             page.locator("#login-form button").click()
             frame = page.frame_locator("#reseed-frame")
             expect(frame.locator(".torrent")).to_contain_text(original.name)
+            expect(frame.locator("body")).to_have_css("padding-right", "16px")
+            assert page.locator("#reseed-frame").evaluate(
+                "el => el.getBoundingClientRect().bottom <= innerHeight - 16"
+            )
+
             frame.locator(".guided button").first.click()
             frame.get_by_role("button", name="Parcourir…").click()
             frame.get_by_role("button", name=str(links), exact=True).click()

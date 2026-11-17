@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -31,6 +30,7 @@ from PySide6.QtWidgets import (
 from torrentlinker.domain import ContentKind, LibraryFolder
 from torrentlinker.gui.library_folder_dialog import grouping, grouping_box
 from torrentlinker.gui.settings_dialog import choose_directory, kind_label, offered_kinds
+from torrentlinker.gui.workspace_tabs import WorkspaceTabs
 from torrentlinker.scan import ScanError
 
 
@@ -202,7 +202,8 @@ class LibraryWorkspace(QWidget):
         self.scan_errors: list[ScanError] = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.sections = QTabWidget()
+        self.setProperty("ownsScrolling", True)
+        self.sections = WorkspaceTabs()
         self.sections.setObjectName("librarySections")
         self.sections.setDocumentMode(True)
         layout.addWidget(self.sections)

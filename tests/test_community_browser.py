@@ -282,6 +282,11 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
             page.locator("#zen-community-tab").click()
             ui = page.frame_locator("#community-frame")
             expect(ui.locator("#community-library")).to_be_visible()
+            expect(ui.locator("body")).to_have_css("padding-right", "16px")
+            assert page.locator("#community-frame").evaluate(
+                "el => el.getBoundingClientRect().bottom <= innerHeight - 16"
+            )
+
             expect(ui.locator(".tabs button")).to_have_count(4)
             worker.evaluate("chrome.alarms.create('companion-commands', {delayInMinutes: 0.001})")
             expect(ui.locator(".torrent")).to_have_count(1, timeout=15000)

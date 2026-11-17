@@ -73,6 +73,11 @@ def test_manual_upload_and_postimages_return_preserve_description(tmp_path, host
             page.locator("#login-form button").click()
             page.locator("[data-view=upload]").first.click()
             frame = page.frame_locator("#upload-frame")
+
+            expect(frame.locator("body")).to_have_css("padding-right", "16px")
+            assert page.locator("#upload-frame").evaluate(
+                "el => el.getBoundingClientRect().bottom <= innerHeight - 16"
+            )
             frame.get_by_role("button", name="+ Choisir un fichier", exact=True).click()
             frame.locator("#manual-path").fill(str(model))
             frame.locator("#manual-kind").select_option("10")
