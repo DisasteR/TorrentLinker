@@ -121,7 +121,7 @@ class JobRequest(BaseModel):
     maximum_bytes: int = Field(default=0, ge=0)
     maximum_torrents: int = Field(default=20, ge=1, le=1_000_000)
     limit_torrents: bool = True
-    plan_goal: PlanGoal = PlanGoal.ZEN
+    plan_goal: PlanGoal = PlanGoal.NOTE
     max_seeders: int | None = Field(default=None, ge=0)
     min_size: int = Field(default=0, ge=0)
     max_size: int = Field(default=0, ge=0)

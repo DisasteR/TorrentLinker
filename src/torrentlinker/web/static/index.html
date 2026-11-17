@@ -590,13 +590,14 @@
             <form id="plan-form">
             <div class="form-grid">
               <label><span data-i18n="planCategory">Category / subcategory</span><select id="plan-category" multiple size="5"><option value="" data-i18n="allCategories">All categories</option></select></label>
-              <label><span data-i18n="optimizeFor">Optimize for</span><select id="plan-goal"><option value="zen" data-i18n="zenPerDay">≈ Zen/day</option><option value="note">Note</option></select></label>
+              <label><span data-i18n="optimizeFor">Optimize for</span><select id="plan-goal"><option value="note">Note</option><option value="zen" data-i18n="zenPerDay">≈ Zen/day</option></select></label>
               <label><span data-i18n="maxGiB">Download budget, GiB</span><input id="plan-budget" type="number" value="10" min="0" step="any" required /></label>
               <label><span><input id="plan-limit-count" type="checkbox" checked /><span data-i18n="maxTorrents">Maximum torrents</span></span><input id="plan-count" type="number" value="100" min="1" max="1000000" required /></label>
               <label><span><input id="plan-limit-seeders" type="checkbox" /><span data-i18n="maxSeeders">Maximum seeders</span></span><input id="plan-seeders" type="number" value="10" min="0" required disabled /></label>
               <label><span data-i18n="minTorrentGiB">Minimum torrent size, GiB</span><input id="plan-min-size" type="number" value="0" min="0" step="any" required /></label>
               <label><span data-i18n="maxTorrentGiB">Maximum torrent size, GiB</span><input id="plan-max-size" type="number" value="0" min="0" step="any" required /></label>
             </div>
+            <p class="muted" data-i18n="planNoteHelp">Note prioritizes each torrent's initial score, without a seed-age bonus. Equal scores prefer smaller downloads. Zen/day maximizes estimated earnings.</p>
             <p class="muted" data-i18n="planZeroHelp">A budget or maximum size of 0 means no additional limit. Available disk space still applies to the plan.</p>
             <p class="muted" data-i18n="planReseedHelp">Checked Full Matches from the Library are included as Reseeds for a single destination without a client budget. They use no download budget. Size, seeder and torrent limits still apply.</p>
             <div class="toolbar"><button id="refresh-profile" class="quiet" type="button" data-i18n="refreshProfile">Refresh profile</button><button id="plan-folders" type="button" data-i18n="planFolders">Category folders…</button><button id="plan" type="submit" class="primary" data-i18n="buildPlan">Build plan</button><button id="plan-now" type="button" hidden data-i18n="planNow">Stop fetching and plan now</button></div>

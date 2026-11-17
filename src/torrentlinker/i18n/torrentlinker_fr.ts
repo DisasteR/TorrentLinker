@@ -5665,8 +5665,8 @@ La mettre à la corbeille ?</translation>
     </message>
     <message>
         <location filename="../gui/zen_view.py" line="400"/>
-        <source>Zen/day maximizes estimated earnings. Note prefers the highest-note torrents first.</source>
-        <translation>Zen/jour maximise les gains estimés. Note privilégie les torrents ayant les meilleures notes.</translation>
+        <source>Zen/day maximizes estimated earnings. Note prioritizes each torrent's initial score, without a seed-age bonus. Equal scores prefer smaller downloads.</source>
+        <translation>Zen/jour maximise les gains estimés. Note privilégie la note initiale de chaque torrent, sans bonus de durée de seed. À note égale, les téléchargements plus petits sont prioritaires.</translation>
     </message>
     <message>
         <location filename="../gui/zen_view.py" line="404"/>
@@ -11776,6 +11776,41 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
     <message>
         <source>Site daily limit reached</source>
         <translation>Limite quotidienne du site atteinte</translation>
+    </message>
+</context>
+<context>
+    <name>RenameDialog</name>
+    <message>
+        <source>Rename inside the torrent</source>
+        <translation>Renommer dans le torrent</translation>
+    </message>
+    <message>
+        <source>These files will be renamed inside your torrent client to match yours (your files are not touched):</source>
+        <translation>Ces fichiers seront renommés dans votre client torrent pour correspondre aux vôtres (vos fichiers ne sont pas modifiés) :</translation>
+    </message>
+    <message>
+        <source>Path in torrent</source>
+        <translation>Chemin dans le torrent</translation>
+    </message>
+    <message>
+        <source>Local path</source>
+        <translation>Chemin local</translation>
+    </message>
+    <message>
+        <source>&amp;Yes</source>
+        <translation>&amp;Oui</translation>
+    </message>
+    <message>
+        <source>&amp;No</source>
+        <translation>&amp;Non</translation>
+    </message>
+    <message>
+        <source>Y</source>
+        <translation>O</translation>
+    </message>
+    <message>
+        <source>N</source>
+        <translation>N</translation>
     </message>
 </context>
 </TS>

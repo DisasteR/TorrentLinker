@@ -34,29 +34,64 @@ def test_guide_worked_example_tanker_fifteen_films_of_4_gb_earns_about_4_a_day()
 @pytest.mark.parametrize(
     ("size", "expected"),
     [
+        (50_000_000, 0.013),
         (100_000_000, 0.025),
-        (500_000_000, 0.125),
+        (500_000_000, 0.13),
         (1 * GB, 0.25),
-        (2 * GB, 0.5),
+        (1024**3, 0.27),  # shown as 1,00 Go
         (4 * GB, 1.0),
         (4 * 1024**3, 1.01),  # shown as 4,00 Go
         (25 * GB, 1.26),
         (60 * GB, 1.40),
-        (200 * GB, 1.64),
     ],
 )
-def test_size_weight_matches_the_size_rule(size: float, expected: float) -> None:
+def test_size_weight_matches_the_guide(size: float, expected: float) -> None:
     assert weight(int(size)) == pytest.approx(expected, abs=0.006)
 
 
-def test_tiny_torrents_weigh_their_size_down_to_a_floor() -> None:
-    assert weight(1_000_000) == pytest.approx(0.00025)
-    assert weight(400_000) == pytest.approx(0.0001)
-    assert weight(10_000) == 0.0001
+@pytest.mark.parametrize(
+    ("size", "expected"),
+    [
+        (0, 0.0001),
+        (1_000, 0.0001),
+        (399_999, 0.0001),
+        (400_000, 0.0001),
+        (400_001, 0.00010000025),
+        (1_000_000, 0.00025),
+        (100_000_000, 0.025),
+        (1 * GB, 0.25),
+        (4 * GB - 1, 0.99999999975),
+        (4 * GB, 1.0),
+    ],
+)
+def test_size_weight_is_linear_with_a_minimum_below_4_gb(size: int, expected: float) -> None:
+    assert weight(size) == pytest.approx(expected, rel=1e-12)
+
+
+def test_size_weight_is_continuous_at_4_gb() -> None:
+    assert weight(4 * GB - 1) < weight(4 * GB) < weight(4 * GB + 1)
+    assert weight(4 * GB + 1) == pytest.approx(1.0, abs=1e-9)
 
 
 def test_weight_keeps_rising_slowly_beyond_25_gb() -> None:
     assert weight(95 * GB) > weight(60 * GB) > weight(25 * GB)
+
+
+def test_new_weights_apply_to_payout_and_added_torrent_estimates() -> None:
+    from torrentlinker.zen import added_values
+
+    # Both have note 1.0: no age or rarity bonus. A 100 MB torrent counts for
+    # 0.025 and a 4 GB torrent for 1, then each is prorated to half a day.
+    torrents = [ZenTorrent(100_000_000, 200), ZenTorrent(4 * GB, 200)]
+    profile = ZenProfile(ZenClass.SWARM_KEEPER, seed_hours=12)
+    expected = [0.025 / 14, 1 / 14]
+
+    day = estimate(profile, torrents)
+
+    assert day.notes == [1.0, 1.0]
+    assert day.per_torrent == pytest.approx(expected)
+    assert day.total == pytest.approx(1.025 / 14)
+    assert added_values(profile, torrents) == pytest.approx(expected)
 
 
 def test_seed_age_bonus_grows_by_steps() -> None:

@@ -414,6 +414,7 @@ def _zen_from_json(d: dict) -> ZenProfile:  # type: ignore[type-arg]
 
 
 def _plan_options_from_json(d: dict) -> PlanOptions:  # type: ignore[type-arg]
+    # Existing settings without a saved goal retain the historical Zen/day default.
     return PlanOptions(
         goal=PlanGoal(d.get("goal", "zen")),
         max_download_bytes=max(0, int(d.get("max_download_bytes", 0))),

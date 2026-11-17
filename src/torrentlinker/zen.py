@@ -1,13 +1,13 @@
 """Zen rules: how c411 pays Zen for seeding, as one dated data table (ADR-0005).
 
-Sources, as of 2026-10:
+Sources, updated 2026-11-16:
 
 - OFFICIAL — c411's guide (c411.org/guide/tokens): nightly payout for the previous
   day; the value of the torrents that count for the Class is summed, multiplied by the
   Class bonus, divided by 7; torrents are grouped by the bonuses that apply to them and
-  each group is rounded to the nearest integer; Seed classes are prorated by the
-  previous day's seed time with at least 30 minutes per torrent; size weight 0.29 at
-  1 GB, 1 at 4 GB, 1.24 at 25 GB; Tanker Class bonus +5 % at 15 torrents up to +35 %
+  each group was rounded to the nearest integer (superseded by the formula below);
+  Seed classes are prorated by the previous day's seed time with at least 30 minutes
+  per torrent; Tanker Class bonus +5 % at 15 torrents up to +35 %
   at 750; the progression tree adds up to +5 %; worked example: a Tanker seeding 15
   films of 4 GB for 90 days (note ≈ 1.7) earns ≈ 4 Zen a day; up to ≈ 0.43 Zen per
   upload a day.
@@ -22,17 +22,18 @@ Sources, as of 2026-10:
   100, +20 % from 150, then +1 % per 50 more up to +25 %); the progression tree, up to
   +5 %, from challenges completed (reported by the profile as treeBonusBp); the shop's
   Pondération badges, added on top even when the grid is at its maximum.
-- OFFICIAL SIZE RULE — c411's announcement "Chaque torrent compte selon sa taille",
-  from the payout for the night of 2026-11-16: the size weight is size ÷ 4 GB up to
-  4 GB, never under 0.0001; above, 1.01 at 4.00 GiB, 1.26 at 25 GB, 1.40 at 60 GB and
-  1.64 at 200 GB. Days paid before keep the old curve, which this module no longer
-  models.
 
 - OFFICIAL FORMULA — c411's "Le calcul en cours", supplied on 2026-10-22:
   payout = round(T × P × S × I ÷ 7 × (1 + B)), with T the torrents counted, P the share
   of the day seeded, S their average weight, I their average note and B the bonus. With
   I averaged by weight, T × S × I is the sum of each torrent's weight × note, which is
   how torrents are counted here; the total is rounded once.
+
+- OFFICIAL WEIGHT EXCERPT — supplied on 2026-11-16, superseding the October size
+  weights recorded in ADR-0005: size / 4 GB up to 4 GB, with a minimum of 0.0001.
+  Published weights above 4 GB are 1.01 at 4 GiB, 1.26 at 25 GB and 1.40 at 60 GB.
+  An exponent of 1/8 fits those rounded examples; the exact curve is not published
+  in the excerpt. The Swarm Keeper category, seed-age and rarity tables still match.
 
 Every figure is an estimate.
 """
@@ -48,8 +49,8 @@ GB = 1_000_000_000  # c411 sizes are decimal: 1 Zen buys 1 Go of download credit
 DIVISOR = 7  # OFFICIAL
 MIN_SEED_HOURS = 0.5  # OFFICIAL: under 30 minutes a day a torrent counts nothing
 MAX_TREE_BONUS = 0.05  # OFFICIAL BONUS PAGE
-WEIGHT_EXPONENT = 0.1256  # fitted to OFFICIAL SIZE RULE's 1.01, 1.26, 1.40 and 1.64
-MIN_WEIGHT = 0.0001  # OFFICIAL SIZE RULE: reached under 400 KB
+WEIGHT_EXPONENT = 0.125  # inferred from OFFICIAL WEIGHT EXCERPT's rounded examples
+MIN_WEIGHT = 0.0001  # OFFICIAL WEIGHT EXCERPT
 UPLOAD_ZEN_PER_DAY = 0.43  # OFFICIAL, upper figure: rough Reuploader estimate per upload
 KEEPER_CATEGORY_BASES = {6000: 0.5}  # OFFICIAL EXCERPT: other listed categories have base 1
 
@@ -113,15 +114,14 @@ class ZenDay:
 
 
 def weight(size: int) -> float:
-    """Size weight: 1 for a 4 GB film (OFFICIAL SIZE RULE).
+    """Size weight: 1 for a 4 GB torrent (OFFICIAL WEIGHT EXCERPT).
 
-    Up to 4 GB: size / 4 GB, never under 0.0001. Above, it rises slowly; c411 gives
-    1.01 at 4.29 GB (4.00 GiB), 1.26 at 25 GB, 1.40 at 60 GB and 1.64 at 200 GB, which a
-    power curve fits within their rounding.
+    Up to 4 GB: size / 4 GB, floored at 0.0001. Above, an inferred 1/8-power curve
+    matches c411's rounded examples. GB is decimal, even when the site displays GiB.
     """
     gb = size / GB
     if gb <= 4:
-        return max(gb / 4, MIN_WEIGHT)
+        return max(MIN_WEIGHT, gb / 4)
     return float((gb / 4) ** WEIGHT_EXPONENT)
 
 

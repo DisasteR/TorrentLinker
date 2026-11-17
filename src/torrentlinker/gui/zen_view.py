@@ -551,12 +551,13 @@ class PlanView(QGroupBox):
         self._show_times()
         options = QHBoxLayout()
         self.goal = QComboBox()
-        self.goal.addItem(self.tr("Zen/day"), PlanGoal.ZEN.value)
         self.goal.addItem(self.tr("Note"), PlanGoal.NOTE.value)
+        self.goal.addItem(self.tr("Zen/day"), PlanGoal.ZEN.value)
         self.goal.setToolTip(
             self.tr(
                 "Zen/day maximizes estimated earnings. "
-                "Note prefers the highest-note torrents first."
+                "Note prioritizes each torrent's initial score, without a seed-age bonus. "
+                "Equal scores prefer smaller downloads."
             )
         )
         label = QLabel(self.tr("Optimize for"))
