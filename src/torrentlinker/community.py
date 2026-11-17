@@ -21,7 +21,13 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from torrentlinker.community_schedule import AUTOMATION, in_window, next_slot, validate_automation
+from torrentlinker.community_schedule import (
+    AUTOMATION,
+    in_window,
+    next_slot,
+    site_day,
+    validate_automation,
+)
 
 KINDS = {"comment": "comment_post", "vote": "trust_vote", "chat": "shout_message"}
 EDITABLE = {"draft", "queued", "paused", "refused", "cancelled"}
@@ -190,6 +196,10 @@ class CommunityActions:
                     else item["posted"] or item["created"]
                 )
             snapshot = json.loads(row["snapshot"])
+            today_start, _ = site_day(self.clock())
+            if row["synced"] < today_start:
+                for rule in snapshot.get("rules", {}).values():
+                    rule["today"] = 0
             settings = self._settings(row)
             quotas = {}
             for kind in KINDS:
@@ -198,7 +208,7 @@ class CommunityActions:
                     for i in items
                     if i["kind"] == kind
                     and i["state"] in ("sending", "uncertain", "posted")
-                    and (i["started"] or 0) > self.clock() - 86400
+                    and (i["started"] or 0) >= today_start
                 )
                 rule = snapshot.get("rules", {}).get(kind, {})
                 quotas[kind] = {
@@ -212,14 +222,15 @@ class CommunityActions:
                     for i in items
                     if i["kind"] == k
                     and i["state"] in ("sending", "uncertain", "posted")
-                    and (i["started"] or 0) > self.clock() - 86400
+                    and (i["started"] or 0) >= min(today_start, self.clock() - 86400)
                 ]
                 for k in KINDS
             }
             for k in KINDS:
                 rule = snapshot.get("rules", {}).get(k, {})
                 reservations[k].extend(
-                    [self.clock()] * max(0, rule.get("today", 0) - len(reservations[k]))
+                    [self.clock()]
+                    * max(0, rule.get("today", 0) - sum(t >= today_start for t in reservations[k]))
                 )
             for item in items:
                 if item["state"] not in ("queued", "paused"):
@@ -232,7 +243,7 @@ class CommunityActions:
                     for i in items
                     if i["kind"] == kind
                     and i["state"] in ("sending", "uncertain", "posted")
-                    and (i["started"] or 0) > self.clock() - 86400
+                    and (i["started"] or 0) >= min(today_start, self.clock() - 86400)
                 )
                 next_at = max(item["due"], row["retry_at"])
                 if recent:
@@ -240,8 +251,6 @@ class CommunityActions:
                         next_at,
                         recent[-1] + max(settings["intervals"][kind], rule.get("cooldown", 0)),
                     )
-                if cap and len(recent) >= cap:
-                    next_at = max(next_at, recent[-cap] + 86400)
                 slot = next_slot(
                     max(next_at, self.clock()),
                     reservations[kind],
@@ -258,7 +267,7 @@ class CommunityActions:
                     else "Action disabled"
                     if not settings["limits"][kind]
                     else "Waiting for fresh site limits"
-                    if self.clock() - row["synced"] > 90
+                    if self.clock() - row["synced"] > 90 or row["synced"] < today_start
                     else "Site permission required"
                     if rule.get("locked", True)
                     else "Site daily limit reached"
@@ -617,7 +626,13 @@ class CommunityActions:
             row = self._account(db, account)
             self._expire(db, account)
             settings = self._settings(row)
-            if not settings["enabled"] or now < row["retry_at"] or now - row["synced"] > 90:
+            today_start, _ = site_day(now)
+            if (
+                not settings["enabled"]
+                or now < row["retry_at"]
+                or now - row["synced"] > 90
+                or row["synced"] < today_start
+            ):
                 return None
             if db.execute(
                 "SELECT 1 FROM actions WHERE account=? AND state='sending'", (account,)
@@ -645,14 +660,14 @@ class CommunityActions:
                 cap = min(settings["limits"][kind], rule["limit"])
                 recent = db.execute(
                     "SELECT started FROM actions WHERE account=? AND kind=? "
-                    "AND state IN ('sending','uncertain','posted') AND started>? "
+                    "AND state IN ('sending','uncertain','posted') AND started>=? "
                     "ORDER BY started",
-                    (account, kind, now - 86400),
+                    (account, kind, min(today_start, now - 86400)),
                 ).fetchall()
                 interval = max(30, settings["intervals"][kind], rule["cooldown"])
-                # A rolling window is deliberately conservative until c411 publishes its reset zone.
+                # Daily quota resets at Paris midnight; cooldown still crosses midnight.
                 if (
-                    len(recent) >= cap
+                    sum(r["started"] >= today_start for r in recent) >= cap
                     or rule["today"] + sum(r["started"] >= row["synced"] for r in recent) >= cap
                 ):
                     continue
@@ -762,6 +777,9 @@ class CommunityActions:
         items = [dict(r) for r in db.execute("SELECT * FROM actions WHERE account=?", (account,))]
         active = sum(i["state"] in ("draft", "queued", "paused", "sending") for i in items)
         snapshot = json.loads(row["snapshot"])
+        if row["synced"] < site_day(now)[0]:
+            for rule in snapshot.get("rules", {}).values():
+                rule["today"] = 0
         rules = snapshot.get("rules", {})
         for kind in KINDS:
             if not config["kinds"][kind]:
@@ -775,10 +793,13 @@ class CommunityActions:
                 for i in items
                 if i["kind"] == kind
                 and i["state"] in ("sending", "uncertain", "posted")
-                and (i["started"] or 0) > now - 86400
+                and (i["started"] or 0) >= min(site_day(now)[0], now - 86400)
             ]
             # External sends reserve capacity conservatively until a later snapshot.
-            reservations.extend([now] * max(0, rule.get("today", 0) - len(reservations)))
+            reservations.extend(
+                [now]
+                * max(0, rule.get("today", 0) - sum(t >= site_day(now)[0] for t in reservations))
+            )
             reservations.extend(
                 max(now, i["due"])
                 for i in items

@@ -293,6 +293,9 @@ def test_webui_to_real_extension_and_durable_receipt(tmp_path, monkeypatch):
             worker.evaluate("chrome.alarms.create('companion-commands', {delayInMinutes: 0.001})")
             expect(ui.locator(".torrent")).to_have_count(1, timeout=15000)
             ui.get_by_role("button", name="Community settings", exact=True).click()
+            expect(
+                ui.get_by_text("Daily quotas reset at midnight, Europe/Paris time.", exact=False)
+            ).to_be_visible()
             ui.locator("#community-enabled").check()
             ui.get_by_role("button", name="Save settings", exact=True).click()
             expect(ui.locator("#drawer")).not_to_be_visible()

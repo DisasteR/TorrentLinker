@@ -37,8 +37,9 @@ La file affiche délais, compteurs du site, usage local et résultats. L'heure
 indiquée est la première heure possible : le compagnon vérifie environ toutes
 les 30 secondes. Le site peut imposer un délai supplémentaire ou refuser le
 message. Chaque action est plafonnée à cinq par jour, avec une limite utilisateur
-plus basse possible. L'application applique aussi un plafond local sur 24 heures
-glissantes, car le fuseau de remise à zéro du site n'est pas publié. Les actions
+plus basse possible. Les quotas du site et de l'application sont remis à zéro à minuit,
+heure de Paris, y compris lors des changements d'heure. L'intervalle entre
+deux publications reste applicable à cheval sur minuit. Les actions
 faites ailleurs sur le site consomment également le quota disponible.
 
 La file, les modèles et les reçus survivent aux redémarrages. Le journal suit

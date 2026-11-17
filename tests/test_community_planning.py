@@ -1,5 +1,8 @@
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+import pytest
 
 from tests.test_community import H, observation
 from torrentlinker.community import DEFAULTS, CommunityActions
@@ -106,7 +109,7 @@ def test_automatic_votes_use_prepared_choices_and_window_is_enforced(tmp_path):
     assert q.claim("42")["vote"] == "disapprove"
 
 
-def test_calendar_reserves_separate_slots_with_rolling_caps(tmp_path):
+def test_calendar_reserves_separate_slots_with_paris_daily_caps(tmp_path):
     from tests.test_community import draft
 
     q = CommunityActions(tmp_path, lambda: 1000000.0)
@@ -118,7 +121,8 @@ def test_calendar_reserves_separate_slots_with_rolling_caps(tmp_path):
     draft(q, subject="b" * 40)
     draft(q, subject="c" * 40)
     items = q.state("42")["items"]
-    assert items[1]["next_at"] - items[0]["next_at"] >= 86400
+    assert datetime.fromtimestamp(items[1]["next_at"], ZoneInfo("Europe/Paris")).hour == 0
+    assert 0 < items[1]["next_at"] - items[0]["next_at"] < 86400
 
 
 def test_automatic_vote_keeps_owner_scheduled_time(tmp_path):
@@ -237,3 +241,109 @@ def test_explicit_cancel_after_automatic_recovery_stays_cancelled(tmp_path):
     q.control("42", item["id"], "cancel", item["revision"])
     assert q.claim("42") is None
     assert q.state("42")["items"][0]["state"] == "cancelled"
+
+
+def test_manual_today_preserves_five_automatic_comments_tomorrow(tmp_path):
+    from zoneinfo import ZoneInfo
+
+    from tests.test_community import draft
+
+    paris = ZoneInfo("Europe/Paris")
+    now = datetime(2026, 11, 17, 23, 31, tzinfo=paris).timestamp()
+    q = CommunityActions(tmp_path, lambda: now)
+    q.observe(
+        "42",
+        {
+            **observation(),
+            "candidates": [{"hash": f"{i:040x}", "title": f"Torrent {i}"} for i in range(5)],
+        },
+    )
+    settings = deepcopy(DEFAULTS)
+    settings["templates"]["comment"] = "Merci pour le partage de {titre}"
+    settings["automation"].update(enabled=True, start="10:00", timezone="Europe/Paris")
+    settings["automation"]["kinds"]["comment"] = True
+    q.settings("42", settings)
+    before = {i["id"]: i["next_at"] for i in q.state("42")["items"]}
+    manual = draft(q)
+    after = {i["id"]: i for i in q.state("42")["items"]}
+    assert {key: after[key]["next_at"] for key in before} == before
+    assert all(datetime.fromtimestamp(t, paris).day == 18 for t in before.values())
+    assert after[manual]["next_at"] == now
+
+
+@pytest.mark.parametrize("kind", ["comment", "vote", "chat"])
+@pytest.mark.parametrize("day", [(2026, 11, 17), (2026, 3, 29), (2026, 10, 25)])
+def test_daily_limit_resets_at_paris_midnight_but_requires_fresh_site_snapshot(tmp_path, day, kind):
+    from zoneinfo import ZoneInfo
+
+    from tests.test_community import draft, receipt
+
+    paris = ZoneInfo("Europe/Paris")
+    local = datetime(*day, 23, 59, tzinfo=paris)
+    clock = [local.timestamp()]
+    q = CommunityActions(tmp_path, lambda: clock[0])
+    settings = deepcopy(DEFAULTS)
+    settings["enabled"] = True
+    settings["limits"][kind] = 1
+    settings["intervals"][kind] = 60
+    q.settings("42", settings)
+    q.observe("42", observation())
+    draft(q, kind=kind, subject="1" if kind == "chat" else H)
+    receipt(q, q.claim("42"))
+    second = draft(
+        q,
+        kind=kind,
+        subject="135" if kind == "chat" else "b" * 40,
+        content="Un autre message pour la communauté",
+    )
+    midnight = (local.replace(hour=0, minute=0) + timedelta(days=1)).timestamp()
+    item = next(i for i in q.state("42")["items"] if i["id"] == second)
+    assert item["next_at"] == midnight
+    clock[0] = midnight
+    assert q.state("42")["quotas"][kind]["local_used"] == 0
+    assert q.claim("42") is None  # yesterday's observation is only 60 seconds old
+    q.observe("42", observation())
+    assert q.claim("42")["id"] == second
+
+
+def test_long_paris_day_keeps_early_sends_in_quota(tmp_path):
+    from tests.test_community import draft, receipt
+
+    paris = ZoneInfo("Europe/Paris")
+    clock = [datetime(2026, 10, 25, 0, 5, tzinfo=paris).timestamp()]
+    q = CommunityActions(tmp_path, lambda: clock[0])
+    settings = deepcopy(DEFAULTS)
+    settings["enabled"] = True
+    settings["limits"]["comment"] = 1
+    q.settings("42", settings)
+    q.observe("42", observation())
+    draft(q)
+    receipt(q, q.claim("42"))
+    second = draft(q, subject="b" * 40)
+    clock[0] = datetime(2026, 10, 25, 23, 30, tzinfo=paris).timestamp()
+    q.observe("42", observation())
+    assert q.claim("42") is None
+    state = q.state("42")
+    assert state["quotas"]["comment"]["local_used"] == 1
+    item = next(i for i in state["items"] if i["id"] == second)
+    assert item["next_at"] == datetime(2026, 10, 26, tzinfo=paris).timestamp()
+
+
+def test_cooldown_crosses_midnight_even_when_daily_quota_resets(tmp_path):
+    from tests.test_community import draft, receipt
+
+    paris = ZoneInfo("Europe/Paris")
+    clock = [datetime(2026, 11, 17, 23, 59, 50, tzinfo=paris).timestamp()]
+    q = CommunityActions(tmp_path, lambda: clock[0])
+    q.settings("42", {**deepcopy(DEFAULTS), "enabled": True})
+    q.observe("42", observation())
+    draft(q)
+    receipt(q, q.claim("42"))
+    second = draft(q, subject="b" * 40)
+    clock[0] += 10
+    q.observe("42", observation())
+    assert q.claim("42") is None
+    item = next(i for i in q.state("42")["items"] if i["id"] == second)
+    assert item["next_at"] == clock[0] + 50
+    clock[0] += 50
+    assert q.claim("42")["id"] == second

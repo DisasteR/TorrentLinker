@@ -32,9 +32,9 @@ here. Pausing cannot recall a request already sent to c411.
 The waitlist shows timers, site counters, local usage and outcomes. Timers are
 an earliest send time, not an exact appointment: the browser polls about every
 30 seconds. The site may impose slower timing or refuse a message. Each action
-has a maximum of five/day, adjustable downward. The app additionally limits
-local sends over a rolling 24 hours because the site's reset timezone is not
-published. Other activity on the site can consume the available daily quota.
+has a maximum of five/day, adjustable downward. Site and local daily quotas reset at midnight in Europe/Paris,
+including daylight-saving changes. The interval between posts still applies
+across midnight. Other activity on the site can consume the available daily quota.
 
 Scheduled items, templates, quotas and receipts survive restarting the app or
 browser. The journal follows the c411 account ID, so changing an API key does

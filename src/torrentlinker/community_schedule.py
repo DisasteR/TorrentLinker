@@ -1,4 +1,4 @@
-"""Publication windows and conservative rolling-day reservations for Community."""
+"""Publication windows and Paris calendar-day quotas for Community."""
 
 from __future__ import annotations
 
@@ -66,6 +66,14 @@ def in_window(stamp: float, config: dict[str, Any]) -> float:
     return max(stamp, start.timestamp())
 
 
+def site_day(stamp: float) -> tuple[float, float]:
+    """c411 daily quotas reset at midnight in France, including DST changes."""
+    start = datetime.fromtimestamp(stamp, ZoneInfo("Europe/Paris")).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return start.timestamp(), (start + timedelta(days=1)).timestamp()
+
+
 def next_slot(
     earliest: float,
     reservations: list[float],
@@ -83,17 +91,9 @@ def next_slot(
         if nearby:
             stamp = nearby[-1] + interval
             continue
-        # No rolling 24-hour window containing this slot may exceed the cap,
-        # including reservations after it, not just past sends.
-        ordered = sorted([*reservations, stamp])
-        index = ordered.index(stamp)
-        conflict = None
-        for start in range(max(0, index - cap), min(index + 1, len(ordered) - cap)):
-            if ordered[start + cap] - ordered[start] < 86400:
-                conflict = ordered[start] + 86400
-                break
-        if conflict is not None:
-            stamp = max(stamp + 1, conflict)
+        start, end = site_day(stamp)
+        if sum(start <= t < end for t in reservations) >= cap:
+            stamp = end
             continue
         return stamp
     return None
