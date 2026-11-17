@@ -347,6 +347,10 @@ class MainWindow(QMainWindow):
         self.review.unpacked.connect(lambda _folder: self.scan())  # show the new folder
         self.review.candidates_checked.connect(self._show_match_zen)
         self.zen_tab = ZenTab(self.seeding_loader, lambda: self.settings.zen, settings.uploads)
+        from torrentlinker.gui.community_view import CommunityView
+
+        self.community_view = CommunityView(self.account_workspace)
+        self.zen_tab.pages.addTab(self.community_view, self.tr("Community"))
         self.zen_tab.profile_view.refresh_requested.connect(self.refresh_profile)
         self.zen_tab.profile_view.refresh_requested.connect(self.refresh_torrent_clients)
         self.companion_panel = None  # only while Settings is open

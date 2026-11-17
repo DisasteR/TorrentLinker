@@ -1,0 +1,13 @@
+#zen-community-panel .community-form {display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+#zen-community-panel label {display:flex;flex-direction:column;gap:6px;margin:8px 0}
+#zen-community-panel input[type=checkbox] {align-self:flex-start}
+#zen-community-panel textarea {width:100%;box-sizing:border-box;resize:vertical}
+#zen-community-panel select {width:100%;min-width:0;max-width:100%}
+#zen-community-panel fieldset {margin:12px 0;min-width:0}
+#zen-community-panel .table-scroll {overflow:auto}
+#community-table td {vertical-align:top;max-width:420px;white-space:pre-wrap;overflow-wrap:anywhere}
+#community-table td:last-child button {margin:2px}
+#community-table tr:has(td [data-community-timer]) {transition:background-color .2s}
+@media (prefers-reduced-motion:reduce){#community-table tr{transition:none}}
+
+#zen-community-panel label[hidden] {display:none}

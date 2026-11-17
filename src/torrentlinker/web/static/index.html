@@ -8,12 +8,14 @@
     <link rel="stylesheet" href="static/media.css" />
     <link rel="stylesheet" href="static/library.css" />
     <link rel="stylesheet" href="static/reseed.css" />
+    <link rel="stylesheet" href="static/community.css" />
     <script src="static/app.js" defer></script>
     <script src="static/categories.js" defer></script>
     <script src="static/library.js" defer></script>
     <script src="static/reseed.js" defer></script>
     <script src="static/zen.js" defer></script>
     <script src="static/profile.js" defer></script>
+    <script src="static/community.js" defer></script>
     <script src="static/plan.js" defer></script>
     <script src="static/feeds.js" defer></script>
     <script src="static/search.js" defer></script>
@@ -510,7 +512,9 @@
             <button id="zen-seeding-tab" role="tab" aria-selected="true" aria-controls="zen-seeding-panel" data-i18n="seedingTab">Seeding</button>
             <button id="zen-plan-tab" role="tab" aria-selected="false" aria-controls="zen-plan-panel" tabindex="-1" data-i18n="planTab">Plan</button>
             <button id="zen-catalogue-tab" role="tab" aria-selected="false" aria-controls="zen-catalogue-panel" tabindex="-1" data-i18n="catalogueTab">Catalogue</button>
+            <button id="zen-community-tab" role="tab" aria-selected="false" aria-controls="zen-community-panel" tabindex="-1">Community</button>
           </div>
+          <section id="zen-community-panel" role="tabpanel" aria-labelledby="zen-community-tab" hidden></section>
           <section id="zen-profile-panel" role="tabpanel" aria-labelledby="zen-profile-tab">
             <p id="profile-notice" role="status"></p>
             <section id="profile-header" class="pf-panel pf-identity" aria-labelledby="profile-username">

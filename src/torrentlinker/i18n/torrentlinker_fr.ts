@@ -3659,6 +3659,10 @@ Fait aussi partie du pack {1}. Il n’est en seed seul qu’avec son propre torr
 <context>
     <name>MainWindow</name>
     <message>
+        <source>Community</source>
+        <translation>Communauté</translation>
+    </message>
+    <message>
         <source>At parity with c411</source>
         <translation>À parité avec c411</translation>
     </message>
@@ -11493,6 +11497,285 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
     <message>
         <source>Show more</source>
         <translation>Afficher la suite</translation>
+    </message>
+</context>
+<context>
+    <name>CommunityView</name>
+    <message>
+        <source>40-character torrent info hash</source>
+        <translation>Hash du torrent de 40 caractères</translation>
+    </message>
+    <message>
+        <source>Action</source>
+        <translation>Action</translation>
+    </message>
+    <message>
+        <source>Already sending or sent. Check c411 for uncertain results.</source>
+        <translation>En cours d’envoi ou déjà envoyé. Vérifiez c411 si le résultat est incertain.</translation>
+    </message>
+    <message>
+        <source>Approve</source>
+        <translation>Approuver</translation>
+    </message>
+    <message>
+        <source>Disapprove</source>
+        <translation>Désapprouver</translation>
+    </message>
+    <message>
+        <source>Chat channel</source>
+        <translation>Canal du chat</translation>
+    </message>
+    <message>
+        <source>Choose your vote</source>
+        <translation>Choisissez votre vote</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Choisir…</translation>
+    </message>
+    <message>
+        <source>Connect the updated companion in Settings → Companion.</source>
+        <translation>Connectez le compagnon mis à jour dans Réglages → Compagnon.</translation>
+    </message>
+    <message>
+        <source>Connected. Queued actions run when due.</source>
+        <translation>Connecté. Les actions en file seront exécutées à leur échéance.</translation>
+    </message>
+    <message>
+        <source>Due; waiting for companion</source>
+        <translation>À échéance ; en attente du compagnon</translation>
+    </message>
+    <message>
+        <source>Editable template</source>
+        <translation>Modèle modifiable</translation>
+    </message>
+    <message>
+        <source>French message suggestions</source>
+        <translation>Suggestions de messages en français</translation>
+    </message>
+    <message>
+        <source>Import seeds &amp;&amp; channels</source>
+        <translation>Importer seeds et canaux</translation>
+    </message>
+    <message>
+        <source>In {0} h {1} min {2} s</source>
+        <translation>Dans {0} h {1} min {2} s</translation>
+    </message>
+    <message>
+        <source>Limits apply per action. General and class chat share one limit. Site limits and slow mode also apply. Local sends are capped over a rolling 24 hours. A signed-in c411 tab and a running app/server are required. Editing a queued item returns it to draft.</source>
+        <translation>Les limites s’appliquent par action. Les canaux général et de classe partagent une limite. Les limites du site et le mode lent s’appliquent aussi. Les envois locaux sont plafonnés sur 24 heures glissantes. Gardez un onglet c411 connecté et l’application/serveur actif. Une modification remet l’élément en brouillon.</translation>
+    </message>
+    <message>
+        <source>Maximum per day (0 disables)</source>
+        <translation>Maximum par jour (0 désactive)</translation>
+    </message>
+    <message>
+        <source>Message, or reason for disapproval. Maximum 500 characters.</source>
+        <translation>Message ou raison de désapprobation. Maximum 500 caractères.</translation>
+    </message>
+    <message>
+        <source>Minimum interval (seconds)</source>
+        <translation>Intervalle minimum (secondes)</translation>
+    </message>
+    <message>
+        <source>Next seeds page</source>
+        <translation>Page de seeds suivante</translation>
+    </message>
+    <message>
+        <source>Pause queue</source>
+        <translation>Suspendre la file</translation>
+    </message>
+    <message>
+        <source>Resume queue</source>
+        <translation>Reprendre la file</translation>
+    </message>
+    <message>
+        <source>Run queued actions automatically while the companion is connected</source>
+        <translation>Exécuter les actions en attente automatiquement lorsque le compagnon est connecté</translation>
+    </message>
+    <message>
+        <source>Save settings</source>
+        <translation>Enregistrer les réglages</translation>
+    </message>
+    <message>
+        <source>Seeded torrent</source>
+        <translation>Torrent en seed</translation>
+    </message>
+    <message>
+        <source>Send after (local time)</source>
+        <translation>Envoyer après (heure locale)</translation>
+    </message>
+    <message>
+        <source>Settings &amp;&amp; templates</source>
+        <translation>Réglages et modèles</translation>
+    </message>
+    <message>
+        <source>Suggestions</source>
+        <translation>Suggestions</translation>
+    </message>
+    <message>
+        <source>Text / reason</source>
+        <translation>Texte / raison</translation>
+    </message>
+    <message>
+        <source>Torrent hash</source>
+        <translation>Hash du torrent</translation>
+    </message>
+    <message>
+        <source>Vote</source>
+        <translation>Vote</translation>
+    </message>
+    <message>
+        <source>Waiting for the companion to import seeds and channels…</source>
+        <translation>En attente de l’import des seeds et canaux par le compagnon…</translation>
+    </message>
+    <message>
+        <source>Waitlist</source>
+        <translation>File d’attente</translation>
+    </message>
+    <message>
+        <source>XP pending, 24 h</source>
+        <translation>XP en attente, 24 h</translation>
+    </message>
+    <message>
+        <source>XP unconfirmed</source>
+        <translation>XP non confirmée</translation>
+    </message>
+    <message>
+        <source>Comment</source>
+        <translation>Commentaire</translation>
+    </message>
+    <message>
+        <source>Trust vote</source>
+        <translation>Vote de confiance</translation>
+    </message>
+    <message>
+        <source>Chat message</source>
+        <translation>Message du chat</translation>
+    </message>
+    <message>
+        <source>Comments</source>
+        <translation>Commentaires</translation>
+    </message>
+    <message>
+        <source>Votes</source>
+        <translation>Votes</translation>
+    </message>
+    <message>
+        <source>Chat messages</source>
+        <translation>Messages du chat</translation>
+    </message>
+    <message>
+        <source>Chat</source>
+        <translation>Chat</translation>
+    </message>
+    <message>
+        <source>New draft</source>
+        <translation>Nouveau brouillon</translation>
+    </message>
+    <message>
+        <source>Use saved template</source>
+        <translation>Utiliser le modèle</translation>
+    </message>
+    <message>
+        <source>Save draft</source>
+        <translation>Enregistrer le brouillon</translation>
+    </message>
+    <message>
+        <source>Destination / text</source>
+        <translation>Destination / texte</translation>
+    </message>
+    <message>
+        <source>State</source>
+        <translation>État</translation>
+    </message>
+    <message>
+        <source>Send after</source>
+        <translation>Envoyer après</translation>
+    </message>
+    <message>
+        <source>Reward / result</source>
+        <translation>Récompense / résultat</translation>
+    </message>
+    <message>
+        <source>Edit selected</source>
+        <translation>Modifier la sélection</translation>
+    </message>
+    <message>
+        <source>Queue selected</source>
+        <translation>Mettre en file</translation>
+    </message>
+    <message>
+        <source>Pause selected</source>
+        <translation>Suspendre la sélection</translation>
+    </message>
+    <message>
+        <source>Move first</source>
+        <translation>En premier</translation>
+    </message>
+    <message>
+        <source>Cancel selected</source>
+        <translation>Annuler la sélection</translation>
+    </message>
+    <message>
+        <source>local</source>
+        <translation>local</translation>
+    </message>
+    <message>
+        <source>site today</source>
+        <translation>site aujourd’hui</translation>
+    </message>
+    <message>
+        <source>Draft</source>
+        <translation>Brouillon</translation>
+    </message>
+    <message>
+        <source>Queued</source>
+        <translation>En attente</translation>
+    </message>
+    <message>
+        <source>Paused</source>
+        <translation>Suspendu</translation>
+    </message>
+    <message>
+        <source>Sending</source>
+        <translation>Envoi</translation>
+    </message>
+    <message>
+        <source>Posted</source>
+        <translation>Publié</translation>
+    </message>
+    <message>
+        <source>Uncertain</source>
+        <translation>Incertain</translation>
+    </message>
+    <message>
+        <source>Refused</source>
+        <translation>Refusé</translation>
+    </message>
+    <message>
+        <source>Cancelled</source>
+        <translation>Annulé</translation>
+    </message>
+    <message>
+        <source>Queue paused</source>
+        <translation>File suspendue</translation>
+    </message>
+    <message>
+        <source>Action disabled</source>
+        <translation>Action désactivée</translation>
+    </message>
+    <message>
+        <source>Waiting for fresh site limits</source>
+        <translation>En attente des limites du site</translation>
+    </message>
+    <message>
+        <source>Site permission required</source>
+        <translation>Permission du site requise</translation>
+    </message>
+    <message>
+        <source>Site daily limit reached</source>
+        <translation>Limite quotidienne du site atteinte</translation>
     </message>
 </context>
 </TS>
