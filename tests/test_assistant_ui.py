@@ -121,6 +121,7 @@ def test_browser_can_configure_model_chat_and_schedule_on_small_screen(tmp_path)
             page = browser.new_page(viewport={"width": 1000, "height": 740}, locale="en-US")
 
             def new_discussion():
+                expect(page.locator(".assistant-dialog")).to_have_count(0)
                 previous = page.locator("#assistant-prompt").element_handle()
                 page.get_by_role("button", name="New discussion", exact=True).click()
                 # The old controls remain visible until the asynchronous reload replaces them.
