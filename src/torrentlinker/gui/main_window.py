@@ -2571,6 +2571,7 @@ class MainWindow(QMainWindow):
         self._apply_filters()
         if hasattr(self, "library_workspace"):
             self.library_workspace.refresh()
+            self.library_workspace.reseed.refresh()
             self.library_workspace.editor.set_folders(self.settings.library_folders)
 
     def _apply_filters(self) -> None:

@@ -16,7 +16,7 @@ def test_native_board_runs_the_shared_workflow(qtbot, tmp_path, monkeypatch):
     window.tabs.setCurrentIndex(1)
     window.library_workspace.sections.setCurrentWidget(board)
     window.settings.profile().reseed_link_root = str(links)
-    board.refresh()
+    window._fill_folder_filter()
     window.resize(1400, 1000)
     window.show()
     from PySide6.QtWidgets import QLineEdit
