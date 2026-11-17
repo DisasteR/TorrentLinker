@@ -330,7 +330,11 @@ def create_app(
             "default-src 'self'; script-src 'self'; style-src 'self'; "
             "img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         )
-        if route in {"/static/community/view.html", "/static/reseed/view.html"}:
+        if route in {
+            "/static/community/view.html",
+            "/static/reseed/view.html",
+            "/static/upload/view.html",
+        }:
             # This bundled component may be embedded only by our own Web UI.
             # Other pages remain unframeable; the component has no network access.
             response.headers["Content-Security-Policy"] = (
@@ -631,6 +635,15 @@ def create_app(
             idle()
             service.secrets.update({"announce-url": body.value})
         return {"ok": True}
+
+    @app.post("/api/upload/workspace/{action}")
+    def upload_workspace(action: str, body: dict, client_id: str = "") -> dict | list:
+        from torrentlinker.upload_workspace import UploadWorkspace
+
+        try:
+            return UploadWorkspace(for_client(client_id).uploads).request(action, body)
+        except (ValueError, KeyError) as error:
+            raise HTTPException(400, str(error)) from error
 
     @app.get("/api/upload/categories")
     def upload_categories() -> list:

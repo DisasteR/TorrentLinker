@@ -34,7 +34,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
-    QTabWidget,
     QToolBar,
     QToolButton,
     QVBoxLayout,
@@ -357,7 +356,9 @@ class MainWindow(QMainWindow):
         self.zen_tab.defer_while_hidden(
             lambda: self.isVisible() and not self.zen_tab.seeding_view.table.isVisible()
         )
-        self.tabs = QTabWidget()
+        from torrentlinker.gui.workspace_tabs import WorkspaceTabs
+
+        self.tabs = WorkspaceTabs()
         self.tabs.addTab(self.zen_tab, self.tr("Zen"))
         self.library_workspace = LibraryWorkspace(self, library_pane, toolbar, match_toolbar)
         self.tabs.addTab(self.library_workspace, self.tr("Library"))
@@ -375,7 +376,11 @@ class MainWindow(QMainWindow):
         self.review.upload_requested.connect(self._open_upload)
         self.upload_tab.upload_started.connect(self._reseed_started)
         self.upload_tab.unpacked.connect(lambda _folder: self.scan())  # show the new folder
-        self.tabs.addTab(self.upload_tab, self.tr("Upload"))
+        from torrentlinker.gui.upload_workspace import UploadBoard
+
+        self.upload_workspace = UploadBoard(self)
+        self.upload_tab.hide()
+        self.tabs.addTab(self.upload_workspace, self.tr("Upload"))
         self.search_tab = SearchTab(store, settings, self.indexer, self.qbit)
         self.tabs.addTab(self.search_tab, self.tr("Search"))
         from torrentlinker.gui.feeds import FeedsTab
@@ -456,7 +461,7 @@ class MainWindow(QMainWindow):
         sidebar = QFrame()
         self.sidebar = sidebar
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(172)
+        sidebar.setFixedWidth(190)
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(16, 24, 16, 16)
         brand_row = QHBoxLayout()
@@ -794,6 +799,10 @@ class MainWindow(QMainWindow):
             and self.tabs.widget(index) is not self.media_tab
         ):
             self.set_media_center(False)
+        owns_scroll = self.tabs.widget(index) is self.upload_workspace
+        policy = QSizePolicy.Policy.Ignored if owns_scroll else QSizePolicy.Policy.Preferred
+        self.tabs.setSizePolicy(policy, policy)
+        self.tabs.updateGeometry()
         self.workspace_scroll.horizontalScrollBar().setValue(0)
         if self.tabs.widget(index) is self.zen_tab:  # opening on the Catalogue page
             self._zen_page_changed(self.zen_tab.pages.currentIndex())
@@ -2275,7 +2284,7 @@ class MainWindow(QMainWindow):
         return self.settings.matching.rules()
 
     def _open_upload(self, entry: LibraryEntry) -> None:
-        self.tabs.setCurrentWidget(self.upload_tab)
+        self.tabs.setCurrentWidget(self.upload_workspace)
         self.upload_tab.select(entry.item.path)
 
     @agent_settings_change

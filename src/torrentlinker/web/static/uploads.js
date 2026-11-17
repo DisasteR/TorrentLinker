@@ -177,6 +177,7 @@ function uploadForm() {
         .filter(Boolean);
     });
   return {
+    ...state.uploadDraft?.form,
     category: Number($("upload-category").value) || null,
     subcategory: Number($("upload-subcategory").value) || null,
     source: $("upload-source").value,

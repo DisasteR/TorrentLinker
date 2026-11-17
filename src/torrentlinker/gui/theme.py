@@ -115,16 +115,17 @@ def _update_theme(app: QApplication, scheme: Qt.ColorScheme) -> None:
         scheme == Qt.ColorScheme.Unknown and app.palette().window().color().lightness() < 128
     )
     bg, panel, alt = (
-        ("#151b23", "#1d2530", "#222d39") if dark else ("#f3f6fa", "#ffffff", "#f7f9fc")
+        ("#161d23", "#202932", "#26323c") if dark else ("#f3f6fa", "#ffffff", "#f7f9fc")
     )
     text, muted, border = (
-        ("#e7eef6", "#a6b4c4", "#354454") if dark else ("#203047", "#5c6c80", "#d5dfe9")
+        ("#e2e9ed", "#98aab7", "#33404b") if dark else ("#203047", "#5c6c80", "#d5dfe9")
     )
-    accent, hover = ("#087f76", "#273c48") if dark else ("#087f76", "#e8f3f2")
-    brand = "#68cec5" if dark else accent
+    accent, hover = ("#80bdb6", "#263e43") if dark else ("#087f76", "#e8f3f2")
+    accent_text = "#102a2b" if dark else "white"
+    brand = "#80bdb6" if dark else accent
     error = "#ff9c9c" if dark else "#b42332"
     warning = "#edbf73" if dark else "#8a5800"
-    selection = "#254c53" if dark else "#d8eeeb"
+    selection = "#263e43" if dark else "#d8eeeb"
     ok = "#4ad394" if dark else "#1f9d63"
     palette = QPalette()
     for role, color in {
@@ -205,7 +206,7 @@ def _update_theme(app: QApplication, scheme: Qt.ColorScheme) -> None:
                                    border-radius: 6px; padding: 7px 12px; }}
         QPushButton:hover, QToolButton:hover {{ background: {hover}; border-color: {accent}; }}
         QPushButton:pressed, QToolButton:pressed {{ background: {selection}; }}
-        QPushButton[primary="true"] {{ background: {accent}; color: white;
+        QPushButton[primary="true"] {{ background: {accent}; color: {accent_text};
             border-color: {accent}; font-weight: 600; }}
         QPushButton:disabled, QToolButton:disabled {{ background: {alt}; color: {muted};
             border-color: {border}; }}
@@ -213,7 +214,7 @@ def _update_theme(app: QApplication, scheme: Qt.ColorScheme) -> None:
         QAbstractSpinBox:focus {{ border: 2px solid {accent}; }}
         /* Button roles (gui/controls.py). Secondary is the plain style above. */
         QPushButton[role="primary"], QToolButton[role="primary"] {{ background: {accent};
-            color: white; border-color: {accent}; font-weight: 600; }}
+            color: {accent_text}; border-color: {accent}; font-weight: 600; }}
         QPushButton[role="quiet"], QToolButton[role="quiet"] {{ background: transparent;
             border-color: transparent; color: {muted}; padding: 7px 8px; }}
         QPushButton[role="quiet"]:hover, QToolButton[role="quiet"]:hover {{
@@ -293,7 +294,7 @@ def _update_theme(app: QApplication, scheme: Qt.ColorScheme) -> None:
             color: {text}; }}
         QPushButton[chip="page"] {{ min-width: 18px; padding: 6px 10px; }}
         QPushButton[chip="page"]:checked {{ background: {accent}; border-color: {accent};
-            color: white; font-weight: 600; }}
+            color: {accent_text}; font-weight: 600; }}
         QFrame#choiceCard {{ background: {panel}; border: 1px solid {border};
             border-radius: 10px; }}
         QFrame#choiceCard:hover {{ border-color: {accent}; }}
@@ -310,7 +311,7 @@ def _update_theme(app: QApplication, scheme: Qt.ColorScheme) -> None:
         QFrame#chatComposer {{ background: {panel}; border: 1px solid {border};
             border-radius: 14px; }}
         QFrame#chatComposer QPlainTextEdit {{ background: transparent; border: 0; padding: 4px 0; }}
-        QToolButton#chatSend {{ background: {accent}; color: white; border-radius: 15px; }}
+        QToolButton#chatSend {{ background: {accent}; color: {accent_text}; border-radius: 15px; }}
         QToolButton#chatSend:hover {{ background: #0a958b; }}
         QToolButton#chatSend:disabled {{ background: {alt}; color: {muted}; }}
         QComboBox#chatModelChip {{ background: transparent; border: 1px solid transparent;

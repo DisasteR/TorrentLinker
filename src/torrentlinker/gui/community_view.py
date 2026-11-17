@@ -122,7 +122,32 @@ class BundledView(QWidget):
                 )
                 info.block(not allowed)
 
+        channel_name = self.channel_name
+        host_view = self
+
         class LocalPage(QWebEnginePage):
+            def createWindow(self, window_type):
+                if channel_name != "upload":
+                    return None
+                from PySide6.QtWidgets import QDialog, QVBoxLayout
+
+                dialog = QDialog(host_view)
+                dialog.setWindowTitle("Postimages")
+                dialog.resize(740, 720)
+                view = QWebEngineView(dialog)
+                # No WebChannel, file access or application bridge in remote content.
+                page = QWebEnginePage(view)
+                view.setPage(page)
+                page.settings().setAttribute(
+                    QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, False
+                )
+                layout = QVBoxLayout(dialog)
+                layout.addWidget(view)
+                page.windowCloseRequested.connect(dialog.close)
+                dialog.finished.connect(lambda _: view.setUrl(QUrl("about:blank")))
+                dialog.show()
+                return page
+
             def acceptNavigationRequest(
                 self,
                 url: QUrl | str,
@@ -158,6 +183,8 @@ class BundledView(QWidget):
             QWebEngineSettings.WebAttribute.LocalStorageEnabled,
         ):
             settings.setAttribute(attribute, False)
+        if self.channel_name == "upload":
+            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
         self.channel = QWebChannel(page)
         self.channel.registerObject(self.channel_name, self.bridge)
         page.setWebChannel(self.channel)

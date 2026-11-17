@@ -12048,4 +12048,11 @@ c411 refuse un upload dont l’uploader ne partage pas : ne le publiez pas avant
         <translation>Exporter l’historique de la communauté</translation>
     </message>
 </context>
+<context>
+    <name>UploadBoard</name>
+    <message>
+        <source>Upload preparation tools</source>
+        <translation>Outils de préparation de l’upload</translation>
+    </message>
+</context>
 </TS>
