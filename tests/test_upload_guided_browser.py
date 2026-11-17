@@ -123,7 +123,7 @@ def test_manual_upload_and_postimages_return_preserve_description(tmp_path, host
             page.locator("#upload-source").fill("Création personnelle")
             page.locator("#upload-save-local").click()
             expect(page.locator("#upload-save-state")).to_contain_text(
-                "enregistr", ignore_case=True
+                "Enregistré localement · Version"
             )
             page.locator("#upload-guided-back").click()
             frame.locator('[data-step="3"]').click()
