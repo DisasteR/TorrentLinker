@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
-    QDoubleSpinBox,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -25,7 +24,6 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
-    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -35,6 +33,8 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
+from torrentlinker.gui.controls import ScrollDoubleSpinBox as QDoubleSpinBox
+from torrentlinker.gui.controls import ScrollSpinBox as QSpinBox
 from torrentlinker.gui.controls import icon_button, set_role
 from torrentlinker.gui.errors import error_text
 from torrentlinker.gui.library_model import human_size
@@ -793,7 +793,9 @@ class PlanView(QGroupBox):
         )
 
     def invalidate(self) -> None:
-        self.begin()
+        # Editing must not disable the focused input: Qt advances focus and scrolls
+        # to the next enabled control when a spin box is disabled mid-keystroke.
+        self._clear_result()
         self.busy(False)
         self.summary.setText(self.tr("Plan options changed. Make a new Plan to apply them."))
 
@@ -858,15 +860,19 @@ class PlanView(QGroupBox):
 
     def begin(self) -> None:
         """Clear the previous result while a new Plan is being prepared."""
-        self.plan = None
+        self._clear_result()
         self.empty_state.label.setText(self.tr("Making a Plan…"))
+        self.busy(True)
+
+    def _clear_result(self) -> None:
+        self.plan = None
+        self.empty_state.label.setText(self.tr("Make a Plan to see suggested torrents here."))
         self.catalogue_notice.clear()
         self.catalogue_notice.hide()
         self._show_times()
         self.table.setRowCount(0)
         self.space_table.setRowCount(0)
         self.space_table.hide()
-        self.busy(True)
 
     def busy(self, busy: bool, text: str | None = None) -> None:
         self._busy = busy

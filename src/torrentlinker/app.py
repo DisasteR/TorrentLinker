@@ -199,6 +199,9 @@ def main() -> int:
     QCoreApplication.setApplicationName("TorrentLinker")
     QCoreApplication.setOrganizationName("TorrentLinker")
     apply_ui_scale(Settings.load(data_dir() / "settings.json").ui_scale)
+    from torrentlinker.gui.windows_identity import set_app_id
+
+    set_app_id()
     app = QApplication(sys.argv)
     show_unexpected_errors()
     app.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "icon.png")))

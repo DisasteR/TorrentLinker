@@ -57,10 +57,10 @@ def test_choosing_deluge_saves_it_and_the_app_connects_through_deluge(  # type: 
     window = MainWindow(settings, tmp_path / "settings.json", Store(tmp_path / "s.db"))
     qtbot.addWidget(window)
     window.qbit()
-    assert window._qbit is not None and isinstance(window._qbit[1], DelugeApi)
+    assert isinstance(window.qbit()._inner, DelugeApi)
     settings.client = TorrentClient.QBITTORRENT
     window.qbit()
-    assert isinstance(window._qbit[1], QbitApi)  # a new choice takes effect at once
+    assert isinstance(window.qbit()._inner, QbitApi)  # a new choice takes effect at once
 
 
 def test_choosing_transmission_saves_it_and_the_app_connects_through_it(  # type: ignore[no-untyped-def]
@@ -90,7 +90,7 @@ def test_choosing_transmission_saves_it_and_the_app_connects_through_it(  # type
     window = MainWindow(settings, tmp_path / "settings.json", Store(tmp_path / "s.db"))
     qtbot.addWidget(window)
     window.qbit()
-    assert window._qbit is not None and isinstance(window._qbit[1], TransmissionApi)
+    assert isinstance(window.qbit()._inner, TransmissionApi)
 
 
 @pytest.mark.parametrize("accept", [True, False])
