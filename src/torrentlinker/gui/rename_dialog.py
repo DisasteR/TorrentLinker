@@ -1,6 +1,7 @@
 """Review torrent-client path changes without growing beyond the screen."""
 
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QKeySequence, QShortcut, QShowEvent
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -56,3 +57,17 @@ class RenameDialog(QDialog):
             shortcut = QShortcut(QKeySequence(key), self)
             shortcut.setAutoRepeat(False)
             shortcut.activated.connect(action)
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        # Qt positions modal windows relative to their parent. Fit the decorated
+        # frame after that placement, including off-screen parents and taskbars.
+        QTimer.singleShot(0, self._fit_position)
+
+    def _fit_position(self) -> None:
+        area = self.screen().availableGeometry()
+        frame = self.frameGeometry()
+        self.move(
+            max(area.left(), min(frame.left(), area.right() - frame.width() + 1)),
+            max(area.top(), min(frame.top(), area.bottom() - frame.height() + 1)),
+        )

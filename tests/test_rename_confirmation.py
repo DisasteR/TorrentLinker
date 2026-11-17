@@ -25,11 +25,14 @@ def panel_for(qtbot, tmp_path):
     return panel
 
 
+@pytest.mark.parametrize("parent_offset", [None, (1500, 1000)])
 def test_long_rename_confirmation_keeps_buttons_visible_and_every_path_reviewable(
-    qtbot, tmp_path, monkeypatch
+    qtbot, tmp_path, monkeypatch, parent_offset
 ):
     monkeypatch.setattr(QMessageBox, "question", QUESTION)
     panel = panel_for(qtbot, tmp_path)
+    if parent_offset:
+        panel.move(*parent_offset)
     renames = {
         f"Horace.and.Pete.2016.S01.VOSTFR.1080p.WEB-DL.AAC2.0.x264-PROPER/"
         f"Horace.and.Pete.2016.S01E{i:02}.VOSTFR.1080p.WEB-DL.AAC2.0.x264-PROPER.mkv": (
@@ -42,6 +45,7 @@ def test_long_rename_confirmation_keeps_buttons_visible_and_every_path_reviewabl
     def inspect():
         dialog = QApplication.activeModalWidget()
         observed["fits"] = dialog.screen().availableGeometry().contains(dialog.frameGeometry())
+        observed["geometry"] = (dialog.frameGeometry(), dialog.screen().availableGeometry())
         observed["buttons"] = all(
             dialog.rect().contains(button.mapTo(dialog, button.rect().bottomRight()))
             for button in dialog.findChildren(QPushButton)
@@ -56,7 +60,7 @@ def test_long_rename_confirmation_keeps_buttons_visible_and_every_path_reviewabl
 
     QTimer.singleShot(50, inspect)
     assert not panel._confirm_renames(renames)
-    assert observed["fits"], "rename confirmation extends beyond the available screen"
+    assert observed["fits"], observed["geometry"]
     assert observed["buttons"]
     assert observed["paths"] == sorted(renames.items())
 
