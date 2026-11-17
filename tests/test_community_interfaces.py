@@ -125,6 +125,22 @@ def test_native_approved_design_and_persistent_editor(qtbot, tmp_path, monkeypat
     target = Path(os.getenv("TL_COMMUNITY_SCREENSHOTS", str(tmp_path)))
     target.mkdir(parents=True, exist_ok=True)
     assert view.grab().save(str(target / "tl-community-desktop.png"))
+
+    # DOM success is insufficient: Wayland GPU failures leave a live but black view.
+    def rendered_pixels():
+        image = view.grab().toImage()
+        return (
+            len(
+                {
+                    image.pixelColor(x, y).rgb()
+                    for x in range(20, image.width(), 40)
+                    for y in range(20, image.height(), 40)
+                }
+            )
+            > 10
+        )
+
+    qtbot.waitUntil(rendered_pixels, timeout=5000)
     js(qtbot, view, "document.querySelector('[data-tab=queue]').click()")
     assert js(qtbot, view, "document.querySelectorAll('.calendar-cell').length") == 7
     js(qtbot, view, "document.querySelector('[data-command=automation]').click()")

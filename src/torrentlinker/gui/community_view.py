@@ -7,12 +7,13 @@ no browser session, arbitrary URL, filesystem or general API is exposed to JS.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QUrl, Signal, Slot
-from PySide6.QtGui import QCloseEvent, QDesktopServices, QHideEvent, QShowEvent
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QHideEvent, QShowEvent
 from PySide6.QtWidgets import QFileDialog, QVBoxLayout, QWidget
 
 from torrentlinker.community import message_library
@@ -83,6 +84,12 @@ class CommunityView(QWidget):
 
     def _load_view(self) -> None:
         # Load Chromium only when the Community tab is opened.
+        # Wayland's GBM/Vulkan texture import can leave a live page entirely black.
+        # This HTML workspace needs no GPU. Keep Qt's media/3D rendering unchanged.
+        if QGuiApplication.platformName().startswith("wayland"):
+            flags = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+            if "--disable-gpu" not in flags.split():
+                os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = f"{flags} --disable-gpu".strip()
         from PySide6.QtWebChannel import QWebChannel
         from PySide6.QtWebEngineCore import (
             QWebEnginePage,
