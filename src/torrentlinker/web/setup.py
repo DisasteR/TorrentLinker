@@ -262,6 +262,8 @@ class Setup:
                     self.secrets.get(self.settings.secret_name(name + "-password"))
                 ),
                 "has_api_key": bool(self.secrets.get(self.settings.secret_name("qbit-api-key"))),
+                "has_proxy_password": bool(self.secrets.get("proxy-password")),
+                "has_announce_url": bool(self.secrets.get("announce-url")),
                 # Without adult content, XXX is left out of every picker (read-only here).
                 "indexer_categories": {
                     str(key): asdict(self.settings.indexer_categories[key])

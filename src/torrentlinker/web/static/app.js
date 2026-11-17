@@ -352,6 +352,10 @@ function step(name) {
 }
 async function refreshSetup() {
   state.setup = await api("setup");
+  // The form below represents this saved profile, even after leaving Add client.
+  state.addingClient = false;
+  $("client-password").value = "";
+  $("client-key").value = "";
   // XXX choices and the Media XXX panel only once adult content is enabled.
   for (const node of document.querySelectorAll("[data-adult]")) node.hidden = !state.setup.adult_content;
   if (!state.clientId) state.clientId = state.setup.client_id;
@@ -463,7 +467,23 @@ function renderCapabilities() {
     }),
   );
 }
+function renderSecretHints() {
+  const setup = state.setup || {};
+  const editingSavedClient = !state.addingClient && $("client-kind").value === setup.client;
+  const fields = [
+    ["client-password", editingSavedClient && setup.has_password],
+    ["client-key", editingSavedClient && setup.has_api_key],
+    ["proxy-password", setup.has_proxy_password],
+    ["announce-url", setup.has_announce_url],
+  ];
+  for (const [id, saved] of fields) {
+    $(id).placeholder = saved
+      ? say("Saved · leave blank to keep", "Enregistré · laisser vide pour conserver")
+      : say("Not saved", "Non enregistré");
+  }
+}
 function clientKind() {
+  renderSecretHints();
   $("username-label").hidden = $("client-kind").value === "deluge";
   $("client-key").parentElement.hidden =
     $("client-kind").value !== "qbittorrent";
@@ -1534,6 +1554,7 @@ $("language").onchange = () => {
   language = $("language").value;
   localStorage.setItem("tl-language", language);
   translate();
+  renderSecretHints();
   document.dispatchEvent(new Event("tl-language-changed"));
   if (state.view === "setup" && state.settingsSection === "agents") guard(loadAgents);
   if (state.view === "zen") { guard(loadZenSeeding); retranslatePlan(); if (profileState) showZenProfile(profileState); }
@@ -1640,8 +1661,11 @@ guard(async () => {
 
 $("save-announce").onclick = () =>
   guard(async () => {
-    await api("setup/announce", { value: $("announce-url").value });
-    $("announce-url").value = "";
+    const value = $("announce-url").value;
+    await api("setup/announce", { value });
+    if ($("announce-url").value === value) $("announce-url").value = "";
+    state.setup.has_announce_url = true;
+    renderSecretHints();
     toast(say("Announce URL saved.", "URL d’annonce enregistrée."));
   });
 $("refresh-profile").onclick = () =>
@@ -1654,15 +1678,16 @@ $("refresh-profile").onclick = () =>
 
 $("save-proxy").onclick = () =>
   guard(async () => {
+    const password = $("proxy-password").value;
     await api("setup/proxy", {
       address: $("proxy-address").value,
       username: $("proxy-username").value,
       torrent_client: $("proxy-client").checked,
-      ...($("proxy-password").value
-        ? { password: $("proxy-password").value }
-        : {}),
+      ...(password ? { password } : {}),
     });
-    $("proxy-password").value = "";
+    if (password) state.setup.has_proxy_password = true;
+    if ($("proxy-password").value === password) $("proxy-password").value = "";
+    renderSecretHints();
     toast(
       say(
         "Proxy settings saved. Test the connection again.",
@@ -1751,6 +1776,7 @@ $("add-client").onclick = () => {
   $("reseed-folder-settings").hidden = true;
   $("client-name").value = ""; $("client-host").value = "";
   $("client-username").value = ""; $("client-password").value = ""; $("client-key").value = "";
+  renderSecretHints();
   $("client-name").focus();
 };
 $("default-client").onclick = () => guard(async () => {

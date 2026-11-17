@@ -185,8 +185,19 @@ def test_the_day_is_rounded_once_on_the_total() -> None:
     assert day.paid == round(day.total)
 
 
-def test_c411_worked_example_rounds_the_total_with_its_bonus() -> None:
-    assert round(18.7 * 1.25) == 23
+@pytest.mark.parametrize(
+    ("hours", "expected", "paid"),
+    [(0.49, 0.0, 0), (0.5, 0.0796875, 0), (12, 1.9125, 2), (24, 3.825, 4)],
+)
+def test_official_tanker_example_through_the_estimator(hours, expected, paid) -> None:
+    # c411 /guide/tokens: fifteen 4 GB films, ninety seed days, note 1.7,
+    # +5% class bonus, approximately four Zen for a full day.
+    torrents = [ZenTorrent(4 * GB, 100, seed_days=90) for _ in range(15)]
+    day = estimate(ZenProfile(ZenClass.TANKER, seed_hours=hours), torrents)
+    assert day.notes == pytest.approx([1.7] * 15)
+    assert day.multiplier == pytest.approx(1.05)
+    assert day.total == pytest.approx(expected)
+    assert day.paid == paid
 
 
 def test_a_reuploader_earns_nothing_from_seeding_and_a_rough_amount_per_upload() -> None:

@@ -1,11 +1,12 @@
 """Zen rules: how c411 pays Zen for seeding, as one dated data table (ADR-0005).
 
-Sources, updated 2026-11-16:
+Sources, checked against the authenticated wiki and guide on 2026-11-17:
 
 - OFFICIAL — c411's guide (c411.org/guide/tokens): nightly payout for the previous
   day; the value of the torrents that count for the Class is summed, multiplied by the
   Class bonus, divided by 7; torrents are grouped by the bonuses that apply to them and
-  each group was rounded to the nearest integer (superseded by the formula below);
+  each group is rounded to the nearest integer. The single-group estimator below
+  does not model separate bonus eligibility for self-uploaded torrents;
   Seed classes are prorated by the previous day's seed time with at least 30 minutes
   per torrent; Tanker Class bonus +5 % at 15 torrents up to +35 %
   at 750; the progression tree adds up to +5 %; worked example: a Tanker seeding 15
@@ -27,13 +28,21 @@ Sources, updated 2026-11-16:
   payout = round(T × P × S × I ÷ 7 × (1 + B)), with T the torrents counted, P the share
   of the day seeded, S their average weight, I their average note and B the bonus. With
   I averaged by weight, T × S × I is the sum of each torrent's weight × note, which is
-  how torrents are counted here; the total is rounded once.
+  how torrents are counted here; this estimates one common-bonus group.
 
 - OFFICIAL WEIGHT EXCERPT — supplied on 2026-11-16, superseding the October size
   weights recorded in ADR-0005: size / 4 GB up to 4 GB, with a minimum of 0.0001.
   Published weights above 4 GB are 1.01 at 4 GiB, 1.26 at 25 GB and 1.40 at 60 GB.
   An exponent of 1/8 fits those rounded examples; the exact curve is not published
   in the excerpt. The Swarm Keeper category, seed-age and rarity tables still match.
+
+- REMAINING UNCERTAINTY (#72) — the November 17 guide and class scoring modal do
+  not specify the precision or order of per-torrent weight × day-share truncation.
+  The issue reports that a minimum-weight torrent shared for half a day counts zero,
+  but that alone does not establish a general rounding rule. This estimator retains
+  fractional contributions until payout rounding; tiny-torrent totals may differ.
+  Do not silently choose a decimal precision or fit an exact large-torrent formula
+  from rounded examples. Recorded historical payouts are never recalculated.
 
 Every figure is an estimate.
 """
